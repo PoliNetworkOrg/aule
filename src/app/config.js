@@ -31,7 +31,9 @@ let _mapboxTokenPromise = null;
 
 export function getMapboxToken() {
   if (!_mapboxTokenPromise) {
-    _mapboxTokenPromise = fetchJson(`${getApiBase()}/v1/config`, Infinity)
+    // Only the validated token promise is reusable; an incomplete response
+    // must be fetched again when the next call retries after a failure.
+    _mapboxTokenPromise = fetchJson(`${getApiBase()}/v1/config`)
       .then((cfg) => {
         if (!cfg?.mapboxToken) throw new Error("/v1/config returned no mapboxToken");
 

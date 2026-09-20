@@ -662,7 +662,9 @@ class InfoPage {
     try {
       const { repo, commits, langs, contributors, stargazers } = await queryClient.fetchQuery({
         queryKey: ["github-stats", GITHUB_REPO],
-        staleTime: STATS_CACHE_TTL,
+        // The complete in-memory/localStorage caches above own freshness.
+        // Partial responses must retry on the next render, as upstream does.
+        staleTime: 0,
         queryFn: async () => {
           const base = `https://api.github.com/repos/${GITHUB_REPO}`;
           const hdrs = { headers: { Accept: "application/vnd.github+json" } };

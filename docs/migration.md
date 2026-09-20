@@ -2,7 +2,7 @@
 
 ## Source and scope
 
-The source is the existing local clone at `/home/ubuntu/dev/PoliAule`, fetched from `origin/dev` and exported at `9b1b476172bcded479611588eeccce069aef187d`. The clone's working tree and checked-out branch were left unchanged. Upstream has no application test suite to port; no application tests or test dependencies were added.
+The initial migration used the existing local clone at `/home/ubuntu/dev/PoliAule`, fetched from `origin/dev` and exported at `9b1b476172bcded479611588eeccce069aef187d`. The clone's working tree and checked-out branch were left unchanged. During the completion review on 2026-09-20, that clone was unavailable on the current machine; a temporary source archive at the same revision was used for comparison, after confirming that it still matched upstream `dev`. Upstream has no application test suite to port; no application tests or test dependencies were added.
 
 The original application modules, component styles, assets, locale files, data snapshot, Python scripts, Cloudflare workers, and data-refresh workflows are retained. The upstream license and original documentation are in `docs/upstream/`. No application feature was deliberately dropped.
 
@@ -45,6 +45,21 @@ The workers and scheduled data-refresh workflows have been carried over, not dep
 - Chromium checks against the original `dev` app at desktop (1440×1000) and mobile (390×844): availability results, classroom details, favourites, info/back navigation, search, and settings. Both versions produced matching route URLs, stored favourites, and search results, without page errors. Screenshots and computed styles were compared.
 - Production-preview checks for numeric and named classroom bookmarks, info links, outer query preservation, direct-link close, language/24-hour preferences, and Campus map rendering.
 - Beta output favicons and API preconnect were checked against upstream beta assets, and stable source assets remained unchanged. Built CSS was checked for both prefixed and unprefixed blur declarations.
+
+### Completion review
+
+Fresh installation, production and beta builds, lint/format checks, and both worker typechecks passed on the continuation machine. Temporary lint probes confirmed that anti-slop rejects unknown type aliases and shadcn rejects unknown classes and raw Tailwind palette colors. The probes were removed. Public assets, translations, and the classroom snapshot match upstream byte-for-byte.
+
+Chromium comparisons against upstream at 1440×1000 and 390×844 matched the sampled layout dimensions, fonts, colors, classroom URLs, favourite state, info/back navigation, and outer query preservation, with no page errors. Malformed classroom bookmarks also retained upstream's home view behavior. Physical-device haptics and Safari-specific transitions remain unverified.
+
+The review found and fixed two migration-specific cache regressions. Query freshness previously prevented the existing controllers from retrying an incomplete map configuration or partial GitHub statistics. These queries now use the default immediate staleness; the existing validated-token promise and complete statistics caches still prevent unnecessary requests. No automatic retries were introduced.
+
+Reproducible browser checks used intercepted responses against both upstream and the migrated app:
+
+1. Return HTTP 200 with `{}` from `/v1/config`, then a configuration containing a placeholder public map token. Call `getMapboxToken()` three times sequentially. The first call must reject, the second must recover, and the third must reuse the successful token: two requests total. Before the fix, the migrated app made one request and failed all three calls.
+2. Make the first GitHub `/languages` response fail while the other statistics endpoints succeed, then let all endpoints succeed. Request statistics three times sequentially. The second call must recover the language data and the third must reuse the complete cache: ten endpoint requests total. Before the fix, the migrated app made five requests and never recovered the missing languages.
+
+These checks passed after the fixes and matched upstream. They were temporary browser verification, not a new committed test suite.
 
 Run worker checks independently:
 
