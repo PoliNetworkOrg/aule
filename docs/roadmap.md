@@ -28,4 +28,8 @@ Each item depends on the preceding contracts and is complete only after its impl
 
 - Availability sections, partial-free filtering, and the building overview now render in React. The overview keeps its original typed zoom and scroll geometry, and all classroom-card consumers now use the shared React component. Desktop/mobile comparisons match result ordering, query context, filters, overview counts, and Campus links.
 
-Step 3 remains in progress. Shared classroom cards now render in React across every view. Other views and startup also remain on the legacy controllers. There are 3 frontend JavaScript modules left; `allowJs` remains enabled until they are converted. The complete frontend migration is not finished.
+- Info content and GitHub statistics now render in React. Desktop/mobile comparisons preserve formatted translations, installation tabs, partial-response retries, and completed-cache reuse.
+
+- Classroom detail, photos, weekly timelines, day selectors, favourite icons, and occupation popovers now render in React. Numeric/named bookmarks, mobile selection, metadata, refresh, and Info return checks preserve the source. Shared pill controls no longer clone HTML.
+
+Steps 1–3 are complete. Step 4 remains: startup is the one remaining frontend JavaScript module, and `allowJs` remains enabled until it is converted. The complete migration is not finished.

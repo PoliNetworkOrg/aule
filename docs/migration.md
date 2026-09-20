@@ -139,3 +139,9 @@ Production/beta builds and lint pass. Temporary Chromium comparisons at desktop/
 Info content, formatted translations, installation instructions, and GitHub statistics now render in React. Typed controllers retain the original transitions, reveal measurements, mobile tabs, and cache behavior. Cleanup releases listeners, observers, timers, and the content root.
 
 Production/beta builds and lint pass. Temporary desktop/mobile comparisons matched text, inline formatting, sampled geometry, platform tabs, route reopening, and partial GitHub failure recovery without browser errors. Both versions made five requests initially, retried all five on reopening after a partial failure, and reused the complete cache on the third opening. Two frontend JavaScript modules remain: classroom detail and startup.
+
+### React classroom-detail checkpoint
+
+Classroom headers, features, photos, weekly timelines, day-selector labels, favourite icons, and occupation popovers now render in React. Typed controllers retain the source's photo decoding, transitions, timeline geometry, hover/tap behavior, and query context. Refresh and teardown release schedule listeners, popovers, intervals, and pill animation state. The shared pill engine now only positions React-rendered labels; its HTML-cloning mode is removed.
+
+Desktop/mobile comparisons cover numeric and named classroom links, favourites, mobile day selection, lesson metadata, manual refresh, and returning from Info. A native hash change exposed an integration bug: browser-created history entries can have null state. The hash adapter now supplies TanStack's default state for those entries. Hidden mobile duplicate labels exist in React on desktop; they do not affect visible layout. Production/beta builds and lint pass. Startup is the one remaining frontend JavaScript module.

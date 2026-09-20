@@ -92,7 +92,9 @@
           "data-reload-label",
           "bo-count-label",
           "info-intro",
-          "info-section-text"
+          "info-section-text",
+          "timeline-time-indicator",
+          "timeline-popover-body"
         ]
       }
     ],

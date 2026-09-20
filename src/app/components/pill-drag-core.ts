@@ -70,7 +70,6 @@ interface PillDragOptions {
   hit: HTMLElement;
   activeRow: HTMLElement;
   cellSelector: string;
-  activeCellClass?: string;
   liftedClass?: string;
   tapScale?: number;
   trail?: { follow: number; give: number; giveCross: number };
@@ -80,8 +79,6 @@ interface PillDragOptions {
   onRender?: (frame: { pos: number }) => void;
   onPillTap?: () => void;
   onChange?: (index: number, options: { silent: boolean }) => void;
-  // React controls render their own duplicate labels; the engine only positions them.
-  cloneCells?: boolean;
 }
 
 export function createPillDragCore({
@@ -91,7 +88,6 @@ export function createPillDragCore({
   hit,
   activeRow,
   cellSelector,
-  activeCellClass = "pill-active-cell",
   liftedClass = "pill--lifted",
   tapScale = 1.3,
   trail = TRAIL,
@@ -101,7 +97,6 @@ export function createPillDragCore({
   onRender,
   onPillTap,
   onChange,
-  cloneCells = true,
 }: PillDragOptions) {
   const events = new AbortController();
   const signal = events.signal;
@@ -190,17 +185,10 @@ export function createPillDragCore({
     // One duplicate per cell, centered on that cell's own anchor midpoint
     // rather than laid out by flex — see .bn-tab-active in bottom-nav.css
     // for why sub-pixel drift between two flow layouts is worth avoiding.
-    if (cloneCells) activeRow.replaceChildren();
     cells.forEach((el, i) => {
-      const dup = cloneCells ? document.createElement("span") : activeRow.children[i];
+      const dup = activeRow.children[i];
 
       if (!(dup instanceof HTMLElement)) return;
-
-      if (cloneCells) {
-        dup.className = activeCellClass;
-        dup.innerHTML = el.innerHTML;
-        activeRow.appendChild(dup);
-      }
 
       dup.style.left = anchors[i].pos + anchors[i].size / 2 + "px";
       dup.style.transform = "translateX(-50%)";

@@ -25,7 +25,7 @@ import { haptics, defaultPatterns } from "./haptics.ts";
 interface DateSelectorOptions {
   isSkipped?: (element: HTMLElement) => boolean;
   onSelect?: (element: HTMLElement, options: { silent: boolean }) => void;
-  rendered?: {
+  rendered: {
     items: HTMLElement;
     indicator: HTMLElement;
     activeRow: HTMLElement;
@@ -39,7 +39,7 @@ export function createPillSelector(
     isSkipped = (el) => el.classList.contains("date-skipped"),
     onSelect,
     rendered,
-  }: DateSelectorOptions = {},
+  }: DateSelectorOptions,
 ) {
   // container's own parent — .date-picker / .detail-schedule-day-selector,
   // both already position:relative. The indicator (+ hit overlay) live here
@@ -52,49 +52,7 @@ export function createPillSelector(
   const wrapper = container.parentElement!;
   const events = new AbortController();
 
-  const indicator =
-    rendered?.indicator ?? wrapper.querySelector<HTMLElement>(":scope > .date-indicator")!;
-
-  if (!rendered) wrapper.appendChild(indicator); // move after `container` in case of re-init (refresh() re-runs this)
-
-  // Wrap the real cells in their own layer so a pill-shaped hole can be
-  // clipped out of them while the indicator is lifted — same reason
-  // .bn-tabbar-items exists in bottom-nav.css/js. Idempotent across repeated
-  // createPillSelector() calls on the same container (setupDatePicker can
-  // re-run): reuse an existing wrapper and just re-adopt whatever cells
-  // currently sit as direct children.
-  let items =
-    rendered?.items ?? container.querySelector<HTMLElement>(":scope > .date-picker-items");
-
-  if (!items) {
-    items = document.createElement("div");
-    items.className = "date-picker-items";
-    container.insertBefore(items, container.firstChild);
-  }
-
-  const adoptCells = () =>
-    Array.from(container.querySelectorAll(":scope > .date-element-container")).forEach((el) =>
-      items!.appendChild(el),
-    );
-
-  if (!rendered) adoptCells();
-
-  // Accent-colored cell duplicates (.bn-active-row's equivalent) live in an
-  // overflow:hidden inner layer that blurs while lifted (.bn-pill-inner's).
-  const activeRow = rendered?.activeRow ?? document.createElement("div");
-  const hit = rendered?.hit ?? document.createElement("div");
-
-  if (!rendered) {
-    indicator.querySelector(":scope > .date-indicator-inner")?.remove();
-    const inner = document.createElement("div");
-    inner.className = "date-indicator-inner";
-    activeRow.className = "date-indicator-active-row";
-    inner.appendChild(activeRow);
-    indicator.appendChild(inner);
-    wrapper.querySelector(":scope > .date-indicator-hit")?.remove();
-    hit.className = "date-indicator-hit";
-    wrapper.appendChild(hit);
-  }
+  const { indicator, items, activeRow, hit } = rendered;
 
   function shake() {
     indicator.classList.remove("shake");
@@ -114,8 +72,6 @@ export function createPillSelector(
     hit,
     activeRow,
     cellSelector: ".date-element-container",
-    cloneCells: !rendered,
-    activeCellClass: "date-indicator-cell",
     liftedClass: "date-indicator--lifted",
     tapScale: 1.6,
     // Wide row → the whole thing trails a bit more than the compact tabbar.
@@ -133,9 +89,6 @@ export function createPillSelector(
   // Call after (re)generating the cells, and whenever their layout can shift
   // (window resize, a hide-sundays toggle collapsing some cells).
   function refresh() {
-    // Cells regenerated elsewhere (date-picker.js clears + re-appends) land
-    // as direct children of `container` again — keep them inside `items`.
-    if (!rendered) adoptCells();
     core.refresh({ snap: true });
   }
 

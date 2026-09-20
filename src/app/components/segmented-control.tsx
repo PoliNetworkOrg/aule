@@ -54,9 +54,7 @@ export function SegmentedControl({
       hit: hit.current,
       activeRow: activeRow.current,
       cellSelector: ".seg-item",
-      activeCellClass: "seg-active-cell",
       liftedClass: "seg-pill--lifted",
-      cloneCells: false,
       onChange(index, { silent }) {
         if (!silent) current.current.onSelect(current.current.options[index].value);
       },

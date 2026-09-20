@@ -32,7 +32,7 @@ import {
   ensureClassroomDirectory,
   classroomsData as staticClassroomsData,
 } from "./classroom-search-data.ts";
-import { classroomDetail } from "./components/classroom-detail.js";
+import { classroomDetail } from "./components/classroom-detail.tsx";
 import { infoPage } from "./components/info-page.tsx";
 
 import { initTimeControls } from "./components/time-controls-state.ts";

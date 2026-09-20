@@ -38,7 +38,6 @@ export function Toggle({ value, onChange, ref }: ToggleProps) {
       activeRow: activeRow.current,
       cellSelector: ".settings-toggle__cell",
       liftedClass: "seg-pill--lifted",
-      cloneCells: false,
       onPillTap: () => drag.select(drag.index === 1 ? 0 : 1),
       onChange(index, { silent }) {
         if (silent) return;
