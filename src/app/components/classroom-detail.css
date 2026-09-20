@@ -1,0 +1,1745 @@
+/* ── Classroom Detail Panel ────────────────────────────────────────── */
+
+/* Sits inside .body-container at the same level as .tab-content divs.
+   Hidden by default (via the [hidden] attribute); shown as a flex column
+   that fills the remaining space when the detail-open class is on body. */
+
+#classroom-detail-overlay:not([hidden]) {
+  @apply flex;
+  @apply flex-col;
+  flex: 1;
+  background: var(--background-color);
+}
+
+/* Fallback fade-in for browsers without View Transitions only. When VT IS
+   supported, `will-change: opacity` here promoted the overlay to its own
+   compositing layer, and Firefox (and Safari, until scrolled) then would not
+   composite the classroom photo into the header's backdrop-filter — the
+   progressive blur under the header on the detail page rendered blank. */
+@supports not (view-transition-name: none) {
+  #classroom-detail-overlay:not([hidden]) {
+    opacity: 0;
+    transition: opacity 0.22s ease;
+    will-change: opacity;
+  }
+}
+
+/* Extend this element's own box up behind the header (cancelling the shift
+   with matching padding, so children keep their normal position) — matches
+   .detail-photo-container's negative margin below; only relevant when a
+   photo is actually there to fill that reserved space. A VT names and
+   snapshots THIS element for the card→page zoom, and that snapshot is
+   clipped to its own layout box; without this, the photo's negative margin
+   overflows past that box and is simply absent from the animating snapshot,
+   only appearing once the transition ends and the real, unclipped DOM
+   takes over. */
+#classroom-detail-overlay:not([hidden]):has(.detail-photo-container) {
+  margin-top: calc(-1 * var(--header-height, 84px) - 0.5rem);
+  padding-top: calc(var(--header-height, 84px) + 0.5rem);
+}
+
+#classroom-detail-overlay.visible {
+  opacity: 1;
+}
+
+/* Hide tab contents and footer while the detail panel is open */
+body.detail-open .tab-content {
+  visibility: hidden;
+  @apply absolute;
+  opacity: 0;
+  @apply pointer-events-none;
+  height: 0;
+  @apply overflow-hidden;
+}
+
+body.detail-open .footer {
+  visibility: hidden;
+  @apply absolute;
+  opacity: 0;
+  @apply pointer-events-none;
+}
+
+/* Disable background animations while the detail panel is open to save CPU/GPU */
+body.detail-open .tab-content,
+body.detail-open .tab-content * {
+  animation: none !important;
+  transition: none !important;
+}
+
+/* ── Hero photo ─────────────────────────────────────────────────── */
+
+.detail-photo-container {
+  @apply relative;
+  @apply w-full;
+  aspect-ratio: 16 / 9;
+  @apply overflow-hidden;
+  background: color-mix(in srgb, var(--text-color-primary) 5%, transparent);
+  animation: detail-skeleton-pulse 1.4s ease-in-out infinite;
+
+  align-self: center;
+  flex-shrink: 0;
+
+  transition:
+    box-shadow 0.4s ease,
+    background-color 0.4s ease;
+
+  /* Cancel body-container's 0.5rem padding-top, then extend further up by
+     the header's own live-measured height (--header-height, kept in sync by
+     a ResizeObserver in script.js — it already grows for the 3.5rem
+     header-nav-row while the detail panel is open) so the photo shows
+     through the blurred header instead of sitting below it. Using the real
+     height instead of a fixed guess keeps this correct at every breakpoint. */
+  margin-top: calc(-1 * var(--header-height, 84px) - 0.5rem);
+}
+
+/* Mobile "Hero Header" style */
+@media (max-width: 599px) {
+  .detail-photo-container {
+    @apply w-full;
+    /* Stabilize height: no longer just a byproduct of width. */
+    aspect-ratio: auto;
+    height: 38vh;
+    min-height: 280px;
+    border-radius: 0;
+    box-shadow: none;
+  }
+}
+
+/* Desktop "Hero Header" style — full width like mobile, not a bounded card.
+   A bounded card here would make the card→page VT zoom read as "a giant
+   photo appeared" instead of "the page opened," since the photo would be
+   the only shape distinguishable from the (same-colored) page background. */
+@media (min-width: 600px) {
+  .detail-photo-container {
+    @apply w-full;
+    max-width: none;
+    aspect-ratio: 21 / 9;
+    border-radius: 0;
+    box-shadow: none;
+  }
+}
+
+.detail-photo-container.loaded {
+  animation: none;
+  background: var(--background-color-secondary);
+}
+
+@media (max-width: 599px) {
+  .detail-photo-container.loaded {
+    background: var(--background-color);
+  }
+}
+
+.detail-photo {
+  @apply block;
+  @apply w-full;
+  @apply h-full;
+  object-fit: cover;
+  object-position: center center;
+  border-radius: inherit; /* carry the container's border-radius into the VT snapshot */
+  opacity: 0;
+  transform: scale(1.05);
+  transition:
+    opacity 0.6s ease,
+    transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Use a mask to fade out the image itself at the bottom to avoid "line" artifacts
+     between the image and the background blur layer. */
+  mask-image: linear-gradient(to bottom, black 70%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black 70%, transparent 100%);
+}
+
+.detail-photo.loaded {
+  opacity: 1;
+  /* scale(1.001) keeps the image fractionally larger than its overflow:hidden
+     container at all times — including the final frame — so Safari never
+     recalculates the overflow clip and the repaint flicker doesn't occur. */
+  transform: scale(1.001);
+}
+
+.detail-photo-gradient {
+  @apply absolute;
+  @apply inset-0;
+  top: auto;
+  height: 180px;
+  opacity: 0;
+  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  @apply pointer-events-none;
+
+  mask-image: linear-gradient(
+    to top,
+    black 0%,
+    black 20%,
+    rgba(0, 0, 0, 0.5) 60%,
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(
+    to top,
+    black 0%,
+    black 20%,
+    rgba(0, 0, 0, 0.5) 60%,
+    transparent 100%
+  );
+
+  background: linear-gradient(
+    to top,
+    var(--background-color) 0%,
+    color-mix(in srgb, var(--background-color) 80%, transparent) 30%,
+    transparent 100%
+  );
+}
+
+.detail-photo.loaded + .detail-photo-gradient {
+  opacity: 1;
+}
+
+/* ── Header ─────────────────────────────────────────────────────── */
+
+/* Back button is a sibling of <header> (not a child — see index.html) so it
+   stays out of the app-header VT snapshot. Position it fixed over the empty
+   .header-nav-row band: the header is sticky at top:11px, and the nav row is
+   the bottom 3.5rem of it, so its vertical centre sits at
+   11px + --header-height - 1.75rem. */
+#detail-back-btn {
+  @apply fixed;
+  left: 1rem;
+  top: calc(11px + var(--header-height, 84px) - 1.75rem);
+  transform: translateY(-50%);
+  z-index: 1002; /* above .header (z-index: 1000) and the immersive photo */
+}
+
+#detail-back-btn[hidden] {
+  display: none;
+}
+
+.detail-header {
+  padding: 1.25rem 1.25rem 0.5rem;
+  @apply flex;
+  @apply flex-col;
+  gap: 0.125rem;
+  @apply items-start; /* Mobile default */
+}
+
+.detail-title-row {
+  @apply flex;
+  align-items: baseline;
+  @apply justify-between;
+  @apply w-full;
+  gap: 1rem;
+}
+
+@media (min-width: 600px) {
+  .detail-title-row {
+    @apply flex-col;
+    @apply items-center;
+    gap: 0.5rem;
+    width: auto;
+  }
+}
+
+.detail-status-wrapper {
+  @apply flex;
+  @apply flex-col;
+  @apply items-end;
+}
+
+@media (min-width: 600px) {
+  .detail-status-wrapper {
+    @apply items-center;
+  }
+}
+
+.detail-status-label {
+  font-size: var(--text-70);
+  font-weight: 700;
+  color: var(--text-color-secondary);
+  opacity: 0.65;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.1rem;
+}
+
+.detail-title-row .classroom-status-txt {
+  font-size: var(--text-100);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.85;
+}
+
+@media (min-width: 600px) {
+  .detail-header {
+    @apply items-center; /* Desktop centered */
+  }
+}
+
+@media (max-width: 599px) {
+  .detail-header {
+    padding-top: 1rem;
+    gap: 0;
+    @apply relative;
+    z-index: 2; /* Stay above the blur layer */
+
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: start;
+    text-align: left;
+  }
+
+  .detail-title-row {
+    display: contents;
+  }
+
+  .detail-title {
+    grid-column: 1;
+    grid-row: 1;
+    text-align: left;
+    /* Align perfectly with the floating back button */
+    padding-top: 0.25rem;
+    /* Shrink to text width (like it did as a flex item before) so the VT morph
+       from the card name stays positional rather than expanding across the full column */
+    width: fit-content;
+    max-width: 100%;
+  }
+
+  .detail-status-wrapper {
+    grid-column: 2;
+    grid-row: 1;
+    @apply flex;
+    @apply flex-col;
+    @apply items-end;
+    /* Match title's padding-top for alignment */
+    padding-top: 0.25rem;
+  }
+
+  .detail-subtitle {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    margin-bottom: 0.25rem;
+    text-align: left;
+    align-self: start;
+  }
+
+  .detail-stats {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    margin-top: 0;
+  }
+
+  /* Pull header up to overlay the blurred hero only when the photo container is present.
+     This also handles the photo-load-error case: once the container is removed from the DOM
+     the negative margin is lifted and the header reflows into its natural position. */
+  #classroom-detail-overlay:has(.detail-photo-container) .detail-header {
+    margin-top: -6rem;
+  }
+}
+
+.detail-title {
+  font-size: 1.875rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text-color-primary);
+  user-select: none;
+}
+
+.detail-stats {
+  @apply flex;
+  @apply flex-wrap;
+  gap: 0.75rem;
+  margin-top: 0.25rem;
+}
+
+.detail-stat {
+  @apply flex;
+  @apply items-center;
+  gap: 0.375rem;
+  font-size: var(--text-85);
+  font-weight: 600;
+  color: var(--text-color-secondary);
+}
+
+.detail-stat .hgi-stroke {
+  font-size: var(--text-110) !important;
+  color: var(--text-color-accent);
+}
+
+.detail-back-btn {
+  @apply relative;
+
+  width: 3rem;
+  height: 3rem;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  border: none;
+
+  /* Same glass material as .header-button (style.css) — this is styled as
+     one of the header buttons, just relocated over the nav row. */
+  background: var(--glass-tint);
+  box-shadow:
+    0 0 0 0.1px var(--glass-outline),
+    var(--glass-highlight),
+    0 4px 40px 0 var(--glass-shadow-color);
+  backdrop-filter: blur(var(--glass-blur-sm));
+  -webkit-backdrop-filter: blur(var(--glass-blur-sm));
+
+  color: var(--text-color-secondary);
+
+  @apply flex;
+  @apply items-center;
+  @apply justify-center;
+
+  transition:
+    background-color 0.2s ease,
+    box-shadow 0.2s ease;
+
+  /* Ensure the button and its content adapt their internal rendering to the theme */
+  color-scheme: light dark;
+}
+
+/* Outside 0.5px gradient stroke — same recipe as .header-button::after in
+   style.css. A radial-gradient mask, not the pill's box-corner + mask-
+   composite trick, since this is a true circle (see that file's comment on
+   the seam it avoids). */
+.detail-back-btn::after {
+  content: "";
+  @apply absolute;
+  inset: -0.5px;
+  border-radius: inherit;
+
+  background: var(--glass-stroke-gradient);
+  opacity: var(--glass-stroke-opacity);
+
+  -webkit-mask-image: radial-gradient(
+    circle closest-side,
+    transparent calc(100% - 0.5px),
+    #fff calc(100% - 0.5px)
+  );
+  mask-image: radial-gradient(
+    circle closest-side,
+    transparent calc(100% - 0.5px),
+    #fff calc(100% - 0.5px)
+  );
+
+  @apply pointer-events-none;
+}
+
+@media (prefers-color-scheme: dark) {
+  .detail-back-btn {
+    box-shadow:
+      0 0 0 0.1px var(--glass-outline),
+      var(--glass-highlight),
+      0 4px 40px 0 var(--glass-shadow-color);
+  }
+}
+
+@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .detail-back-btn {
+    background: color-mix(in srgb, var(--background-color-secondary) 95%, black);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .detail-back-btn {
+      background: color-mix(in srgb, var(--background-color-secondary) 95%, white);
+    }
+  }
+}
+
+/* Lit hover, press feedback and swipe-deform: shared .liquid-glass rules
+   (components/liquid-glass.{css,js}). The base rule keeps its own
+   `transform: translateY(-50%)` centring — .liquid-glass drives `translate`
+   and `scale` separately, so the two compose. */
+
+/* ── Content ─────────────────────────────────────────────────────── */
+
+.detail-content {
+  @apply w-full;
+  padding: 1rem 1.25rem 4rem;
+  max-width: 680px;
+  margin: 0 auto;
+  text-align: left;
+}
+
+.detail-subtitle {
+  margin: 0 0 1.5rem;
+  font-size: var(--text-100);
+  font-weight: 600;
+  text-align: left;
+}
+
+@media (min-width: 600px) {
+  .detail-subtitle {
+    text-align: center;
+    margin-bottom: 2rem;
+  }
+}
+
+/* ── Section ─────────────────────────────────────────────────────── */
+
+.detail-section {
+  margin-bottom: 2rem;
+}
+
+.detail-section-title {
+  font-size: var(--text-70);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-color-secondary);
+  margin: 0 0 0.75rem;
+}
+
+.detail-section-header {
+  @apply flex;
+  @apply items-center;
+  @apply justify-between;
+  gap: 0.5rem;
+  @apply flex-wrap;
+  margin-bottom: 0.75rem;
+}
+
+.detail-section-header .detail-section-title {
+  margin-bottom: 0;
+}
+
+.detail-schedule-legend {
+  @apply flex;
+  gap: 0.75rem;
+}
+
+.detail-schedule-legend-item {
+  @apply flex;
+  @apply items-center;
+  gap: 0.375rem;
+}
+
+.detail-schedule-legend-box {
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 2px;
+  background: var(--busy-gradient);
+  border: 1px solid color-mix(in srgb, var(--color-status-busy) 20%, black);
+  opacity: 0.85;
+}
+
+@media (prefers-color-scheme: dark) {
+  .detail-schedule-legend-box {
+    border-color: color-mix(in srgb, var(--color-status-busy) 20%, white);
+  }
+}
+
+.detail-schedule-legend-label {
+  font-size: var(--text-70);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-color-secondary);
+  opacity: 0.8;
+}
+
+/* ── Features ─────────────────────────────────────────────────────── */
+
+.detail-features {
+  @apply flex;
+  @apply flex-wrap;
+  gap: 0.5rem;
+}
+
+.detail-feature-chip {
+  @apply relative;
+
+  @apply inline-flex;
+  @apply items-center;
+  gap: 0.375rem;
+  padding: 0.4rem 0.875rem 0.4rem 0.625rem;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-90);
+  font-weight: 600;
+  color: var(--text-color-primary);
+
+  /* Same glass material as .header-button (style.css) — see the recipe
+     note at :root's --glass-tint definition there. */
+  background: var(--glass-tint);
+  box-shadow:
+    0 0 0 0.1px var(--glass-outline),
+    var(--glass-highlight),
+    0 4px 40px 0 var(--glass-shadow-color);
+  backdrop-filter: blur(var(--glass-blur-sm));
+  -webkit-backdrop-filter: blur(var(--glass-blur-sm));
+}
+
+/* Outside 0.5px gradient stroke — same recipe as .detail-back-btn::after
+   used to be, back when it was a pill (padding + mask-composite: exclude,
+   the box-corner trick for non-circular surfaces). */
+.detail-feature-chip::after {
+  content: "";
+  @apply absolute;
+  inset: -0.5px;
+  border-radius: inherit;
+  padding: 0.5px;
+
+  background: var(--glass-stroke-gradient);
+  opacity: var(--glass-stroke-opacity);
+
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+
+  @apply pointer-events-none;
+}
+
+@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .detail-feature-chip {
+    background: color-mix(in srgb, var(--background-color-secondary) 95%, black);
+  }
+}
+
+.detail-feature-chip .hgi-stroke {
+  font-size: var(--text-110);
+  color: var(--text-color-accent);
+}
+
+.detail-no-features {
+  font-size: var(--text-90);
+  margin: 0;
+}
+
+/* ── Weekly Schedule ─────────────────────────────────────────────── */
+
+/* Desktop: create space on the left for the today indicator */
+@media (min-width: 600px) {
+  .detail-schedule-inner {
+    padding-left: 4.5rem;
+  }
+}
+
+.detail-schedule-grid {
+  @apply relative;
+  @apply flex;
+  @apply flex-row;
+  gap: 0.875rem;
+  @apply items-center;
+  margin-bottom: 0.25rem;
+}
+
+/* Left pill: vertical date picker clone. Same glass material as
+   .date-picker-container (components/date-picker.css) — see the recipe
+   note at :root's --glass-tint definition in style.css. */
+.detail-schedule-labels-pill {
+  @apply relative;
+  flex-shrink: 0;
+  width: 3.75rem;
+  @apply flex;
+  @apply flex-col;
+  @apply justify-between;
+  gap: 0.75rem;
+
+  background: var(--glass-tint);
+  backdrop-filter: blur(var(--glass-blur-md));
+  -webkit-backdrop-filter: blur(var(--glass-blur-md));
+  border-radius: var(--radius-pill);
+  padding: 0.75rem 0.5rem;
+
+  box-shadow:
+    0 0 0 0.1px var(--glass-outline),
+    var(--glass-highlight),
+    0 4px 40px 0 var(--glass-shadow-color);
+}
+
+/* Outside 0.5px gradient stroke — same recipe as .date-picker-container::after
+   in date-picker.css. */
+.detail-schedule-labels-pill::after {
+  content: "";
+  @apply absolute;
+  inset: -0.5px;
+  border-radius: inherit;
+  padding: 0.5px;
+
+  background: var(--glass-stroke-gradient);
+  opacity: var(--glass-stroke-opacity);
+
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+
+  @apply pointer-events-none;
+}
+
+@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .detail-schedule-labels-pill {
+    background: color-mix(in srgb, var(--background-color-secondary) 95%, black);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .detail-schedule-labels-pill {
+      background: color-mix(in srgb, var(--background-color-secondary) 95%, white);
+    }
+  }
+}
+
+/* Override date-element-container sizing to fit the vertical pill */
+.detail-schedule-labels-pill .date-element-container {
+  aspect-ratio: unset;
+  @apply w-full;
+  height: 2.625rem; /* match bar height */
+}
+
+.detail-schedule-label-cell--today .date-day-of-week,
+.detail-schedule-label-cell--today .date-number {
+  color: var(--text-color-accent);
+  font-weight: bold;
+  opacity: 1;
+}
+
+/* Desktop Today indicator — floats to the left of the labels pill, points right */
+.detail-desktop-today-indicator {
+  display: none; /* shown only on desktop via media query below */
+}
+
+@media (min-width: 600px) {
+  .detail-desktop-today-indicator {
+    @apply block;
+    @apply absolute;
+    right: calc(100% + 8px); /* 8px gap between indicator and pill */
+
+    background: var(--text-color-accent);
+    color: white;
+    border-radius: var(--radius-pill);
+    padding: 3px 10px;
+    font-size: var(--text-72);
+    font-weight: 800;
+    white-space: nowrap;
+    cursor: default;
+    box-shadow: var(--glow-accent);
+
+    opacity: 0;
+    animation: detail-today-indicator-appear 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) 0.3s forwards;
+
+    will-change: transform, opacity;
+    transition: scale 0.15s ease;
+  }
+
+  .detail-desktop-today-indicator::after {
+    content: "";
+    @apply absolute;
+    left: 100%;
+    top: 50%;
+    transform: translateY(-50%);
+    border: 5px solid transparent;
+    border-left-color: var(--text-color-accent);
+  }
+
+  .detail-desktop-today-indicator.hidden {
+    display: none;
+  }
+}
+
+@media (min-width: 600px) and (prefers-color-scheme: dark) {
+  .detail-desktop-today-indicator {
+    background: var(--color-accent-dark);
+    box-shadow: 0 2px 8px rgba(40, 167, 69, 0.4);
+  }
+  .detail-desktop-today-indicator::after {
+    border-left-color: var(--color-accent-dark);
+  }
+}
+
+@keyframes detail-today-indicator-appear {
+  0% {
+    opacity: 0;
+    transform: translateX(-10px) scale(0.75);
+    filter: blur(4px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+/* Right column: grid lines + bar rows */
+.detail-schedule-bars {
+  @apply relative;
+  flex: 1;
+  @apply flex;
+  @apply flex-col;
+  gap: 0.75rem;
+}
+
+/* Vertical grid lines container */
+.detail-schedule-grid-lines {
+  @apply absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  @apply pointer-events-none;
+  z-index: 0;
+}
+
+.detail-schedule-grid-line {
+  @apply absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--pos);
+  width: 1px;
+  background: color-mix(in srgb, var(--text-color-primary) 8%, transparent);
+}
+
+.detail-schedule-row {
+  @apply relative;
+  z-index: 1;
+}
+
+.detail-schedule-bar-wrapper {
+  @apply relative;
+}
+
+.detail-schedule-bar {
+  @apply relative;
+  height: 2.625rem;
+  background: color-mix(in srgb, var(--text-color-primary) 5%, transparent);
+  border-radius: var(--radius-sm);
+  @apply overflow-hidden;
+  border: 1px solid color-mix(in srgb, var(--text-color-primary) 10%, transparent);
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease;
+}
+
+.detail-schedule-block {
+  @apply absolute;
+  top: 3px;
+  bottom: 3px;
+  /* Increased side gaps for better separation between consecutive blocks */
+  left: calc(var(--block-start) + 2px);
+  width: calc(var(--block-size) - 4px);
+  border-radius: var(--radius-xs);
+  background: var(--busy-gradient);
+  opacity: 0.85;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  border: 1px solid color-mix(in srgb, var(--color-status-busy) 20%, black);
+  transition:
+    opacity 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.detail-schedule-block:hover,
+.detail-schedule-block:focus-visible {
+  opacity: 1;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+}
+
+.detail-schedule-block:focus-visible {
+  outline: 2px solid var(--text-color-accent, #2ecc5a);
+  outline-offset: 1px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .detail-schedule-block {
+    border-color: color-mix(in srgb, var(--color-status-busy) 20%, white);
+  }
+}
+
+.timeline-occupation-popover {
+  /* Positioned entirely by floating-ui (see DynamicPopover in popover.js), which
+     sets left/top inline based on real available space around the hovered
+     block. Reset the generic anchor-positioning rules from style.css so they
+     don't fight with those inline coordinates or apply a stale fallback. */
+  @apply fixed;
+  inset: auto;
+  margin: 0;
+  position-anchor: none;
+  position-try-fallbacks: none;
+
+  @apply flex;
+  @apply flex-col;
+  gap: 4px;
+  max-width: min(280px, 70vw);
+  text-align: start;
+}
+
+.timeline-popover-time {
+  font-size: var(--text-85);
+  font-weight: 600;
+  color: var(--text-color-accent, inherit);
+}
+
+.timeline-popover-title {
+  font-size: var(--text-90);
+  font-weight: 600;
+  line-height: 1.3;
+  word-break: break-word;
+}
+
+.timeline-popover-meta {
+  @apply flex;
+  @apply flex-wrap;
+  gap: 4px 8px;
+  font-size: var(--text-80);
+  color: var(--text-color-secondary);
+}
+
+.timeline-popover-badge {
+  padding: 1px 6px;
+  border-radius: var(--radius-xs);
+  background: color-mix(in srgb, var(--color-status-busy) 18%, transparent);
+  color: var(--color-status-busy);
+  font-weight: 600;
+}
+
+.detail-schedule--hide-sundays .detail-schedule-row--sunday,
+.detail-schedule--hide-sundays .detail-schedule-label-cell--sunday {
+  display: none;
+}
+
+.detail-schedule-row--sunday .detail-schedule-bar {
+  background: color-mix(in srgb, #e53935 8%, transparent);
+  border-color: color-mix(in srgb, #e53935 15%, transparent);
+}
+
+.detail-schedule-ticks .timeline-time-indicator--now {
+  @apply absolute;
+  top: 1px;
+  left: var(--pos);
+  transform: translateX(-50%);
+  z-index: 10;
+  background: var(--color-now);
+  color: white;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-70);
+  font-weight: 800;
+  box-shadow: var(--glow-info);
+}
+
+/* Arrow for the now indicator at the top */
+.detail-schedule-ticks .timeline-time-indicator--now::after {
+  content: "";
+  @apply absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 4px solid transparent;
+  border-top-color: var(--color-now);
+}
+
+.detail-schedule-bar-wrapper .timeline-time-indicator--now {
+  display: none;
+}
+
+.detail-schedule-now-line {
+  @apply absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--pos);
+  width: 2px;
+  transform: translateX(-50%);
+  background: var(--color-now);
+  @apply pointer-events-none;
+  z-index: 4;
+}
+
+.detail-schedule-now-line::before,
+.detail-schedule-now-line::after {
+  content: "";
+  @apply absolute;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  background: inherit;
+  border-radius: 50%;
+  transform: translateX(-50%);
+}
+
+.detail-schedule-now-line::before {
+  top: -3px;
+}
+.detail-schedule-now-line::after {
+  bottom: -3px;
+}
+
+/* ── Query range overlay (Available Tab context) ──────────────────── */
+
+/* Green semi-transparent fill between queried from/to times */
+.detail-schedule-query-region {
+  @apply absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--qfrom);
+  width: calc(var(--qto) - var(--qfrom));
+  background: color-mix(in srgb, var(--text-color-accent) 12%, transparent);
+  border-left: 1.5px solid color-mix(in srgb, var(--text-color-accent) 50%, transparent);
+  border-right: 1.5px solid color-mix(in srgb, var(--text-color-accent) 50%, transparent);
+  @apply pointer-events-none;
+  z-index: 1;
+}
+
+/* From/to pill labels — shown in the ticks area on desktop */
+.detail-schedule-ticks .detail-schedule-query-indicator {
+  @apply absolute;
+  top: 1px;
+  left: var(--qpos);
+  transform: translateX(-50%);
+  background: var(--text-color-accent);
+  color: white;
+  border-radius: var(--radius-pill);
+  padding: 2px 8px;
+  font-size: var(--text-70);
+  font-weight: 800;
+  white-space: nowrap;
+  box-shadow: var(--glow-accent);
+  user-select: none;
+  z-index: 10;
+  @apply pointer-events-none;
+}
+
+.detail-schedule-ticks .detail-schedule-query-indicator::after {
+  content: "";
+  @apply absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 4px solid transparent;
+  border-top-color: var(--text-color-accent);
+}
+
+@media (prefers-color-scheme: dark) {
+  .detail-schedule-ticks .detail-schedule-query-indicator {
+    background: var(--color-accent-dark);
+    box-shadow: 0 2px 8px rgba(40, 167, 69, 0.4);
+  }
+  .detail-schedule-ticks .detail-schedule-query-indicator::after {
+    border-top-color: var(--color-accent-dark);
+  }
+}
+
+/* Hidden on mobile (side indicators take over instead) */
+.detail-schedule-bar-wrapper .detail-schedule-query-indicator {
+  display: none;
+}
+
+.detail-schedule-bar-wrapper .timeline-hover-cursor {
+  @apply absolute;
+  top: 0;
+  transform: translateX(-50%) translateY(calc(-100% - 8px));
+
+  background: var(--background-color);
+  color: var(--text-color-primary);
+  border: 1px solid color-mix(in srgb, var(--text-color-primary) 18%, transparent);
+  border-radius: var(--radius-sm);
+  padding: 3px 8px;
+  font-size: var(--text-72);
+  font-weight: bold;
+  white-space: nowrap;
+  box-shadow: var(--shadow);
+
+  @apply pointer-events-none;
+  user-select: none;
+  z-index: 10;
+}
+
+/* Border triangle (1px larger, in border color, sits behind the fill triangle) */
+.detail-schedule-bar-wrapper .timeline-hover-cursor::before {
+  content: "";
+  @apply absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: color-mix(in srgb, var(--text-color-primary) 18%, transparent);
+}
+
+/* Fill triangle (covers the border triangle except the bottom tip) */
+.detail-schedule-bar-wrapper .timeline-hover-cursor::after {
+  content: "";
+  @apply absolute;
+  top: calc(100% - 1px);
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: var(--background-color);
+}
+
+.detail-schedule-bar .timeline-hover-line {
+  @apply absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  transform: translateX(-50%);
+  background: color-mix(in srgb, var(--text-color-primary) 35%, transparent);
+  @apply pointer-events-none;
+  z-index: 5;
+}
+
+.detail-schedule-ticks {
+  @apply relative;
+  height: 3rem;
+  /* Matched to labels pill width (3.75rem) + gap (0.875rem) */
+  margin-left: calc(3.75rem + 0.875rem);
+  margin-bottom: 0.15rem;
+  overflow: visible;
+}
+
+.detail-schedule-tick {
+  @apply absolute;
+  bottom: 0;
+  left: var(--pos);
+  transform: translateX(-50%);
+  @apply pointer-events-none;
+}
+
+.detail-schedule-tick--quarter {
+  opacity: 0.4;
+  font-size: 0.5rem;
+}
+
+.detail-schedule-tick span {
+  font-size: 0.6rem;
+  color: var(--text-color-secondary);
+  font-weight: 600;
+}
+
+/* ── Vertical layout (mobile) ────────────────────────────────────── */
+
+/* Day selector and now-bar-line: mobile-only */
+.detail-schedule-day-selector,
+.timeline-now-bar-line {
+  display: none;
+}
+
+@media (max-width: 599px) {
+  .detail-schedule-day-selector,
+  .timeline-now-bar-line {
+    @apply block;
+  }
+
+  .detail-schedule-ticks .timeline-time-indicator--now,
+  .detail-schedule-now-line {
+    display: none;
+  }
+
+  /* Override date-picker-container defaults for this context */
+  .detail-schedule-picker {
+    margin-top: 0;
+    margin-bottom: 0; /* gap handled by container */
+    margin-left: auto;
+    margin-right: auto;
+    max-width: 90% !important; /* Force it to stay within parent's 90% as in Available tab */
+
+    /* align-self: center (from date-picker.css) works here because the parent is a flexbox */
+    align-self: center;
+    opacity: 1 !important; /* date-picker-container starts at 0 until JS fires */
+  }
+
+  .detail-schedule-day-selector {
+    @apply flex;
+    @apply flex-col;
+    @apply items-center;
+    @apply w-full;
+    overflow: visible;
+    @apply relative;
+    padding-top: 2rem; /* room for the today indicator pill above the picker */
+
+    /* The chip picker is draggable (see pill-selector.js); without this, a
+       touch-drag starting on/near a day's text triggers the browser's
+       native text-selection/callout instead — same fix as .date-picker in
+       date-picker.css / .bn-wrapper in bottom-nav.css. */
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+
+  .detail-today-indicator {
+    @apply absolute;
+    transform: translateX(-50%);
+
+    background: var(--text-color-accent);
+    color: white;
+    border-radius: var(--radius-pill);
+    padding: 2px 10px;
+    font-size: var(--text-72);
+    font-weight: 800;
+    white-space: nowrap;
+    box-shadow: var(--glow-accent);
+    transform-origin: bottom center;
+
+    opacity: 0;
+    animation: today-indicator-appear 0.65s linear 0.35s forwards;
+
+    will-change: transform, scale;
+    transition:
+      scale 0.15s ease,
+      background-color 0.2s ease;
+  }
+
+  .detail-today-indicator::after {
+    content: "";
+    @apply absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 4px solid transparent;
+    border-top-color: var(--text-color-accent);
+  }
+
+  .detail-today-indicator.hidden {
+    display: none;
+  }
+
+  .detail-today-indicator:hover {
+    scale: 1.05;
+    background: color-mix(in srgb, var(--text-color-accent) 85%, black);
+  }
+
+  /* Container: column — selector on top, then time axis + bar below */
+  #detail-schedule-container {
+    --schedule-bar-height: clamp(240px, 48svh, 480px);
+    @apply flex;
+    @apply flex-col;
+    gap: 2rem;
+  }
+
+  /* Inner row: time axis on the left, single day bar fills the rest */
+  .detail-schedule-inner {
+    @apply flex;
+    @apply flex-row;
+    @apply items-start;
+    @apply justify-center;
+    gap: 0.625rem;
+    overflow: visible; /* clip was silently cutting off bar edges on narrow screens */
+  }
+
+  @media (max-width: 600px) {
+    .detail-schedule-inner {
+      width: 15rem;
+      align-self: center;
+      padding-right: 3.5rem;
+    }
+  }
+
+  /* Time axis */
+  .detail-schedule-ticks {
+    flex-shrink: 0;
+    width: 3.5rem;
+    height: var(--schedule-bar-height);
+    margin-top: 0;
+    margin-left: 0;
+    margin-bottom: 0;
+    overflow: visible;
+  }
+
+  .detail-schedule-tick span {
+    font-size: var(--text-70);
+  }
+
+  .detail-schedule-tick {
+    left: auto;
+    right: 0;
+    bottom: auto;
+    top: var(--pos);
+    transform: translateY(-50%);
+    text-align: right;
+  }
+
+  /* Now indicator: outside the bar, to the right, arrow pointing left.
+     position/padding/etc. used to come from a shared, unscoped
+     .timeline-time-indicator base rule in classroom-list.css that no longer
+     exists (that file's own timeline was replaced by a simpler status bar) —
+     declaring them here directly instead of relying on that cross-file
+     dependency. */
+  .detail-schedule-bar-wrapper .timeline-time-indicator--now {
+    @apply absolute;
+    @apply block;
+    left: calc(100% + 0.5rem);
+    right: auto;
+    top: var(--pos);
+    transform: translateY(-50%);
+    transform-origin: left center;
+    background: var(--color-now);
+    color: white;
+    padding: 2px 8px;
+    border-radius: var(--radius-pill);
+    font-size: var(--text-70);
+    font-weight: 800;
+    white-space: nowrap;
+    box-shadow: var(--glow-info);
+    user-select: none;
+    z-index: 10;
+    animation: now-indicator-appear-mobile 0.65s linear 0.35s forwards;
+  }
+
+  /* Arrow points left toward the bar */
+  .detail-schedule-bar-wrapper .timeline-time-indicator--now::after {
+    top: 50%;
+    right: 95%;
+    left: auto;
+    border-top-color: transparent;
+    border-right-color: var(--color-now);
+    transform: translateY(-50%);
+  }
+
+  @keyframes now-indicator-appear-mobile {
+    0% {
+      opacity: 0;
+      transform: translateX(-40px) translateY(-50%) scale(0, 0);
+      filter: blur(16px);
+      animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    25% {
+      opacity: 1;
+      transform: translateX(0) translateY(-50%) scale(0.85, 0.25);
+      filter: blur(2px);
+      animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    75% {
+      transform: translateX(0) translateY(-50%) scale(1.06, 1.08);
+      filter: blur(0);
+      animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    100% {
+      opacity: 1;
+      transform: translateX(0) translateY(-50%) scale(1, 1);
+      filter: blur(0);
+    }
+  }
+
+  /* Grid: fills all remaining space after the ticks column */
+  .detail-schedule-grid {
+    flex: 1;
+    @apply flex-row;
+    gap: 0;
+    min-width: 0;
+    max-width: 18rem;
+  }
+
+  .detail-schedule-grid-lines {
+    left: 0;
+  }
+
+  .detail-schedule-now-line {
+    display: none;
+  }
+
+  /* All day rows hidden on mobile; only .selected is shown */
+  .detail-schedule-row {
+    display: none;
+    @apply flex-col;
+    align-items: stretch;
+    flex: 1;
+    gap: 0;
+  }
+
+  .detail-schedule-row.selected {
+    @apply flex;
+    animation: detail-row-fade-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  .detail-schedule-row.selected .detail-schedule-block {
+    animation: detail-block-appear 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation-delay: calc(var(--idx) * 0.04s + 0.1s);
+  }
+
+  @keyframes detail-row-fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes detail-block-appear {
+    from {
+      opacity: 0;
+      transform: scaleX(0.85) scaleY(0.85);
+      filter: blur(4px);
+    }
+    to {
+      opacity: 0.85;
+      transform: scaleX(1) scaleY(1);
+      filter: blur(0);
+    }
+  }
+
+  /* Labels pill redundant on mobile — chip selector shows the current day */
+  .detail-schedule-labels-pill {
+    display: none;
+  }
+
+  .detail-schedule-bar-wrapper {
+    flex: 1;
+  }
+
+  /* Vertical bar */
+  .detail-schedule-bar {
+    height: var(--schedule-bar-height);
+    @apply w-full;
+    border-radius: var(--radius-md);
+  }
+
+  /* Blocks: vertical positioning using the CSS vars */
+  .detail-schedule-block {
+    /* Increased gaps for better separation between consecutive blocks on mobile */
+    top: calc(var(--block-start) + 2px);
+    height: calc(var(--block-size) - 4px);
+    left: 3px;
+    right: 3px;
+    width: auto;
+    bottom: auto;
+    border-radius: 6px;
+  }
+
+  /* Grid lines on mobile: horizontal */
+  .detail-schedule-grid-line {
+    left: 0;
+    right: 0;
+    top: var(--pos);
+    bottom: auto;
+    width: auto;
+    height: 1px;
+  }
+
+  /* Hide Sunday chips when hide-sundays is active */
+  .detail-schedule--hide-sundays .detail-schedule-day--sunday {
+    display: none;
+  }
+
+  /* Hover cursor: floats to the right of the bar, vertically centred on the mouse */
+  .detail-schedule-bar-wrapper .timeline-hover-cursor {
+    left: calc(100% + 0.5rem);
+    top: 0; /* overridden by JS */
+    right: auto;
+    transform: translateY(-50%);
+  }
+
+  /* No downward arrow — cursor is beside the bar, not above it */
+  .detail-schedule-bar-wrapper .timeline-hover-cursor::before,
+  .detail-schedule-bar-wrapper .timeline-hover-cursor::after {
+    display: none;
+  }
+
+  /* Hover line: horizontal sweep across the bar */
+  .detail-schedule-bar .timeline-hover-line {
+    top: 0; /* overridden by JS */
+    left: 0;
+    right: 0;
+    bottom: auto;
+    width: auto;
+    height: 2px;
+    transform: translateY(-50%);
+  }
+
+  /* Now indicator line inside today's bar */
+  .timeline-now-bar-line {
+    @apply absolute;
+    left: 3px;
+    right: 3px;
+    top: var(--pos);
+    height: 2px;
+    background: var(--color-now);
+    transform: translateY(-50%);
+    z-index: 4;
+    @apply pointer-events-none;
+  }
+
+  .timeline-now-bar-line::before,
+  .timeline-now-bar-line::after {
+    content: "";
+    @apply absolute;
+    top: 50%;
+    width: 6px;
+    height: 6px;
+    background: inherit;
+    border-radius: 50%;
+    transform: translateY(-50%);
+  }
+  .timeline-now-bar-line::before {
+    left: -3px;
+  }
+  .timeline-now-bar-line::after {
+    right: -3px;
+  }
+
+  /* Query region: rotate to vertical bar orientation */
+  .detail-schedule-query-region {
+    left: 0;
+    right: 0;
+    width: auto;
+    bottom: auto;
+    top: var(--qfrom);
+    height: calc(var(--qto) - var(--qfrom));
+    border-left: none;
+    border-right: none;
+    border-top: 1.5px solid color-mix(in srgb, var(--text-color-accent) 50%, transparent);
+    border-bottom: 1.5px solid color-mix(in srgb, var(--text-color-accent) 50%, transparent);
+  }
+
+  /* Side indicator pills to the right of the bar (mirror the "now" indicator) */
+  .detail-schedule-ticks .detail-schedule-query-indicator {
+    display: none;
+  }
+
+  .detail-schedule-bar-wrapper .detail-schedule-query-indicator {
+    @apply block;
+    @apply absolute;
+    left: calc(100% + 0.5rem);
+    top: var(--qpos);
+    transform: translateY(-50%);
+    background: var(--text-color-accent);
+    color: white;
+    border-radius: var(--radius-pill);
+    padding: 2px 8px;
+    font-size: var(--text-70);
+    font-weight: 800;
+    white-space: nowrap;
+    box-shadow: var(--glow-accent);
+    user-select: none;
+    z-index: 10;
+    @apply pointer-events-none;
+  }
+
+  /* Arrow pointing left toward the bar */
+  .detail-schedule-bar-wrapper .detail-schedule-query-indicator::after {
+    content: "";
+    @apply absolute;
+    top: 50%;
+    right: 95%;
+    left: auto;
+    border: 4px solid transparent;
+    border-right-color: var(--text-color-accent);
+    transform: translateY(-50%);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .detail-schedule-bar-wrapper .detail-schedule-query-indicator {
+      background: var(--color-accent-dark);
+      box-shadow: 0 2px 8px rgba(40, 167, 69, 0.4);
+    }
+    .detail-schedule-bar-wrapper .detail-schedule-query-indicator::after {
+      border-right-color: var(--color-accent-dark);
+    }
+  }
+}
+
+/* ── Skeleton loading ─────────────────────────────────────────────── */
+
+.detail-schedule-loading {
+  @apply flex;
+  @apply flex-col;
+  gap: 0.45rem;
+}
+
+.detail-schedule-skeleton {
+  height: 1.625rem;
+  background: color-mix(in srgb, var(--text-color-primary) 8%, transparent);
+  border-radius: 0.4rem;
+  animation: detail-skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+.detail-schedule-skeleton:nth-child(odd) {
+  animation-delay: 0.1s;
+}
+
+@keyframes detail-skeleton-pulse {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+/* Detail-only header controls (back button, favourite toggle) scaling in/out
+   in step with the page morph. */
+
+/* Safari doesn't rasterize backdrop-filter into a ::view-transition snapshot —
+   it re-composites the blur live at the snapshot's original size, ignoring the
+   scale-in/out transform, so a stale blurred rectangle hangs in the header
+   while the button itself scales. Drop the blur on these controls for the
+   duration of their enter/exit VT (`header-ctl-vt` is toggled on <html> in
+   classroom-detail.js); the glass tint + stroke alone carry the ~0.3s move. */
+.header-ctl-vt #favourite-btn,
+.header-ctl-vt #detail-back-btn {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+@keyframes header-ctl-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes header-ctl-scale-out {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+}
+
+/* ── Tabbar hidden state (when detail overlay is open) ───────────── */
+/* Targets .bn-wrapper (not .bn-tabbar) so the standalone search button
+   and pill hide along with the tab group. */
+
+.bn-wrapper.detail-open {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* ── View Transition animation overrides ──────────────────────────── */
+
+@supports (view-transition-name: none) {
+  /* Suppress the CSS opacity fallback transition when VT is available.
+     Must match/exceed the base rule's specificity (#id:not([hidden]) = 1,1,0),
+     otherwise this loses the cascade and the fallback fade keeps running
+     underneath the VT snapshot, fighting it once the transition hands back
+     to the live DOM. */
+  #classroom-detail-overlay:not([hidden]) {
+    transition: none;
+  }
+
+  /* Root cross-fade (for everything else: background, tabbar, etc. — the
+     header is pinned separately below, since backdrop-filter can't stay
+     "live" during a VT and freezing it into root would show the wrong,
+     pre-transition blur for most of the animation). */
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 0.25s;
+  }
+
+  /* The header is a constant translucent/blurred overlay, not changing
+     content — pin it with no animation so its frozen snapshot is just
+     whichever state (old or new) is already correct, instead of cross-fading
+     between "blurring the small card" and "blurring the full photo." Give it
+     a z-index above the card/photo group so it still paints on top, matching
+     its live stacking order. */
+  ::view-transition-group(app-header) {
+    animation: none;
+    z-index: 2;
+  }
+
+  /* Show ONLY the "old" header snapshot for the whole transition — no
+     cross-fade. The header is a constant translucent overlay (its fade/blur is
+     identical before and after), but Safari captures the "new" snapshot ~10%
+     short on the right: it's measured mid-layout, inside the busy
+     startViewTransition update callback, so its fade/blur paint stops partway
+     across while the snapshot box stays full width — leaving a strip of
+     un-faded photo down the right edge for the whole animation. The "old"
+     snapshot is taken from the settled page and is always full width. The only
+     thing "old" lacks is the back button / taller nav row, and that just
+     appears when the live DOM takes over at the end — imperceptible against
+     the 0.5s morph. */
+  ::view-transition-old(app-header) {
+    animation: none;
+    opacity: 1;
+  }
+
+  ::view-transition-new(app-header) {
+    animation: none;
+    opacity: 0;
+  }
+
+  /* Safari snapshots a position:sticky element's ::view-transition-group at its
+     unstuck flow position, so the header's new-state snapshot on detail-close
+     lands off-screen whenever the list was scrolled (it "disappears" mid-
+     animation, then snaps back). While .header-vt-fixed is set (see
+     classroom-detail.js _doClose) pin the header with position:fixed — which is
+     viewport-relative and captured correctly — and add a compensating
+     padding-top to .body-container so removing the header from flow shifts
+     nothing: its normal 1.5rem padding PLUS the header height it just lost.
+     (Getting this wrong by the 1rem difference vs. the base padding made the
+     page behind jump a few px up on open and back down on close.) Scoped
+     away from non-Safari (.no-safari), which doesn't have the bug. */
+  :root:not(.no-safari).header-vt-fixed .header {
+    @apply fixed;
+  }
+
+  :root:not(.no-safari).header-vt-fixed .body-container {
+    padding-top: calc(1.5rem + var(--header-height, 0px));
+  }
+
+  /* Shared element: whole card morphs into the whole page (SwiftUI .zoom-style).
+     Group (size/position) and both snapshots (opacity cross-fade) share the same
+     duration/easing — a mismatch here makes the shorter one snap back to full
+     opacity before the transition ends, reading as a sudden pop instead of a fade. */
+  ::view-transition-group(classroom-detail-zoom) {
+    animation-duration: 0.5s;
+    animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+    @apply overflow-hidden; /* clip both snapshots to the group's morphing bounds */
+  }
+
+  ::view-transition-old(classroom-detail-zoom),
+  ::view-transition-new(classroom-detail-zoom) {
+    animation-duration: 0.5s;
+    animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+    animation-fill-mode: both;
+  }
+
+  /* Detail-only header controls get their own VT groups (pulled out of the
+     pinned `app-header` snapshot) so they scale in on open / out on close,
+     on top of the header, in step with the page morph — instead of popping
+     when the live DOM takes over at the end. The `:only-child` guard keeps
+     the animation to genuine enter/exit: on a detail↔info move where the back
+     button stays put, both snapshots exist and it just morphs in place. */
+  #detail-back-btn {
+    view-transition-name: detail-back-btn;
+  }
+  #favourite-btn {
+    view-transition-name: favourite-btn;
+  }
+
+  ::view-transition-group(detail-back-btn),
+  ::view-transition-group(favourite-btn) {
+    z-index: 3; /* above ::view-transition-group(app-header), which is 2 */
+  }
+
+  ::view-transition-new(detail-back-btn):only-child,
+  ::view-transition-new(favourite-btn):only-child {
+    animation: header-ctl-scale-in 0.32s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    transform-origin: center;
+  }
+
+  ::view-transition-old(detail-back-btn):only-child,
+  ::view-transition-old(favourite-btn):only-child {
+    animation: header-ctl-scale-out 0.2s ease-in both;
+    transform-origin: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-new(detail-back-btn):only-child,
+  ::view-transition-new(favourite-btn):only-child,
+  ::view-transition-old(detail-back-btn):only-child,
+  ::view-transition-old(favourite-btn):only-child {
+    animation: none;
+  }
+}
+
+@media (max-width: 599px) and (prefers-color-scheme: dark) {
+  .detail-today-indicator {
+    background: var(--color-accent-dark);
+    box-shadow: 0 2px 8px rgba(40, 167, 69, 0.4);
+  }
+  .detail-today-indicator::after {
+    border-top-color: var(--color-accent-dark);
+  }
+  .detail-today-indicator:hover {
+    background: var(--color-accent-dark-hover);
+  }
+}

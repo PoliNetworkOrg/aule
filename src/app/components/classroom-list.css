@@ -1,0 +1,594 @@
+.available-classrooms-container {
+  margin: 0.5rem 0;
+  padding: 0.5rem;
+
+  background-color: transparent;
+  border: 4px solid transparent;
+
+  border-radius: var(--radius-xl);
+
+  @apply flex;
+  @apply flex-col;
+
+  justify-content: space-evenly;
+}
+
+.results-filter-row {
+  @apply flex;
+  @apply flex-row;
+  @apply justify-end;
+  padding: 0.25rem 0.5rem 0;
+  gap: 1rem;
+}
+
+.results-filter-btn {
+  @apply inline-flex;
+  @apply items-center;
+  gap: 0.25rem;
+
+  padding: 0.25rem 0.75rem;
+  border-radius: var(--radius-pill);
+  border: 1.5px solid color-mix(in srgb, var(--text-color-accent) 40%, transparent);
+  background: color-mix(in srgb, var(--text-color-accent) 15%, transparent);
+  color: var(--text-color-accent);
+
+  font-family:
+    "Nunito",
+    -apple-system,
+    BlinkMacSystemFont,
+    sans-serif;
+  font-size: var(--text-80);
+  font-weight: 700;
+
+  transition:
+    background 0.2s ease,
+    opacity 0.2s ease;
+}
+
+.results-filter-btn:not(.active) {
+  background: transparent;
+  opacity: 0.45;
+}
+
+.results-filter-btn .hgi-stroke {
+  font-size: var(--text-100) !important;
+}
+
+.available-classrooms-container.hide-partial [data-status="partially-free"] {
+  display: none;
+}
+
+/* Hide a building's header too when every one of its rooms is partially-free
+   (and therefore already hidden above) — otherwise an empty header would be
+   left dangling with no cards under it. */
+.available-classrooms-container.hide-partial [data-all-partial="true"] {
+  display: none;
+}
+
+.available-classrooms-container.empty {
+  flex: 1;
+  padding: 4rem 0;
+  gap: 1.5rem;
+  @apply items-center;
+  @apply justify-center;
+}
+
+.empty-container-icon {
+  color: var(--text-color-secondary);
+  opacity: 0.75;
+
+  font-size: 7rem !important;
+}
+
+.empty-container-title {
+  font-size: var(--text-150);
+  font-weight: 700;
+
+  color: var(--text-color-secondary);
+  opacity: 0.75;
+
+  margin: 0;
+}
+
+.empty-container-subtitle {
+  font-size: var(--text-90);
+  font-weight: 630;
+
+  color: var(--text-color-secondary);
+  opacity: 0.6;
+
+  margin: 0 3rem;
+}
+
+/* Results list — a vertical stack of per-building <li> sections (see
+   buildBuildingSection in script.js). Each section is its own card grid, so
+   its sticky header is confined to that section's box: a new building's
+   header pushes the previous one out of the sticky slot (list-style)
+   instead of every header piling up at the top. */
+.list-outer-container {
+  list-style: none;
+  margin: 0;
+  padding: 0.25rem;
+
+  @apply flex;
+  @apply flex-col;
+  gap: 0.5rem;
+}
+
+.building-section {
+  display: grid;
+  /* Fit as many columns as fit at an 8.5rem card floor, and fall back to a
+     single column when even one 8.5rem card won't fit (very small window /
+     split screen). Two parts matter:
+       - 8.5rem, not the old 9.5rem: the results box at a 360px viewport is
+         only ~296px wide (tab + list + container padding), and two 9.5rem
+         tracks + the gap need ~316px — that 20px is why a stock 360px Android
+         phone dropped to one giant column.
+       - min(100%, 8.5rem): when the row itself is narrower than 8.5rem the
+         floor collapses to 100% instead of overflowing, so the fallback is a
+         clean single column rather than a clipped card. */
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 8.5rem), 1fr));
+  gap: 0.75rem;
+}
+
+.building-section-header {
+  grid-column: 1 / -1;
+
+  /* Parks directly beneath the sticky picker bar — its live height comes
+     from --picker-bar-height (script.js); the + 1.5rem matches the picker
+     bar's own offset below the app header. This holds all the way up to the
+     1100px breakpoint below: the side nav rail appears at 600px, but the
+     picker form itself doesn't go static (non-sticky, --picker-bar-height
+     legitimately 0) until the 1100px two-column layout, so this rule can't
+     drop the offset any earlier without the header sliding in behind the
+     still-sticky pickers. */
+  @apply sticky;
+  top: calc(var(--header-height, 84px) + 2.25rem + var(--picker-bar-height, 0px) + 0.5rem);
+  z-index: 2;
+
+  @apply flex;
+  @apply flex-row;
+  @apply items-center;
+  @apply justify-between;
+  gap: 0.75rem;
+  padding: 0.25rem;
+  text-align: start;
+
+  /* `backwards`, not `both`: the end keyframe is the natural resting state,
+     and letting `filter: blur(0)` linger as an applied filter breaks the
+     glass button's nested backdrop-filter in Safari (same reason
+     .tab-content.visible drops `forwards`). */
+  animation: card-appear 0.4s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+@media (min-width: 1100px) {
+  /* No mask on the scroll panel here: a `mask` on an ancestor disables
+     `backdrop-filter` on descendants in Chromium, which kills the glass
+     title pill's blur. The app header's fade overlay already covers the
+     panel's top, so the hard overflow edge isn't visible anyway. */
+  .building-section-header {
+    top: 1rem;
+  }
+}
+
+/* Glass pill around the name + altName group, so the sticky label reads
+   cleanly over the cards scrolling beneath it. Same --glass-* material as
+   .header-button / the classroom cards. */
+.building-section-titles {
+  @apply relative;
+
+  @apply flex;
+  @apply flex-col;
+  @apply items-start;
+  gap: 0;
+
+  /* It's a <button> now (opens the building overview) — strip the UA chrome. */
+  appearance: none;
+  border: none;
+  font: inherit;
+  text-align: start;
+  cursor: default;
+
+  padding: 0.5rem 1.05rem;
+  border-radius: var(--radius-pill);
+
+  background: var(--glass-tint);
+  backdrop-filter: blur(var(--glass-blur-md));
+  -webkit-backdrop-filter: blur(var(--glass-blur-md));
+
+  box-shadow:
+    0 0 0 0.1px var(--glass-outline),
+    var(--glass-highlight),
+    0 4px 40px 0 var(--glass-shadow-color);
+}
+
+/* Outside 0.5px gradient stroke — same recipe as .classroom-card::after. */
+.building-section-titles::after {
+  content: "";
+  @apply absolute;
+  inset: -0.5px;
+  border-radius: inherit;
+  padding: 0.5px;
+
+  background: var(--glass-stroke-gradient);
+  opacity: var(--glass-stroke-opacity);
+
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+
+  @apply pointer-events-none;
+}
+
+.building-section-btn {
+  flex: none;
+}
+
+.building-section-btn i {
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.building-name {
+  font-size: var(--text-110);
+  font-weight: 700;
+  line-height: 1.2;
+  color: rgba(0, 0, 0, 0.5);
+  margin: 0;
+}
+
+.building-alt-name {
+  font-size: var(--text-75);
+  font-weight: 600;
+  line-height: 1.1;
+  color: rgba(0, 0, 0, 0.5);
+  margin: 0;
+}
+
+@media (prefers-color-scheme: dark) {
+  .building-name,
+  .building-alt-name {
+    color: rgba(255, 255, 255, 0.5);
+  }
+}
+
+/* Each card is a grid item directly — no extra wrapper box (the old
+   .classroom-list-item-container padding/shadow chrome moved onto the card
+   itself, since the card is no longer full-width and needs its own bounds). */
+.classroom-list-item-container {
+  display: contents;
+}
+
+.classroom-list-item-container .classroom-card {
+  animation: card-appear 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Prevent re-triggering the staggered animation after the first load */
+.list-outer-container.appeared .classroom-card,
+.list-outer-container.appeared .building-section-header {
+  animation: none !important;
+}
+
+/* Also disable the parent tab-content animation if it has appeared once */
+:has(> .list-outer-container.appeared) {
+  animation: none !important;
+}
+
+@keyframes card-appear {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   CLASSROOM CARD
+   Ported from the Figma "Classroom Card / Portrait" component: a photo with
+   a gradient fade to a solid, readable footer instead of the old design's
+   second blurred copy of the photo and mix-blend-mode overlay. The card's
+   chrome reuses the project's existing --glass-* tokens instead of one-off
+   shadow values, per the Figma spec's own Glass effect names.
+   ══════════════════════════════════════════════════════════════ */
+
+/* Outer box: carries the box-shadow (highlight + drop shadow) and the
+   gradient stroke ring. Deliberately NOT overflow:hidden — box-shadow is
+   clipped by overflow on the element that declares it, not just its
+   children, so the shadow has to live on an unclipped box. The photo is
+   clipped to the rounded corners by the inner .classroom-card-clip instead. */
+.classroom-card {
+  @apply relative;
+  aspect-ratio: 154 / 196;
+  /* Belt-and-braces cap: if a card ever ends up in a very wide single track
+     (some fallback layout, an unexpected container width), the portrait
+     aspect-ratio won't blow it up to a full-screen tile. */
+  max-width: 24rem;
+  text-align: start;
+
+  padding: 0;
+  border-radius: var(--radius-lg);
+
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+
+  background-color: var(--background-color-secondary);
+  /* Only the two non-inset parts here — outline hairline and drop shadow,
+     both painted outside the box, so they're unaffected by whatever's
+     inside. The inset highlight moved to ::before (see below): inset
+     shadows paint behind child content by default, and .classroom-card-clip
+     (the photo) is fully opaque, so an inset shadow declared here would be
+     invisible on any photo card. */
+  box-shadow:
+    0 0 0 0.1px var(--glass-outline),
+    0 4px 40px 0 var(--glass-shadow-color);
+
+  transition: transform 0.15s ease;
+
+  content-visibility: auto;
+  /* "auto" keyword: this card also carries aspect-ratio, so a fixed guess
+     that doesn't match the grid's actual column width caused a real bug —
+     a size mismatch between the guessed and rendered box could make a
+     card's very first IntersectionObserver callback (photo lazy-load) get
+     silently dropped. Earlier profiling showed no measurable perf cost
+     either way, so "auto" (remember the real size after first layout) is
+     the safe choice here.
+     Explicit width AND height (not one value reused for both) matching the
+     card's actual 154:196 proportions — a square-ish single-value guess was
+     visibly wrong on width, and while the card is transitioning between
+     skipped/relevant (e.g. mid-scroll on Safari), the photo can briefly
+     render against that wrong placeholder size, showing as a squeezed
+     sliver via object-fit: cover. */
+  contain-intrinsic-size: auto 155px auto 197px;
+
+  &:hover {
+    transform: scale(1.02);
+  }
+
+  /* Held down (see classroom-detail.js press handler). Snappier transition in
+     than the shared 0.15s so the feedback feels immediate; the release hands
+     off to the View Transition mid-scale. Doubled specificity to win over
+     :hover on desktop. */
+  &.classroom-card--pressed {
+    transform: scale(0.96);
+    transition: transform 0.1s ease;
+  }
+
+  &:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--text-color-accent) 72%, white);
+    outline-offset: 3px;
+  }
+}
+
+.classroom-card-clip {
+  @apply absolute;
+  @apply inset-0;
+  border-radius: inherit;
+  @apply overflow-hidden;
+  isolation: isolate;
+}
+
+/* Inset highlight, repainted here (on top of .classroom-card-clip's photo)
+   instead of as part of .classroom-card's own box-shadow — see the note
+   there. This pseudo has no content of its own, so it never blocks clicks
+   or covers the photo underneath it visually beyond its shadow. */
+.classroom-card::before {
+  content: "";
+  @apply absolute;
+  @apply inset-0;
+  border-radius: inherit;
+  box-shadow: var(--glass-highlight);
+  @apply pointer-events-none;
+  z-index: 1;
+}
+
+/* Outside 0.5px gradient stroke — same recipe as .header-button::after /
+   .bn-tabbar::after in style.css / bottom-nav.css. */
+.classroom-card::after {
+  content: "";
+  @apply absolute;
+  inset: -0.5px;
+  border-radius: inherit;
+  padding: 0.5px;
+
+  background: var(--glass-stroke-gradient);
+  opacity: var(--glass-stroke-opacity);
+
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+
+  @apply pointer-events-none;
+}
+
+.classroom-card-photo {
+  @apply absolute;
+  @apply inset-0;
+  @apply w-full;
+  @apply h-full;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+.classroom-card-photo.loaded {
+  opacity: 1;
+}
+
+/* Failed photo — hide the broken <img> and show a muted placeholder icon instead */
+.classroom-card--photo.photo-failed .classroom-card-photo {
+  display: none;
+}
+
+.classroom-card--photo.photo-failed::before {
+  content: "\f1e97";
+  font-family: "hugeicons-stroke-rounded";
+  font-size: var(--text-200);
+  @apply absolute;
+  @apply inset-0;
+  @apply flex;
+  @apply items-center;
+  @apply justify-center;
+  color: color-mix(in srgb, var(--text-color-primary) 20%, transparent);
+  z-index: 0;
+  @apply pointer-events-none;
+}
+
+/* Gradient overlay laid across the full card — exact stops from the Figma
+   component — fading the photo to a solid, readable footer. */
+.classroom-card-scrim {
+  @apply absolute;
+  /* 1px bleed past the true edges (clipped precisely by .classroom-card-clip's
+     overflow:hidden) — guards against a sub-pixel rounding gap at the card's
+     bottom edge on some mobile DPR/zoom combos, where inset:0 can land a
+     hair short of the actual box and let the photo show through. */
+  inset: -1px;
+  @apply pointer-events-none;
+
+  background: linear-gradient(
+    to bottom,
+    rgba(217, 217, 217, 0) 53%,
+    rgba(217, 217, 217, 0.8) 80%,
+    rgba(217, 217, 217, 1) 89%
+  );
+}
+
+@media (prefers-color-scheme: dark) {
+  .classroom-card-scrim {
+    background: linear-gradient(
+      to bottom,
+      rgba(26, 26, 26, 0) 53%,
+      rgba(26, 26, 26, 0.8) 80%,
+      rgba(26, 26, 26, 1) 89%
+    );
+  }
+}
+
+.classroom-card-content {
+  @apply relative;
+  z-index: 2;
+  @apply h-full;
+  padding: 0.85rem;
+  @apply flex;
+  @apply flex-col;
+  @apply justify-end;
+  gap: 0.1rem;
+}
+
+.classroom-status-txt {
+  flex: 0 0 auto;
+  font-size: var(--text-80);
+  font-weight: 800;
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+.classroom-status-txt.free {
+  color: var(--color-status-free);
+}
+
+.classroom-status-txt.free-soon {
+  color: var(--color-status-free-soon);
+}
+
+.classroom-status-txt.partially-free,
+.classroom-status-txt.occupied-soon {
+  color: var(--color-status-partial);
+}
+
+.classroom-status-txt.not-free,
+.classroom-status-txt.occupied {
+  color: var(--color-status-busy);
+}
+
+.classroom-name {
+  font-size: var(--text-150);
+  font-weight: 800;
+  margin: 0;
+  color: var(--text-color-primary);
+  @apply overflow-hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.classroom-card-meta-row {
+  @apply flex;
+  @apply flex-row;
+  align-items: baseline;
+  @apply justify-between;
+  gap: 0.5rem;
+}
+
+.classroom-card-building {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--text-80);
+  color: color-mix(in srgb, var(--text-color-primary) 55%, transparent);
+  margin: 0;
+  @apply overflow-hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Favourite marker — only rendered when buildCardForClassroom is called with
+   showFavouriteStar, and only visible once the card carries .classroom-card--fav
+   (kept in sync by utils/favourites.js). Hidden in the Favourites carousel,
+   where the arg is omitted. */
+.classroom-card-fav-star {
+  display: none;
+  @apply absolute;
+  /* Match the .classroom-card-content inset so the star lines up with the
+     name / building text below it. */
+  top: 0.85rem;
+  right: 0.85rem;
+  z-index: 3;
+  line-height: 0;
+  color: #f0b429;
+  @apply pointer-events-none;
+  /* Stronger drop shadow so the star reads over bright photos, on top of the
+     contrast stroke on the glyph itself. */
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.55)) drop-shadow(0 0 6px rgba(0, 0, 0, 0.4));
+}
+
+.classroom-card-fav-star .star-icon {
+  width: 18px;
+  height: 18px;
+  @apply block;
+  overflow: visible; /* don't clip the contrast stroke at the viewBox edge */
+}
+
+/* Thin contrasting outline painted behind the yellow fill via
+   paint-order: stroke — keeps the star readable over photos. Fallback is a
+   manual black-on-light / white-on-dark swap; where contrast-color() is
+   supported it derives the same choice from the card surface automatically. */
+.classroom-card-fav-star .star-icon path {
+  stroke: rgba(0, 0, 0, 0.55);
+  stroke-width: 2.5px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .classroom-card-fav-star .star-icon path {
+    stroke: rgba(255, 255, 255, 0.65);
+  }
+}
+
+@supports (color: contrast-color(white)) {
+  .classroom-card-fav-star .star-icon path {
+    stroke: color-mix(in srgb, contrast-color(var(--background-color-secondary)) 60%, transparent);
+  }
+}
+
+.classroom-card--fav .classroom-card-fav-star {
+  @apply block;
+}

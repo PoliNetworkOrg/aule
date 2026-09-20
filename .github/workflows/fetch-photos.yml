@@ -1,0 +1,133 @@
+name: Fetch Classroom Photos
+
+on:
+  schedule:
+    - cron: "0 5 1 * *" # Once a month, 1st at 5am UTC (clear of daily occupancy 3am/10am and weekly opening-hours Sunday 6am)
+  workflow_dispatch: # Allow manual runs from the GitHub Actions tab
+    inputs:
+      no_delay:
+        description: "Skip delay between API calls"
+        type: boolean
+        default: false
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      # The manifest lives in R2 next to the photos, not in actions/cache:
+      # this job runs monthly, and GitHub evicts any cache entry untouched for
+      # 7 days, so a cache-backed manifest would always be gone by the next run
+      # and every photo would look "new". Keeping it in R2 also makes it the
+      # single source of truth for what's actually uploaded. It's downloaded
+      # here and re-uploaded at the end, gated on upload+purge having succeeded
+      # (see "Save photo manifest" below) so a partial failure forces a full
+      # retry next run instead of the manifest drifting from R2.
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Restore photo manifest from R2
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          mkdir -p photos
+          if npx --yes wrangler@4 r2 object get "poliaule-data/photos/manifest.json" \
+              --file photos/manifest.json --remote; then
+            echo "Restored manifest with $(jq 'length' photos/manifest.json) entries."
+          else
+            echo "No manifest in R2 yet (first run?) - treating every photo as new."
+            rm -f photos/manifest.json
+          fi
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run photo fetcher
+        id: fetch
+        env:
+          PYTHONUNBUFFERED: 1
+          NO_DELAY: ${{ inputs.no_delay }}
+        run: |
+          if [ "$NO_DELAY" = "true" ]; then
+            python scripts/fetch_photos.py --no-delay
+          else
+            python scripts/fetch_photos.py
+          fi
+
+      - name: Notify Telegram
+        if: always()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          FETCH_OUTCOME: ${{ steps.fetch.outcome }}
+          FETCH_STATUS: ${{ steps.fetch.outputs.status }}
+          FETCH_MESSAGE: ${{ steps.fetch.outputs.message }}
+        run: |
+          if [ "$FETCH_OUTCOME" != "success" ]; then
+            TEXT="❌ PoliAule photo fetch crashed — check the Actions log."
+          elif [ "$FETCH_STATUS" = "failed" ]; then
+            TEXT=$(printf '⚠️ PoliAule photo fetch\n%s' "$FETCH_MESSAGE")
+          else
+            TEXT=$(printf '✅ PoliAule photo fetch\n%s' "$FETCH_MESSAGE")
+          fi
+          curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            --data-urlencode chat_id="${TELEGRAM_CHAT_ID}" \
+            --data-urlencode text="$TEXT"
+
+      - name: Upload changed photos to R2
+        if: hashFiles('photos/*.jpg') != ''
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          for f in photos/*.jpg; do
+            npx --yes wrangler@4 r2 object put "poliaule-data/$f" --file "$f" --content-type image/jpeg --remote
+            npx --yes wrangler@4 r2 object put "poliaule-data-beta/$f" --file "$f" --content-type image/jpeg --remote
+          done
+
+      - name: Purge API cache for changed photos
+        if: hashFiles('photos/*.jpg') != ''
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          # Cloudflare's purge-by-URL API accepts at most 30 files per call.
+          ls photos/*.jpg | xargs -n1 basename | sed 's/\.jpg$//' | while read -r id; do
+            echo "https://api.poliaule.com/v1/photos/${id}"
+            echo "https://api-beta.poliaule.com/v1/photos/${id}"
+          done > /tmp/purge-urls.txt
+
+          split -l 30 /tmp/purge-urls.txt /tmp/purge-batch-
+          for batch in /tmp/purge-batch-*; do
+            URLS=$(jq -R . "$batch" | jq -s '{files: .}')
+            curl -sS -X POST "https://api.cloudflare.com/client/v4/zones/7ba55951cabeecf5f38d0c35762ea451/purge_cache" \
+              -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              -H "Content-Type: application/json" \
+              --data "$URLS"
+          done
+
+      # Only persisted when everything before it (fetch, upload, purge) succeeded,
+      # so a partial failure forces a retry next run instead of the manifest
+      # silently drifting from what's actually in R2 (see the restore step above).
+      # fetch_photos.py always rewrites manifest.json, carrying unchanged hashes
+      # forward, so this is a complete snapshot even on a no-change run.
+      - name: Save photo manifest to R2
+        if: success()
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          for bucket in poliaule-data poliaule-data-beta; do
+            npx --yes wrangler@4 r2 object put "$bucket/photos/manifest.json" \
+              --file photos/manifest.json --content-type application/json --remote
+          done

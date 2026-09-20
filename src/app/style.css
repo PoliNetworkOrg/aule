@@ -1,0 +1,1984 @@
+/* Theme and color schemes */
+:root {
+  box-sizing: border-box;
+
+  scrollbar-width: thin;
+  scrollbar-color: gray transparent;
+
+  /* Layout metrics normally kept live by JS (script.js / bottom-nav.js write
+     these onto the same element as inline styles, which win over these). They
+     are seeded here so the very first layout — before those scripts run, or if
+     a module fails to load — is already close, instead of every consumer
+     falling back to its own hand-written literal (which had drifted: some said
+     80px, some 84px for the header). */
+  --header-height: 84px;
+  --bottom-nav-height: 88px;
+  --side-nav-width: 88px;
+  /* not --picker-bar-height: it is legitimately 0 when the picker bar isn't
+     sticky (desktop) or not present, so its per-use `, 0px` fallback stays. */
+}
+
+.app-tooltip {
+  @apply absolute;
+  z-index: 9999;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: var(--text-color-primary);
+  color: var(--background-color);
+  font-family:
+    "Nunito",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  font-size: var(--text-70);
+  font-weight: 600;
+  white-space: nowrap;
+  @apply pointer-events-none;
+  opacity: 0;
+  transform: translateY(3px);
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease;
+}
+
+.app-tooltip--visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+*,
+*:before,
+*:after {
+  box-sizing: inherit;
+}
+
+/* Native-app feel: reserve the pointing-hand cursor for genuine links only.
+   Buttons, tabs, toggles, cards, selects and menu items keep the default
+   arrow and communicate their affordance through hover/active states, the
+   way native UI does. Individual components must not re-add cursor: pointer,
+   nor grab/grabbing on custom drag controls (sliders, scrubbers, deform
+   handles) — draggability is shown through motion, not a cursor swap. Only
+   col-resize / not-allowed / text, where they genuinely apply. */
+button,
+[role="button"],
+[role="option"],
+[role="tab"],
+[role="switch"],
+[role="tablist"],
+[role="listbox"],
+[role="menu"],
+label,
+summary,
+select {
+  cursor: default;
+}
+
+/* Native-app feel: UI chrome is not text you drag-select. Buttons, tabs,
+   toggles, option lists and the label text inside them are unselectable,
+   like native controls. Genuine content — classroom names, addresses,
+   opening hours, schedule/event text, info-page prose, text inputs — opts
+   back in with `user-select: text` in its own component. */
+button,
+[role="button"],
+[role="option"],
+[role="tab"],
+[role="switch"],
+[role="tablist"],
+[role="listbox"],
+[role="menu"],
+label,
+summary,
+select,
+.app-header,
+.bn-tabbar,
+.empty-container-title,
+.empty-container-subtitle,
+.detail-section-header,
+.detail-section-title,
+.detail-status-label,
+.detail-schedule-legend-label,
+.detail-schedule-labels-pill,
+.detail-schedule-label-cell,
+.badge-label,
+.badge-text,
+.github-stat-label {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+:root {
+  --background-color: #f2f2f2;
+  --background-color-secondary: #ffffff;
+
+  --popup-background: rgba(230, 230, 230, 0.5);
+
+  /* Text colors */
+  --text-color-primary: #1a1a1a;
+  --text-color-secondary: #333333;
+  --text-color-accent: #2a9e47;
+
+  /* Status colors */
+  --color-status-free: #2a9e47;
+  --color-status-free-soon: #5a7a10;
+  --color-status-partial: #f0b429;
+  --color-status-busy: #e53935;
+
+  --accent-gradient: linear-gradient(135deg, #0d7a30, #2ecc5a);
+  --busy-gradient: linear-gradient(135deg, #ff5252, #e53935);
+
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 4px 12px rgba(0, 0, 0, 0.08);
+
+  /* Radius scale — matches the values already in use across components,
+     not an invented step size. Nested/concentric corners (an inner element
+     whose radius is derived from its parent's radius minus padding, so the
+     curves stay parallel) are intentionally NOT put on this scale — forcing
+     a fixed token there breaks the concentric relationship. */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-2xl: 32px;
+  --radius-pill: 999px;
+
+  /* Type scale — the 12 sizes actually used 5+ times across components,
+     not an invented scale. Values used ≤4 times were snapped into the
+     nearest step here only when within ~0.03–0.05rem (imperceptible);
+     anything farther off (one-off hero sizes, icon-specific px values)
+     was left as a literal rather than forced to fit. */
+  --text-70: 0.7rem;
+  --text-72: 0.72rem;
+  --text-75: 0.75rem;
+  --text-80: 0.8rem;
+  --text-85: 0.85rem;
+  --text-90: 0.9rem;
+  --text-100: 1rem;
+  --text-110: 1.1rem;
+  /* The headline steps are fluid: they hold their full (max) size from tablet
+     width up, and ease down on narrow phones so a 24px card title on a 360px
+     screen doesn't dominate the card. rem alone can't do this — it's fixed to
+     the root size and never reacts to the viewport. Max == the old fixed
+     value, so desktop is unchanged. */
+  --text-125: clamp(1.15rem, 1.09rem + 0.3vw, 1.25rem);
+  --text-150: clamp(1.3rem, 1.16rem + 0.7vw, 1.5rem);
+  --text-175: clamp(1.45rem, 1.26rem + 0.95vw, 1.75rem);
+  --text-200: clamp(1.6rem, 1.36rem + 1.2vw, 2rem);
+
+  /* Glass material — the tabbar's recipe (bn-tabbar, pre-tokenization) is
+     the canonical source for this; every other translucent surface should
+     match it, not the other way around. No saturate() — the tabbar never
+     had one. */
+  --glass-tint: rgba(250, 250, 250, 0.7);
+  --glass-outline: rgba(0, 0, 0, 0.25);
+  --glass-shadow-color: rgba(0, 0, 0, 0.1);
+  /* The specular rim along the top and bottom edges. Plain white here; the
+     HDR block below pushes it past white on displays that have the headroom
+     (see the --glass-specular override under `dynamic-range: high`). Dark
+     mode redefines --glass-highlight wholesale and doesn't use this. */
+  --glass-specular: rgb(255 255 255);
+  --glass-highlight:
+    inset -1px 0 2px 0 rgba(0, 0, 0, 0.25), inset 1px 0 2px 0 rgba(0, 0, 0, 0.25),
+    inset 0 -1px 2px 0 var(--glass-specular), inset 0 1px 2px 0 var(--glass-specular),
+    inset 0 -8px 4px 0 rgba(0, 0, 0, 0.02), inset 0 8px 4px 0 rgba(0, 0, 0, 0.02);
+  --glass-blur-sm: 4px;
+  --glass-blur-md: 8px;
+  --glass-blur-lg: 18px;
+
+  /* "Clear" variant — a lighter tint and a shallower blur for surfaces that
+     want to stay glassy but read as less opaque (e.g. the campus sheet at
+     its collapsed detent, where it should get out of the map's way). Same
+     alpha reduction in both themes; only the base colour differs, same as
+     --glass-tint above. */
+  --glass-tint-clear: rgba(250, 250, 250, 0.35);
+  --glass-blur-clear: 8px;
+
+  /* Outside 0.5px gradient stroke, top to bottom (Figma's outside-stroke
+     equivalent). Applied per glass surface via a masked ::after ring —
+     see .header-button::after below for the shared recipe. */
+  --glass-stroke-gradient: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 1) 0%,
+    rgba(94, 94, 94, 0.25) 25%,
+    rgba(94, 94, 94, 0.8) 50%,
+    rgba(94, 94, 94, 0.25) 75%,
+    rgba(255, 255, 255, 1) 100%
+  );
+  --glass-stroke-opacity: 0.8;
+
+  /* Repeated shadow/glow patterns, extracted only where the literal value
+     was byte-identical across multiple files — not a general elevation
+     scale, just naming duplication that already existed. */
+  --bevel: inset 1px 1px 0 rgba(255, 255, 255, 0.3), inset -1px -1px rgba(255, 255, 255, 0.1);
+  --glow-accent: 0 2px 8px color-mix(in srgb, var(--text-color-accent) 40%, transparent);
+  --glow-info: 0 2px 8px rgba(33, 150, 243, 0.4);
+  --shadow-groove: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+  --shadow-dim: 0 1px 2px rgba(0, 0, 0, 0.5);
+
+  /* Bouncy press feedback shared by the glass buttons (header, campus
+     picker, back button, search FAB). The moment a button is touched it
+     snaps down fast and linearly; on release it springs back with an
+     overshoot via the spring easing over a longer duration. */
+  --press-scale: 0.9;
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --press-in-dur: 0.11s;
+  --press-in-ease: cubic-bezier(0.3, 0, 0.4, 1);
+  --press-out-dur: 0.5s;
+
+  /* "Now" marker blue — fixed by design, doesn't react to theme (verified:
+     no dark-mode override exists anywhere it's used). */
+  --color-now: #2196f3;
+
+  /* Darker/more-saturated green used only inside dark-mode blocks for the
+     today/now indicators, for better white-text contrast than
+     --text-color-accent's dark value gives (per the original comments). */
+  --color-accent-dark: #28a745;
+  --color-accent-dark-hover: #218838;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background-color: #1e1e1e;
+    --background-color-secondary: #2a2a2a;
+
+    --popup-background: rgba(100, 100, 100, 0.75);
+
+    /* Text colors */
+    --text-color-primary: #eaeaea;
+    --text-color-secondary: #cccccc;
+    --text-color-accent: #3ce065;
+
+    /* Status colors */
+    --color-status-free: #3ce065;
+    --color-status-free-soon: color-mix(
+      in srgb,
+      var(--color-status-free) 70%,
+      var(--color-status-partial)
+    );
+    --color-status-partial: #f5a623;
+    --color-status-busy: #ff5252;
+
+    --accent-gradient: linear-gradient(135deg, #1fa840, #90ffb8);
+    --busy-gradient: linear-gradient(135deg, #f44336, #ff867f);
+
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 12px rgba(0, 0, 0, 0.6);
+
+    --glass-tint: rgba(21, 21, 21, 0.8);
+    --glass-tint-clear: rgba(21, 21, 21, 0.35);
+    --glass-outline: rgba(255, 255, 255, 0.25);
+    --glass-shadow-color: rgba(0, 0, 0, 0.1);
+    --glass-highlight:
+      inset -1px 0 2px 0 rgba(0, 0, 0, 0.75), inset 1px 0 2px 0 rgba(0, 0, 0, 0.75),
+      inset 0 -1px 2px 0 rgba(255, 255, 255, 0.2), inset 0 1px 2px 0 rgba(255, 255, 255, 0.2),
+      inset 0 -8px 4px 0 rgba(255, 255, 255, 0.02), inset 0 8px 4px 0 rgba(255, 255, 255, 0.02);
+    --glass-stroke-gradient: linear-gradient(
+      to bottom,
+      rgba(223, 223, 223, 0.35) 0%,
+      rgba(41, 41, 41, 0.5) 25%,
+      rgba(0, 0, 0, 1) 50%,
+      rgba(41, 41, 41, 0.5) 75%,
+      rgba(223, 223, 223, 0.35) 100%
+    );
+  }
+}
+
+/* HDR specular highlights.
+
+   In light mode the glass rim was already rgb(255 255 255) — the brightest
+   colour SDR can express — so against a light background it barely reads as a
+   highlight at all. On a display with dynamic range to spare we spend it here:
+   components above 100% in display-p3 are extended-range values, and the
+   compositor takes them past reference white instead of clamping.
+
+   Gated on `dynamic-range: high` rather than left to clamp on its own, so SDR
+   displays keep the exact previous value and the effect is one token to tune.
+   Requires an HDR-capable display *and* the browser actually driving it in HDR
+   (Chrome/Edge 136+, Safari 26+); everywhere else the media query simply
+   doesn't match.
+
+   The @supports is load-bearing, not belt-and-braces: the media query shipped
+   before color() did (Chrome 98 vs 111), so a browser in that gap would store
+   an unparseable value in --glass-specular. Custom properties aren't validated
+   until substitution, so that wouldn't fall back through the cascade — it
+   would invalidate the whole box-shadow at computed-value time and drop it to
+   `none`, taking the outline and drop shadow with it. */
+@media (dynamic-range: high) {
+  @supports (color: color(display-p3 1 1 1)) {
+    :root {
+      --glass-specular: color(display-p3 200% 200% 200%);
+    }
+  }
+}
+
+/* ── Perf-gated glass blur ────────────────────────────────────────────────
+   utils/blur-capability.js grants [data-blur="on"] only once a splash-time
+   benchmark proves the device composites backdrop-filter smoothly (or the
+   user picks "On" in Settings). No blur is the safe baseline: before the
+   verdict lands, and on any device that fails the benchmark, every
+   backdrop-filter in the app is disabled and the shared glass tint becomes
+   near-opaque so translucent surfaces stay legible without the blur behind
+   them. Higher specificity than :root (and :root inside the dark-mode media
+   query) so it overrides both regardless of source order. */
+:root[data-blur="off"] {
+  --glass-blur-sm: 0px;
+  --glass-blur-md: 0px;
+  --glass-blur-lg: 0px;
+  --glass-blur-clear: 0px;
+  --glass-tint: rgba(250, 250, 250, 0.94);
+  --glass-tint-clear: rgba(250, 250, 250, 0.9);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-blur="off"] {
+    --glass-tint: rgba(21, 21, 21, 0.94);
+    --glass-tint-clear: rgba(21, 21, 21, 0.9);
+  }
+}
+
+/* Catches every backdrop-filter in the app, including the ones on hardcoded
+   pixel values that don't go through --glass-blur-* (settings, info page,
+   keybindings overlay, campus map pills, etc.) — one rule instead of
+   migrating each file's hardcoded blur to a token. */
+:root[data-blur="off"] * {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Base Styles */
+html,
+body {
+  touch-action: manipulation;
+}
+
+html {
+  @apply h-full;
+
+  overflow-x: hidden;
+  overflow-y: auto;
+
+  /* Don't let Android Chrome / WebView auto-inflate the font size of text in
+     wide blocks ("font boosting"). It scales the *rendered* size — not the rem
+     values — so it only shows on Android (never desktop or iOS Safari), which
+     is exactly why the cards looked oversized only there. `100%` keeps the
+     user's own browser font-size preference working. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+
+  background-color: transparent;
+}
+
+/* Always reserve the scrollbar's width, but only where there's a classic
+   (space-taking) scrollbar to reserve — i.e. pointer:fine / desktop. Opening
+   the classroom detail collapses every .tab-content to height:0, which removes
+   the page scrollbar; closing it brings it back. Without a stable gutter that
+   ~15px swing changes the content width, and grids sized with
+   repeat(auto-fill, ...) (Campus building page, Available results) resolve to a
+   different column count before vs. after the transition.
+   On touch devices the scrollbar is an overlay (zero-width), so `stable` would
+   only ever subtract usable width for no benefit — and on a 360px phone that
+   was enough to drop the results grid to a single column. `scrollbar-width:
+   thin` (set on :root) still applies everywhere; that's the "thin scrollbar",
+   independent of this. */
+@media (pointer: fine) {
+  html {
+    scrollbar-gutter: stable;
+  }
+}
+
+body {
+  min-height: 100%;
+  margin: 0;
+  padding: 0;
+
+  @apply flex;
+  @apply flex-col;
+
+  background-color: var(--background-color);
+  scroll-behavior: smooth;
+  text-align: center;
+  font-family:
+    "Nunito",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
+
+  /* Remove the tap highlight for mobile browsers */
+  -webkit-tap-highlight-color: transparent;
+
+  user-select: none;
+}
+
+.noscript-overlay {
+  @apply fixed;
+  @apply inset-0;
+  z-index: 9999;
+
+  background: var(--background-color);
+
+  @apply flex;
+  @apply items-center;
+  @apply justify-center;
+  padding: 2rem;
+}
+
+/* ── Splash Screen ────────────────────────────────────────────────────────
+   Every visual rule for the splash (.splash-overlay, .splash-logo,
+   .splash-loading-label, the splash-error-* state, splash-header-item,
+   html:has(.splash-overlay), and the splash-logo-fade-in/splash-loading-*
+   keyframes) lives ONLY in index.html's inlined critical <style> now, not
+   here. It used to be duplicated in both places ("keep in sync" comments on
+   each copy) — but @keyframes don't merge across stylesheets: when this
+   file's identically-named @keyframes finished loading, it fully replaced
+   the inline one as the winning rule, and that swap was visibly restarting
+   the splash logo's fade-in mid-animation on slow connections (the two
+   copies were behaviorally identical but came from different CSSOM
+   objects, which browsers don't always treat as "no real change"). Since
+   the splash element is always gone from the DOM well before this
+   stylesheet matters, there's no reason for it to restate any of this —
+   only the reduced-motion --ease-spring override (app-wide, not
+   splash-specific) and the view-transition rules below (never duplicated
+   inline — they don't apply until the transition actually starts, long
+   after this file has loaded) still belong here. */
+@media (prefers-reduced-motion: reduce) {
+  /* Keep the press feedback, drop the springy overshoot. */
+  :root {
+    --ease-spring: ease;
+    --press-in-ease: ease;
+    --press-out-dur: 0.15s;
+  }
+}
+
+/* Splash logo View Transition */
+@supports (view-transition-name: none) {
+  /* Pure positional morph — suppress the default cross-fade so it reads as
+     one image moving rather than two images dissolving into each other.
+     The splash logo and the header logo are the same artwork, so we keep
+     only the "old" snapshot visible (it scales with the group) and hide the
+     "new" one entirely — otherwise both are painted at full opacity at
+     different sizes and you see two icons stacked during the morph. */
+  ::view-transition-old(splash-icon) {
+    animation: none;
+  }
+
+  ::view-transition-new(splash-icon) {
+    animation: none;
+    opacity: 0;
+  }
+
+  ::view-transition-group(splash-icon) {
+    animation-duration: 0.6s;
+    animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+}
+
+/* Generic HTML Elements */
+h1 {
+  font-size: 3rem;
+  font-weight: bold;
+  color: var(--text-color-primary);
+}
+
+h2 {
+  font-size: 2.25rem;
+  font-weight: bold;
+  color: var(--text-color-primary);
+}
+
+h3 {
+  font-size: var(--text-175);
+  font-weight: 600;
+  color: var(--text-color-primary);
+}
+
+h4 {
+  font-size: var(--text-150);
+  font-weight: 500;
+  color: var(--text-color-primary);
+}
+
+p {
+  font-size: var(--text-100);
+  color: var(--text-color-primary);
+}
+
+a {
+  color: var(--text-color-accent);
+}
+
+.body-text {
+  font-size: var(--text-100);
+  color: var(--text-color-primary);
+}
+
+.body-small-text {
+  font-size: var(--text-85);
+  color: var(--text-color-primary);
+}
+
+.caption-text {
+  font-size: var(--text-75);
+  color: var(--text-color-primary);
+}
+
+label {
+  font-size: var(--text-75);
+  font-weight: medium;
+  color: var(--text-color-primary);
+}
+
+.quote-text {
+  font-size: var(--text-100);
+  font-style: italic;
+  color: var(--text-color-primary);
+}
+
+.button-text {
+  font-size: var(--text-80);
+  font-weight: medium;
+  color: var(--text-color-primary);
+}
+
+.transparent-button {
+  background-color: transparent;
+  border-color: transparent;
+}
+
+.secondary {
+  color: color-mix(in srgb, var(--text-color-primary) 70%, transparent);
+}
+
+.info-box {
+  @apply flex;
+  @apply flex-col;
+  @apply items-center;
+  gap: 0.25rem;
+
+  padding: 1rem 1.25rem;
+  border-radius: 12px;
+
+  background: color-mix(in srgb, #f5a623 15%, transparent);
+  border: 1px solid color-mix(in srgb, #f5a623 30%, transparent);
+
+  mix-blend-mode: multiply;
+
+  width: fit-content;
+  align-self: center;
+  margin: 0 auto;
+}
+
+@media (prefers-color-scheme: dark) {
+  .info-box {
+    mix-blend-mode: screen;
+  }
+}
+
+.info-box-icon {
+  margin: 0;
+  font-size: var(--text-150);
+}
+
+.info-box-title {
+  margin: 0;
+  color: #d4820a;
+  font-weight: bold;
+}
+
+@media (prefers-color-scheme: dark) {
+  .info-box-title {
+    color: #f5a623;
+  }
+}
+
+.info-box-content {
+  margin: 0;
+  font-size: var(--text-90);
+  color: color-mix(in srgb, #d4820a 80%, var(--text-color-primary));
+  font-weight: 600;
+}
+
+/* --- Styles --- */
+
+/* Header */
+.header-top-strip {
+  @apply sticky;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1001;
+
+  height: 11px;
+
+  background-color: var(--background-color);
+}
+
+.header {
+  padding-top: calc(env(safe-area-inset-top));
+
+  @apply flex;
+  @apply flex-col;
+  gap: 0;
+
+  @apply sticky;
+  top: 11px;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+
+  user-select: none;
+
+  isolation: isolate;
+}
+
+/* Opaque fill behind the status-bar safe area. The blur/fade layers live
+   inside .header-top-line-container, which starts below .header's
+   safe-area padding, so that strip has no background of its own. On most
+   browsers the status bar hides it; in a Safari iOS PWA the safe area is
+   transparent and page content is visible scrolling underneath. */
+.header::before {
+  content: "";
+  @apply absolute;
+  inset: 0 0 auto 0;
+  height: env(safe-area-inset-top);
+  background-color: var(--background-color);
+  z-index: 0;
+  @apply pointer-events-none;
+}
+
+.header-blur-layers {
+  @apply absolute;
+  @apply inset-0;
+  bottom: -0.5rem;
+
+  @apply pointer-events-none;
+  /* Negative so it paints behind header-top-line-container's own (non-
+     positioned) content without needing z-index on every sibling — scoped
+     to that container's stacking context via its position+z-index below. */
+  z-index: -1;
+}
+
+.header-blur-layer {
+  @apply absolute;
+  @apply inset-0;
+}
+
+.header-blur-layer:nth-child(1) {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  mask-image: linear-gradient(to bottom, transparent 0%, black 12.5%, black 25%, transparent 37.5%);
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    black 12.5%,
+    black 25%,
+    transparent 37.5%
+  );
+}
+
+.header-blur-layer:nth-child(2) {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 12.5%,
+    black 25%,
+    black 37.5%,
+    transparent 50%
+  );
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 12.5%,
+    black 25%,
+    black 37.5%,
+    transparent 50%
+  );
+}
+
+.header-blur-layer:nth-child(3) {
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 25%,
+    black 37.5%,
+    black 50%,
+    transparent 62.5%
+  );
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 25%,
+    black 37.5%,
+    black 50%,
+    transparent 62.5%
+  );
+}
+
+.header-blur-layer:nth-child(4) {
+  backdrop-filter: blur(1px);
+  -webkit-backdrop-filter: blur(1px);
+  mask-image: linear-gradient(to bottom, transparent 37.5%, black 50%, black 100%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 37.5%, black 50%, black 100%);
+}
+
+.header-fade-overlay {
+  @apply absolute;
+  @apply inset-0;
+
+  background: linear-gradient(
+    to bottom,
+    var(--background-color) 0%,
+    color-mix(in srgb, var(--background-color) 70%, transparent) 45%,
+    color-mix(in srgb, var(--background-color) 25%, transparent) 70%,
+    transparent 100%
+  );
+}
+
+.header-top-line-container {
+  @apply relative;
+  z-index: 1;
+
+  padding: 0 1rem;
+
+  @apply flex;
+  @apply flex-row;
+  @apply items-center;
+  @apply justify-between;
+
+  line-height: 2rem;
+}
+
+.header-title-container {
+  @apply flex;
+  @apply flex-row;
+
+  @apply items-center;
+  @apply justify-start;
+  gap: 0.5rem;
+}
+
+.header-title-btn {
+  @apply flex;
+  @apply flex-row;
+  @apply items-center;
+  gap: 0.5rem;
+  background: none;
+  border: none;
+  padding: 0;
+  border-radius: 0.5rem;
+  -webkit-tap-highlight-color: transparent;
+  font: inherit;
+}
+
+.header-title-beta-container > h4 {
+  margin: 0;
+  padding: 0;
+
+  line-height: 0;
+}
+
+.header-title-beta-container {
+  @apply flex;
+  @apply flex-row;
+  align-items: baseline;
+  @apply justify-center;
+  gap: 0.2em;
+}
+
+.header-title {
+  font-size: var(--text-200);
+  font-weight: bold;
+
+  background: var(--text-color-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+
+  mix-blend-mode: multiply;
+}
+
+@media (prefers-color-scheme: dark) {
+  .header-title {
+    mix-blend-mode: normal;
+  }
+}
+
+.header-logo {
+  width: auto;
+  height: 2rem;
+
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.header-buttons-container {
+  @apply flex;
+  @apply flex-row;
+  @apply items-center;
+  @apply justify-center;
+  gap: 0.5rem;
+}
+
+.header-button {
+  @apply relative;
+
+  width: 3rem;
+  height: 3rem;
+  border-radius: var(--radius-pill);
+
+  /* Same glass material as the tabbar/back button. */
+  background: var(--glass-tint);
+  backdrop-filter: blur(var(--glass-blur-sm));
+  -webkit-backdrop-filter: blur(var(--glass-blur-sm));
+
+  color: var(--text-color-secondary);
+
+  @apply flex;
+  @apply items-center;
+  @apply justify-center;
+
+  border-color: transparent;
+
+  box-shadow:
+    0 0 0 0.1px var(--glass-outline),
+    var(--glass-highlight),
+    0 4px 40px 0 var(--glass-shadow-color);
+
+  transition:
+    background-color 0.2s ease,
+    box-shadow 0.2s ease;
+
+  /* Lit hover state, press feedback and the swipe-deform are all handled by
+     the shared .liquid-glass rules (components/liquid-glass.{css,js}). */
+}
+
+/* Outside 0.5px gradient stroke (Figma's "outside stroke") without
+   affecting layout. header-button is a true circle (fixed equal
+   width/height), so the ring is masked with a radial-gradient rather than
+   the padding + mask-composite: exclude trick used on the pill-shaped
+   surfaces (.bn-tabbar::after, .detail-back-btn::after) — that box-corner
+   technique has a seam at the four cardinal points of a perfect circle
+   (border-radius: 999px on a square box), rendered as a bright spot/arc
+   instead of a clean ring. A radial-gradient mask is exact Euclidean
+   distance from the center, so it doesn't hit that seam. .bn-search-btn is
+   also a true circle and uses the same fix (see bottom-nav.css). */
+.header-button::after {
+  content: "";
+  @apply absolute;
+  inset: -0.5px;
+  border-radius: inherit;
+
+  background: var(--glass-stroke-gradient);
+  opacity: var(--glass-stroke-opacity);
+
+  -webkit-mask-image: radial-gradient(
+    circle closest-side,
+    transparent calc(100% - 0.5px),
+    #fff calc(100% - 0.5px)
+  );
+  mask-image: radial-gradient(
+    circle closest-side,
+    transparent calc(100% - 0.5px),
+    #fff calc(100% - 0.5px)
+  );
+
+  @apply pointer-events-none;
+}
+
+/* Favourite toggle: only ever visible on the classroom detail page.
+   .header-button sets `display: flex`, which outranks the `hidden` attribute's
+   UA `display: none`, so visibility is driven from `body.detail-open` here
+   instead (the JS `hidden` toggle is kept as a harmless belt-and-braces). */
+#favourite-btn {
+  display: none;
+}
+
+body.detail-open #favourite-btn {
+  @apply flex;
+}
+
+/* hgi-star outline by default, filled yellow star when the current classroom
+   is favourited (icon swapped in JS, see classroom-detail.js). */
+#favourite-btn .hgi-star {
+  font-size: 1.375rem;
+}
+
+#favourite-btn .star-icon {
+  width: 1.5rem;
+  height: 1.5rem;
+  @apply block;
+}
+
+#favourite-btn.favourite-btn--active {
+  color: #f0b429;
+}
+
+.pulse-indicator {
+  --pulse-color: var(--text-color-secondary);
+}
+
+.pulse-indicator.green {
+  --pulse-color: var(--text-color-accent);
+}
+
+.pulse-indicator.yellow {
+  --pulse-color: #f0b429;
+}
+
+.pulse-indicator.red {
+  --pulse-color: #e53935;
+}
+
+.pulse-indicator {
+  @apply relative;
+  width: 1rem;
+  height: 1rem;
+}
+
+.pulse-indicator::before,
+.pulse-indicator::after {
+  content: "";
+  @apply absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+}
+
+.pulse-indicator::before {
+  @apply w-full;
+  @apply h-full;
+  background: var(--pulse-color);
+  animation: pulse-dot 2s ease-out infinite;
+}
+
+.pulse-indicator::after {
+  @apply w-full;
+  @apply h-full;
+  border: 2px solid var(--pulse-color);
+  animation: pulse-ring 2s ease-out infinite;
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.8;
+  }
+
+  70% {
+    transform: translate(-50%, -50%) scale(1.8);
+    opacity: 0;
+  }
+
+  100% {
+    transform: translate(-50%, -50%) scale(1.8);
+    opacity: 0;
+  }
+}
+
+@keyframes pulse-dot {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+
+  70% {
+    transform: translate(-50%, -50%) scale(1.1);
+  }
+
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+.data-fetch-popover-container {
+  @apply flex;
+  @apply flex-col;
+
+  gap: 0;
+}
+
+.data-reload-btn {
+  @apply flex;
+  @apply items-center;
+  gap: 0.35rem;
+  margin-top: 0.75rem;
+  font-size: var(--text-85);
+}
+
+.data-reload-icon {
+  font-size: var(--text-100);
+  transition: transform 0.3s ease;
+}
+
+.data-reload-icon.spinning {
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.header-nav-row {
+  @apply relative;
+  z-index: 1;
+  @apply flex;
+  @apply items-center;
+  @apply justify-center;
+  padding: 0 1rem;
+  /* Collapses to 0 by default so it doesn't eat space in the header when the
+     back button isn't shown. The back button is absolutely positioned (out
+     of flow), so once it's visible this row has no in-flow content to size
+     itself against — without an explicit height it collapses to ~0 and the
+     button (vertically centered via its own top:50%/translateY) ends up
+     overflowing it top and bottom. 3.5rem gives the button (34px tall)
+     comfortable clearance from the header bar above. */
+}
+
+body.detail-open .header-nav-row,
+body.info-open .header-nav-row {
+  min-height: 3.5rem;
+}
+
+.hgi-stroke {
+  font-size: 22px !important;
+}
+
+@keyframes slide-in-top {
+  from {
+    opacity: 0;
+    filter: blur(4px);
+    transform: translateY(-20px);
+    scale: 0.92;
+  }
+
+  to {
+    opacity: 1;
+    filter: blur(0px);
+    transform: translateY(0);
+    scale: 1;
+  }
+}
+
+/* Footer */
+.footer {
+  @apply flex;
+  @apply flex-row;
+  @apply items-center;
+  @apply justify-between;
+
+  padding: 1rem;
+  /* --bottom-nav-height is only the pill bar's own rendered height; the bar
+     also floats 20px clear of the viewport edge (see .bn-wrapper's
+     `bottom: 20px`), so that offset has to be added back in here. */
+  padding-bottom: calc(var(--bottom-nav-height, 88px) + 20px);
+}
+
+@media (min-width: 600px) {
+  /* Rail moves to the top-left at this width, so the bottom clearance above
+     no longer applies (see the matching breakpoint in bottom-nav.css). */
+  .footer {
+    padding-bottom: 1rem;
+  }
+}
+
+.version-info-button > label {
+  text-decoration: underline;
+  font-family:
+    "Nunito",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+}
+
+.info-label {
+  text-align: end;
+}
+
+.slide-in-top {
+  animation: slide-in-top 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Tab content */
+.body-container {
+  /* Clears the header blur/fade layer's -2rem overhang so the first section's
+     title (e.g. Favourites) isn't blurred at the top. */
+  padding-top: 1.5rem;
+  padding-bottom: var(--bottom-nav-height, 88px);
+
+  flex: 1;
+  @apply flex;
+  @apply flex-col;
+}
+
+@media (min-width: 600px) {
+  .body-container {
+    padding-bottom: 0;
+  }
+}
+
+.tab-content {
+  padding: 0 1rem;
+
+  /* content-visibility:hidden instead of display:none: it still keeps the
+     subtree out of layout/paint, but (unlike display:none) doesn't remove it
+     from the render tree, so content-visibility:auto on descendants (e.g.
+     .classroom-card) keeps working — switching tabs doesn't force a full
+     "unhide and lay out everything" pass over the tab being shown. */
+  content-visibility: hidden;
+}
+
+@media (min-width: 600px) {
+  .tab-content {
+    /* Clears the fixed side rail: its own left offset (20px) + its measured
+       width (--side-nav-width, kept live by bottom-nav.js) + breathing room. */
+    padding-left: calc(20px + var(--side-nav-width, 88px) + 1.5rem);
+  }
+}
+
+.tab-content.visible {
+  content-visibility: visible;
+
+  flex: 1;
+  @apply flex;
+  @apply flex-col;
+
+  /* No `forwards`: with it, the frozen final keyframe leaves `filter:
+     blur(0)` / `transform: scale(1,1)` permanently applied as live
+     properties (not `none`) once the animation ends. Safari treats even a
+     no-op filter like that as an active filter root and refuses to
+     composite a *nested* backdrop-filter underneath it (e.g. the date
+     picker's lifted indicator blurring inside its already-blurred
+     container) — Firefox doesn't have this quirk. Nothing else here sets
+     filter/transform at rest, so dropping `forwards` reverts them to
+     `none` after the 0.3s animation completes, which is visually identical
+     but stops blocking descendants' own backdrop-filter in Safari. */
+  animation: appear 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes appear {
+  from {
+    opacity: 0;
+    filter: blur(8px);
+    transform: scale(0.95, 1);
+  }
+
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: scale(1, 1);
+  }
+}
+
+@keyframes disappear {
+  from {
+    opacity: 1;
+    filter: blur(0);
+    transform: scale(1);
+  }
+
+  to {
+    opacity: 0;
+    filter: blur(8px);
+    transform: scale(0.95);
+  }
+}
+
+@keyframes i18n-pop {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.96);
+    filter: blur(3px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+.i18n-animate {
+  animation: i18n-pop 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.section-header {
+  @apply flex;
+  @apply flex-col;
+
+  @apply justify-start;
+  text-align: start;
+
+  padding: 1rem 0;
+}
+
+.section-header-title,
+.section-header-subtitle,
+.subsection-header-title,
+.subsection-header-subtitle {
+  margin: 0;
+  padding: 0;
+}
+
+.section-header-title {
+  @apply flex;
+  @apply items-center;
+  @apply justify-start;
+  gap: 4px;
+  /* Base size for the 600–1100px range; the <600 and >1100 media queries below
+     override it. Token, not a bare 18px, to stay on the type scale. */
+  font-size: var(--text-110);
+  font-weight: bold;
+  /* Solid color + opacity, not rgba() alpha: Safari drops the alpha channel
+     of an inherited color on the HugeIcons ::before glyph (stacking context
+     from blur/view-transitions), so the icon rendered at full opacity while
+     the text was at 50%. opacity dims both identically. */
+  color: #000;
+  opacity: 0.5;
+}
+
+.section-header-title-icon {
+  flex: none;
+  font-size: 1em;
+  width: 1em;
+  height: 1em;
+  line-height: 1;
+}
+
+@media (prefers-color-scheme: dark) {
+  .section-header-title {
+    color: #fff;
+  }
+}
+
+.section-header-subtitle {
+  font-size: 1.35rem;
+}
+
+@media (max-width: 600px) {
+  .section-header-title {
+    font-size: var(--text-175);
+  }
+
+  .section-header-subtitle {
+    font-size: var(--text-100);
+  }
+}
+
+.subsection-header-title {
+  font-size: var(--text-150);
+  font-weight: 600;
+}
+
+.subsection-header-subtitle {
+  font-size: var(--text-85);
+}
+
+@media (max-width: 600px) {
+  .subsection-header-title {
+    font-size: var(--text-125);
+  }
+
+  .subsection-header-subtitle {
+    font-size: var(--text-75);
+  }
+}
+
+.form {
+  @apply flex;
+  @apply flex-col;
+
+  text-align: center;
+  @apply justify-center;
+
+  gap: 1rem;
+}
+
+/* Campus + Date pills sit side by side, wrapping to a second line on narrow
+   viewports, left-aligned across the full width of the form. */
+.picker-row {
+  @apply flex;
+  flex-flow: row wrap;
+  @apply justify-start;
+  @apply items-start;
+  gap: 0.75rem;
+  @apply w-full;
+
+  /* So the docked date/time pickers (desktop) can size-query this column. */
+  container-type: inline-size;
+}
+
+/* Transparent by default — date + time act as direct children of .picker-row
+   (mobile pill bar is unchanged). The desktop rule below turns it into a real
+   flex box so the two panels stack together beside the campus list. */
+.picker-substack {
+  display: contents;
+}
+
+/* <campus-chip-picker> / <date-chip-picker> are display:block custom elements;
+   without this each stretches to the row's full width and forces a wrap even
+   when both pills would comfortably fit on one line. Shrink-wrap them to their
+   pill instead. `.picker-substack` is display:contents on mobile, so its
+   children (date + time) are laid out by `.picker-row` directly and need the
+   same treatment. */
+.picker-row > *,
+.picker-substack > * {
+  flex: 0 1 auto;
+  width: max-content;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.available-classroom-results {
+  color: var(--text-color-primary);
+}
+
+/* On mobile the picker form sticks under the header so the campus / date /
+   time controls stay reachable while scrolling the results below. No
+   background of its own — it sits inside the header's blur/fade overhang, and
+   the glass pills let the results scroll through behind them. (Desktop lays
+   the form out in a static grid column — overridden at the 600px breakpoint.) */
+#available-classrooms-form {
+  @apply sticky;
+  /* Extra clearance so the glass pills don't sit inside the header's blur/fade
+     overhang on mobile. */
+  top: calc(var(--header-height, 84px) + 2.25rem);
+  z-index: 10;
+
+  gap: 8px;
+}
+
+/* ── Skeleton loading states ──────────────────────────────────── */
+
+@keyframes skeleton-shimmer {
+  from {
+    background-position: 200% center;
+  }
+
+  to {
+    background-position: -200% center;
+  }
+}
+
+.date-picker-skeleton {
+  display: none;
+}
+
+form[data-loading] .date-picker-skeleton {
+  @apply flex;
+  @apply flex-row;
+  @apply items-center;
+  padding: 0.5rem 0.75rem;
+  border-radius: 999px;
+  margin-top: 2rem;
+  align-self: center;
+  background-color: var(--background-color-secondary);
+  box-shadow: var(--bevel), var(--shadow);
+}
+
+form[data-loading] .date-picker-skeleton > div {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+form[data-loading] .date-picker-skeleton > div {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--text-color-primary) 6%, transparent) 25%,
+    color-mix(in srgb, var(--text-color-primary) 12%, transparent) 50%,
+    color-mix(in srgb, var(--text-color-primary) 6%, transparent) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.6s linear infinite;
+}
+
+ul li::marker {
+  color: var(--text-color-accent);
+}
+
+.popover {
+  @apply absolute;
+  z-index: 1000;
+
+  max-width: 35%;
+  word-wrap: break-word;
+
+  padding: 12px 16px;
+
+  /* Same glass material as the tabbar/header-button — see the recipe note
+     at :root's --glass-tint definition. */
+  background: var(--glass-tint);
+  backdrop-filter: blur(var(--glass-blur-md));
+  -webkit-backdrop-filter: blur(var(--glass-blur-md));
+  color: var(--text-color-primary);
+
+  border-radius: 12px;
+  box-shadow:
+    0 0 0 0.1px var(--glass-outline),
+    var(--glass-highlight),
+    0 4px 40px 0 var(--glass-shadow-color);
+
+  opacity: 0;
+  transform: scale(0.78) translateY(var(--popover-closed-ty, -6px));
+
+  @apply pointer-events-none;
+
+  transition:
+    opacity 120ms ease-out,
+    transform 200ms cubic-bezier(0.34, 1.3, 0.64, 1);
+
+  will-change: opacity, transform;
+}
+
+/* Outside 0.5px gradient stroke — same recipe as .detail-back-btn::after
+   in classroom-detail.css. */
+.popover::after {
+  content: "";
+  @apply absolute;
+  inset: -0.5px;
+  border-radius: inherit;
+  padding: 0.5px;
+
+  background: var(--glass-stroke-gradient);
+  opacity: var(--glass-stroke-opacity);
+
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+
+  @apply pointer-events-none;
+}
+
+@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .popover {
+    background: color-mix(in srgb, var(--background-color-secondary) 95%, black);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .popover {
+      background: color-mix(in srgb, var(--background-color-secondary) 95%, white);
+    }
+  }
+}
+
+@media (max-width: 600px) {
+  .popover {
+    max-width: 60%;
+  }
+}
+
+.popover[data-show] {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+
+  @apply pointer-events-auto;
+}
+
+.arrow {
+  @apply absolute;
+  width: 10px;
+  height: 10px;
+  background: inherit;
+  /* Matches the popover's own glass blur so the part of the triangle poking
+     out past the box reads as the same material rather than a flat chip of
+     color. (A `clip-path: path()` notch cut directly into the popover body
+     was tried instead — merging the two into one shape — but Chromium
+     doesn't reliably paint backdrop-filter/background into the part of a
+     clip-path that extends past the element's own box: a notch pointing
+     "after" the box painted solid, one pointing "before" it painted as a
+     near-invisible sliver. Not something to build the arrow's visibility on.) */
+  backdrop-filter: inherit;
+  -webkit-backdrop-filter: inherit;
+  transform: rotate(45deg);
+}
+
+/* The arrow is a rotated square straddling the popover's edge — half of it
+   sits behind the popover box, half pokes out. Left unclipped, that inner
+   half paints flat (no highlight/stroke) on top of the glass box's own edge
+   decoration, showing as a seam. Clipping to just the outward-pointing
+   triangle removes it. popover.js sets data-side to match the box edge the
+   arrow is attached to (see `_updateAnchorOriginAndArrow`/`computeFloatingPosition`). */
+.arrow[data-side="top"] {
+  clip-path: polygon(0 0, 100% 0, 0 100%);
+}
+.arrow[data-side="bottom"] {
+  clip-path: polygon(100% 0, 100% 100%, 0 100%);
+}
+.arrow[data-side="left"] {
+  clip-path: polygon(0 0, 0 100%, 100% 100%);
+}
+.arrow[data-side="right"] {
+  clip-path: polygon(0 0, 100% 0, 100% 100%);
+}
+
+@supports (anchor-name: --a) {
+  .popover {
+    @apply fixed;
+    inset: auto;
+    top: anchor(bottom);
+    right: anchor(right);
+    margin: 8px 0 0 0;
+    position-try-fallbacks:
+      --popover-above,
+      flip-inline,
+      --popover-above flip-inline;
+    position-visibility: anchors-visible;
+  }
+
+  @position-try --popover-above {
+    inset: auto;
+    bottom: anchor(top);
+    right: anchor(right);
+    margin: 0 0 8px 0;
+  }
+}
+
+.popover-title {
+  font-size: 1.65rem;
+
+  margin: 0;
+  align-self: center;
+
+  background: var(--accent-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+
+  mix-blend-mode: multiply;
+}
+
+@media (prefers-color-scheme: dark) {
+  .popover-title {
+    mix-blend-mode: normal;
+  }
+}
+
+.popover-title.green {
+  background: linear-gradient(135deg, #0d7a30, #2ecc5a);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.popover-title.yellow {
+  background: linear-gradient(135deg, #b07d00, #f0b429);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.popover-title.red {
+  background: linear-gradient(135deg, #a01010, #e53935);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.popover-subtitle {
+  font-size: var(--text-125);
+
+  margin: 0 0 0.5rem 0;
+}
+
+.changelog-logo {
+  width: auto;
+  height: 4rem;
+  margin-bottom: 0.5rem;
+
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.changelog-container {
+  text-align: start;
+
+  @apply flex;
+  @apply flex-col;
+}
+
+.popover ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  @apply flex;
+  @apply flex-col;
+  gap: 6px;
+
+  text-align: start;
+}
+
+.popover ul li {
+  font-size: var(--text-90);
+  color: var(--text-color-secondary);
+  padding-left: 16px;
+  @apply relative;
+}
+
+.popover ul li::before {
+  content: "";
+  @apply absolute;
+  left: 4px;
+  top: 0.45em;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--text-color-secondary);
+}
+
+.hero-badge {
+  @apply inline-flex;
+  @apply items-center;
+  @apply justify-center;
+  gap: 0.5rem;
+  align-self: center;
+
+  padding: 0.6rem 1rem;
+  margin: 0.5rem;
+
+  background-color: rgba(30, 30, 30, 0.08);
+  border-radius: 9999px;
+  text-decoration: none;
+  font-weight: 600;
+  color: #24292f;
+
+  box-shadow: var(--shadow);
+
+  transition:
+    transform 0.2s ease,
+    background-color 0.2s ease;
+}
+
+.hero-badge:hover {
+  transform: scale(1.1);
+  background-color: rgba(30, 30, 30, 0.15);
+}
+
+.hero-icon {
+  width: 1.4rem;
+  height: 1.4rem;
+  color: #24292f;
+}
+
+.hero-text {
+  font-size: var(--text-90);
+}
+
+/* Dark mode */
+@media (prefers-color-scheme: dark) {
+  .hero-badge {
+    background-color: rgba(255, 255, 255, 0.08);
+    color: #fff;
+  }
+
+  .hero-badge:hover {
+    background-color: rgba(255, 255, 255, 0.15);
+  }
+
+  .hero-icon {
+    color: #fff;
+  }
+}
+
+.button-primary {
+  @apply flex;
+  @apply flex-row;
+  gap: 0.25rem;
+
+  @apply items-center;
+  @apply justify-center;
+
+  font-size: var(--text-100);
+  font-weight: bold;
+  font-family:
+    "Nunito",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
+
+  width: fit-content;
+  align-self: center;
+
+  padding: 0.5rem 1rem;
+
+  border-radius: 999px;
+
+  background-color: color-mix(
+    in srgb,
+    var(--text-color-accent) 28%,
+    var(--background-color-secondary)
+  );
+  border: 1.5px solid color-mix(in srgb, var(--text-color-accent) 45%, transparent);
+  color: var(--text-color-accent);
+
+  box-shadow:
+    inset 1px 2px 0 rgba(255, 255, 255, 0.4),
+    inset -1px -1px 0 rgba(255, 255, 255, 0.15),
+    var(--shadow);
+
+  transition:
+    scale 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.2s ease,
+    background-color 0.2s ease;
+
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+@media (hover: hover) {
+  .button-primary:hover {
+    scale: 1.05;
+    background-color: color-mix(
+      in srgb,
+      var(--text-color-accent) 38%,
+      var(--background-color-secondary)
+    );
+    box-shadow:
+      inset 1px 2px 0 rgba(255, 255, 255, 0.4),
+      inset -1px -1px 0 rgba(255, 255, 255, 0.15),
+      0 4px 20px color-mix(in srgb, var(--text-color-accent) 35%, transparent),
+      var(--shadow);
+  }
+}
+
+.button-primary:active {
+  scale: 0.96;
+  transition:
+    scale 0.12s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.12s ease,
+    background-color 0.12s ease;
+}
+
+.button-primary:not(:active) {
+  transition:
+    scale 0.4s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.3s ease,
+    background-color 0.3s ease;
+}
+
+.button-primary.button-secondary {
+  background: color-mix(in srgb, var(--text-color-accent) 12%, transparent);
+  border-color: color-mix(in srgb, var(--text-color-accent) 25%, transparent);
+  box-shadow: none;
+}
+
+@media (hover: hover) {
+  .button-primary.button-secondary:hover {
+    background: color-mix(in srgb, var(--text-color-accent) 20%, transparent);
+    box-shadow: none;
+  }
+}
+
+.button-secondary:active {
+  scale: 0.93;
+}
+
+/*
+Variants for Samsung Internet,
+since it doesn't support many features
+in its compositor.
+All fancy elements like blurs or blend modes
+are rendered as solid colors
+*/
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .no-safari .bn-tabbar,
+  .no-safari .bn-search-btn {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: var(--background-color-secondary);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .no-safari .bn-tabbar,
+    .no-safari .bn-search-btn {
+      background: rgba(55, 55, 55, 0.96);
+    }
+  }
+}
+
+.samsung .bn-tabbar,
+.samsung .bn-search-btn,
+.samsung .header-button {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: var(--background-color-secondary);
+}
+
+.samsung .header-title,
+.samsung .popover-title {
+  mix-blend-mode: normal;
+  -webkit-text-fill-color: unset;
+  /* fallback to plain color */
+  background: none;
+  color: var(--text-color-accent);
+}
+
+.samsung .info-box {
+  mix-blend-mode: normal;
+}
+
+.samsung .arrow {
+  display: none;
+  /* background: inherit is broken, just hide it */
+}
+
+/* ── Desktop two-column layout (Available screen) ── */
+@media (min-width: 1100px) {
+  .section-header-title {
+    font-size: var(--text-175);
+  }
+
+  .section-header-subtitle {
+    font-size: var(--text-110);
+  }
+
+  .subsection-header-title {
+    font-size: var(--text-125);
+  }
+
+  .building-name {
+    font-size: var(--text-150);
+  }
+
+  .classroom-name,
+  .classroom-status-txt {
+    font-size: var(--text-125);
+  }
+
+  #available-classrooms-container.visible {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto 1fr;
+    column-gap: 1.5rem;
+    /* Don't reset padding-left here — it's carrying the side rail's
+       clearance from the .tab-content rule at the 600px breakpoint. */
+    padding-right: 2rem;
+  }
+
+  #available-classrooms-container > .favourites-section {
+    grid-column: 1;
+    grid-row: 1;
+    /* The carousel's non-shrinking cards give it a wide min-content size;
+       without this, Chrome lets that inflate the 1fr track and squeeze the
+       results column. (Firefox already treats the scroll container as
+       shrinkable.) */
+    min-width: 0;
+  }
+
+  #available-classrooms-container > .section-header {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  #available-classrooms-form {
+    grid-column: 1;
+    grid-row: 3;
+    align-self: start;
+
+    /* Not sticky on desktop — the results column scrolls on its own. */
+    position: static;
+    gap: 1rem;
+  }
+
+  /* When the pickers dock (inline-expanded, see components/picker-dock.js) they
+     flow as a wrapping row of glass panels: side by side when the column is
+     wide enough, stacked when it isn't. Each panel hugs its own content
+     (`.picker-row` is already `flex-flow: row wrap`). */
+  .picker-row:has(.dcp-popup--docked),
+  .picker-row:has(.trc-popup--docked),
+  .picker-row:has(.cp-panel-host--docked) {
+    @apply items-start;
+  }
+
+  /* Each expanded panel hugs its own content and does NOT shrink — so it
+     wraps to the next line when the column can't fit it beside its sibling,
+     rather than squashing. */
+  date-chip-picker:has(.dcp-popup--docked),
+  time-range-chip-picker:has(.trc-popup--docked),
+  .picker-row > .cp-panel-host--docked {
+    flex: 0 0 auto;
+    width: fit-content;
+    max-width: 100%;
+  }
+
+  /* Campus listbox docked in the column (its shadow host, portaled here from
+     <body> by campus-picker.js). */
+  .cp-panel-host--docked {
+    @apply block;
+  }
+
+  /* Date + Time sit in their own wrapping flex box beside the campus panel.
+     `flex: 1 1 0` lets the box take whatever width is left on campus's line,
+     and its contents wrap within that:
+       - room for both  -> campus | date time
+       - room for one   -> campus | date
+                                    time
+       - no room        -> the whole box drops below campus, then date/time
+                           wrap again on the full width (side by side, else
+                           stacked).
+     Its `min-content` width is the wider single picker, so the box only
+     stays beside campus while at least one picker fits there. */
+  .picker-row .picker-substack {
+    @apply flex;
+    flex-flow: row wrap;
+    gap: 0.75rem;
+    flex: 1 1 0;
+    width: auto;
+    align-content: flex-start;
+    @apply items-start;
+  }
+
+  #available-classrooms-results {
+    grid-column: 2;
+    grid-row: 1 / span 3;
+    align-self: start;
+
+    @apply sticky;
+    top: calc(var(--header-height, 84px) + 1rem);
+
+    max-height: calc(100dvh - var(--header-height, 84px) - 2rem);
+    overflow-y: auto;
+
+    /* A scroll container clips on BOTH axes, so the cards' 40px soft shadows
+       were cut off at the panel's sides. Push the panel's edges outward — into
+       the page's padding-right on the right, and across the grid's 1.5rem
+       column gap plus 0.75rem of the pickers column on the left — and pad by
+       the same amount, so the content stays put while the clip edge moves out
+       past the shadows. The shadow's tail needs the full 40px + offset before
+       it's gone, or its cut-off reads as a faint line; the 0.75rem overlap
+       stays inside the picker panels' own padding, so nothing clickable is
+       under it. */
+    margin: 1rem -2rem 1rem -2.25rem;
+    padding-inline: 2.25rem 2rem;
+  }
+
+  #available-classrooms-results.empty {
+    position: static;
+    align-self: stretch;
+    max-height: none;
+  }
+}
+
+/* ── Global reduced-motion fallback ──────────────────────────────────────── */
+/* Keeps opacity-only fades; removes spatial motion and decorative loops.    */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

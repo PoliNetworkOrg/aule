@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.vite/
+.tanstack/
+*.tsbuildinfo
+.env*
+!.env.example
+.dev.vars*
+.wrangler/
+__pycache__/
+*.pyc
+occupancy/
+photos/
+logs/
+data/opening-hours.json

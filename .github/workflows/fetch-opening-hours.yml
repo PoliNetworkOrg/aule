@@ -1,0 +1,66 @@
+name: Fetch Opening Hours
+
+on:
+  schedule:
+    - cron: "0 6 * * 0" # Once a week, Sunday 6am UTC (clear of the occupancy fetches, which run at 3am UTC and hourly from 5am to 7pm UTC)
+  workflow_dispatch: # Allow manual runs from the GitHub Actions tab
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run opening hours scraper
+        id: scrape
+        run: python scripts/fetch_opening_hours.py
+
+      - name: Notify Telegram
+        if: always()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          SCRAPE_OUTCOME: ${{ steps.scrape.outcome }}
+          SCRAPE_STATUS: ${{ steps.scrape.outputs.status }}
+          SCRAPE_MESSAGE: ${{ steps.scrape.outputs.message }}
+        run: |
+          if [ "$SCRAPE_OUTCOME" != "success" ] || [ "$SCRAPE_STATUS" = "failed" ]; then
+            TEXT=$(printf '⚠️ PoliAule opening-hours scrape\n%s' "${SCRAPE_MESSAGE:-Script crashed — check the Actions log.}")
+          else
+            TEXT=$(printf '✅ PoliAule opening-hours scrape\n%s' "$SCRAPE_MESSAGE")
+          fi
+          curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            --data-urlencode chat_id="${TELEGRAM_CHAT_ID}" \
+            --data-urlencode text="$TEXT"
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Upload opening hours data to R2
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npx --yes wrangler@4 r2 object put poliaule-data/opening-hours.json --file data/opening-hours.json --content-type application/json --remote
+          npx --yes wrangler@4 r2 object put poliaule-data-beta/opening-hours.json --file data/opening-hours.json --content-type application/json --remote
+
+      - name: Purge API cache
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          curl -sS -X POST "https://api.cloudflare.com/client/v4/zones/7ba55951cabeecf5f38d0c35762ea451/purge_cache" \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data '{"files":["https://api.poliaule.com/v1/opening-hours","https://api-beta.poliaule.com/v1/opening-hours"]}'

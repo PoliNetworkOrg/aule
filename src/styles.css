@@ -1,0 +1,31 @@
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+@import "./app/style.css";
+@import "./app/components/date-picker.css";
+@import "./app/components/date-chip-picker.css";
+@import "./app/components/data-fetch-card.css";
+@import "./app/components/time-picker.css";
+@import "./app/components/time-range-slider.css";
+@import "./app/components/time-range-chip-picker.css";
+@import "./app/components/classroom-list.css";
+@import "./app/components/building-overview.css";
+@import "./app/components/settings.css";
+@import "./app/components/segmented-control.css";
+@import "./app/components/search-overlay.css";
+@import "./app/components/classroom-detail.css";
+@import "./app/components/info-page.css";
+@import "./app/components/bottom-nav.css";
+@import "./app/components/campus-map.css";
+@import "./app/components/campus-sheet.css";
+@import "./app/components/favourites.css";
+@import "./app/components/liquid-glass.css";
+@import "./app/components/keybindings.css";
+
+@theme inline {
+  --color-background: var(--background-color);
+  --color-foreground: var(--text-color-primary);
+  --color-muted: var(--text-color-secondary);
+}
+
+/* Preflight is deliberately omitted: the original controls own their reset. */

@@ -1,0 +1,558 @@
+/* ── Settings Component ────────────────────────────────────────────────────── */
+
+/* Popup's glass box-shadow, kept as one custom property because settings.js
+   also pins it inline mid-morph (see openSettings/closeSettings) — an inline
+   style always wins over the stylesheet, so both places must reference this
+   rather than the recipe's three layers directly. */
+:root {
+  --settings-glass-shadow:
+    0 0 0 0.1px var(--glass-outline), var(--glass-highlight), 0 4px 40px 0 var(--glass-shadow-color);
+}
+
+/* Overlay */
+.settings-overlay {
+  @apply fixed;
+  @apply inset-0;
+  background: rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  @apply pointer-events-none;
+  display: none;
+  z-index: 1100;
+  transition: opacity 0.35s ease;
+}
+
+.settings-overlay--active {
+  opacity: 1;
+  @apply pointer-events-auto;
+  @apply block;
+}
+
+.samsung .settings-overlay--active {
+  background: rgba(0, 0, 0, 0.55);
+}
+
+/* Popup shell — morphs from the header button.
+   Same glass material as the popovers / header buttons — see the recipe
+   note at :root's --glass-tint definition in style.css. */
+.settings-popup {
+  @apply fixed;
+  z-index: 1200;
+  background: var(--glass-tint);
+  backdrop-filter: blur(var(--glass-blur-lg));
+  -webkit-backdrop-filter: blur(var(--glass-blur-lg));
+  border-radius: 50%;
+  box-shadow: var(--settings-glass-shadow);
+  @apply flex-col;
+  /* display:flex set via JS */
+
+  transition:
+    transform 0.42s cubic-bezier(0.32, 0.72, 0, 1),
+    border-radius 0.42s cubic-bezier(0.32, 0.72, 0, 1),
+    box-shadow 0.42s ease,
+    background 0.42s ease;
+
+  will-change: transform;
+}
+
+/* Outside 0.5px gradient stroke — same recipe as .kb-help-panel::after in
+   keybindings.css. Content clipping lives on the separate
+   `.settings-popup__clip` layer below, so this isn't cut off. */
+.settings-popup::after {
+  content: "";
+  @apply absolute;
+  inset: -0.5px;
+  border-radius: inherit;
+  padding: 0.5px;
+
+  background: var(--glass-stroke-gradient);
+  opacity: var(--glass-stroke-opacity);
+
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+
+  @apply pointer-events-none;
+}
+
+@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .settings-popup {
+    background: color-mix(in srgb, var(--background-color-secondary) 95%, black);
+  }
+}
+
+/* Clips content to the popup's (animated) rounded shape without clipping
+   the glass box-shadow/stroke above, which live on `.settings-popup`
+   itself — `overflow` clips an element's own box-shadow, so the two can't
+   share a box. Same split as `.campus-sheet-glass` / `.campus-sheet-clip`
+   in campus-sheet.css.
+   Stays an in-flow flex item (not absolutely positioned) so it still
+   contributes to `.settings-popup`'s content height — openSettings()
+   measures that via `scrollHeight` while `height: auto` to size the popup
+   to its natural content. */
+.settings-popup__clip {
+  @apply relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: clip;
+  border-radius: inherit;
+}
+
+/* Inner content fades in after the morph completes */
+.settings-popup__inner {
+  opacity: 0;
+  transition: opacity 0.18s ease;
+  @apply flex;
+  @apply flex-col;
+  gap: 1.1rem;
+  padding: 0 1.25rem 1.5rem; /* top padding lives in the sticky title row */
+  @apply h-full;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.settings-popup--open .settings-popup__inner {
+  opacity: 1;
+  transition-delay: 0.28s;
+}
+
+/* Title row: sticky header with gradient blur + color fade.
+   Also the swipe-to-dismiss drag handle (settings.js's wireDismissDrag) —
+   `touch-action: none` so a touch drag here drives the gesture directly
+   instead of the browser trying to scroll/pull-to-refresh underneath it. */
+.settings-popup__title-row {
+  @apply sticky;
+  top: 0;
+  z-index: 10;
+  @apply flex;
+  @apply items-center;
+  @apply justify-between;
+  /* Extend edge-to-edge, cancelling the inner's horizontal padding */
+  margin: 0 -1.25rem;
+  padding: 1.25rem 1.25rem 0.875rem;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* The blur+color gradient lives on ::before so mask-image can fade both
+   simultaneously — the mask affects backdrop-filter output too. */
+.settings-popup__title-row::before {
+  content: "";
+  @apply absolute;
+  @apply inset-0;
+  bottom: -2.5rem; /* extend into the gap below the row */
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  background: var(--glass-tint);
+  -webkit-mask-image: linear-gradient(to bottom, black 45%, transparent 100%);
+  mask-image: linear-gradient(to bottom, black 45%, transparent 100%);
+  @apply pointer-events-none;
+  z-index: -1;
+}
+
+/* Close button — flush with inner padding, vertically aligned to title */
+.settings-close-btn {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  margin-right: -0.125rem; /* optical alignment to inner padding edge */
+  border-radius: 50%;
+  border: none;
+  background: color-mix(in srgb, var(--text-color-primary) 10%, transparent);
+  color: color-mix(in srgb, var(--text-color-primary) 55%, transparent);
+  @apply flex;
+  @apply items-center;
+  @apply justify-center;
+  opacity: 0;
+  transition:
+    opacity 0.18s ease,
+    background 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.settings-close-btn .hgi-stroke {
+  font-size: 18px !important;
+}
+
+.settings-popup--open .settings-close-btn {
+  opacity: 1;
+  transition-delay: 0.28s;
+}
+
+@media (hover: hover) {
+  .settings-close-btn:hover {
+    background: color-mix(in srgb, var(--text-color-primary) 16%, transparent);
+    color: var(--text-color-primary);
+  }
+}
+
+/* Hide the trigger while the popup is morphing */
+.settings-btn--morphing {
+  visibility: hidden;
+}
+
+/* ── Large title ────────────────────────────────────────────────────────────── */
+
+.settings-popup__title {
+  font-size: var(--text-175); /* 28px — Apple "Tile Heading" scale */
+  font-weight: 700;
+  line-height: 1.14;
+  letter-spacing: -0.01em;
+  color: var(--text-color-primary);
+  margin: 0;
+  padding: 0 0.25rem; /* slight indent aligns with section group padding */
+}
+
+/* ── Section ────────────────────────────────────────────────────────────────── */
+
+.settings-section {
+  @apply flex;
+  @apply flex-col;
+  gap: 0.4rem;
+}
+
+/* Section header: colored icon badge + uppercase label */
+.settings-section__header {
+  @apply flex;
+  @apply items-center;
+  gap: 0;
+  padding: 0 0.25rem;
+
+  text-align: center;
+}
+
+.settings-section__icon-badge {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  color: color-mix(in srgb, var(--text-color-primary) 48%, transparent);
+  @apply flex;
+  @apply items-center;
+  @apply justify-center;
+  flex-shrink: 0;
+}
+
+.settings-section__icon-badge .hgi-stroke {
+  font-size: var(--text-100) !important;
+}
+
+.settings-section__header-label {
+  font-size: var(--text-100);
+  font-weight: bold;
+  color: color-mix(in srgb, var(--text-color-primary) 48%, transparent);
+}
+
+/* ── Group card ─────────────────────────────────────────────────────────────── */
+
+.settings-group {
+  background: color-mix(in srgb, var(--text-color-primary) 6%, transparent);
+  border-radius: 11px;
+  @apply overflow-hidden;
+}
+
+/* ── Row ────────────────────────────────────────────────────────────────────── */
+
+.settings-row {
+  @apply flex;
+  @apply items-center;
+  @apply justify-between;
+  gap: 0.75rem;
+  min-height: 44px; /* Apple minimum touch target */
+  padding: 0.6rem 0.875rem;
+}
+
+/* Separator between rows in the same group */
+.settings-row + .settings-row,
+.settings-warning + .settings-row {
+  border-top: 0.5px solid color-mix(in srgb, var(--text-color-primary) 10%, transparent);
+}
+
+.settings-row__icon-title-container {
+  @apply flex;
+  @apply items-center;
+  gap: 0.75rem;
+}
+
+.settings-row__icon-badge {
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  background: var(--badge-color, var(--text-color-accent));
+  color: #fff;
+  @apply flex;
+  @apply items-center;
+  @apply justify-center;
+  flex-shrink: 0;
+}
+
+.settings-row__icon-badge .hgi-stroke {
+  font-size: 17px !important;
+}
+
+.settings-row__label {
+  flex: 1;
+  font-size: var(--text-100);
+  font-weight: 400;
+  letter-spacing: -0.014em;
+  color: var(--text-color-primary);
+}
+
+/* Label parts used inside the segmented controls (see segmented-control.css
+   for the control itself). */
+.settings-lang-btn__flag {
+  font-size: var(--text-100);
+  line-height: 1;
+}
+
+.settings-lang-btn__name {
+  font-size: var(--text-75);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+/* Icon inside a segmented control item */
+.settings-seg-icon {
+  font-size: var(--text-110) !important;
+  line-height: 1;
+}
+
+/* ── Label group (label + sublabel stacked) ─────────────────────────────────── */
+
+.settings-row__label-group {
+  @apply flex;
+  @apply flex-col;
+  gap: 0.15rem;
+  flex: 1;
+
+  text-align: left;
+}
+
+.settings-row__sublabel {
+  font-size: var(--text-75);
+  font-weight: 400;
+  color: color-mix(in srgb, var(--text-color-primary) 48%, transparent);
+  letter-spacing: -0.01em;
+}
+
+.settings-row__sublabel:empty {
+  display: none;
+}
+
+/* ── iOS-style toggle switch ────────────────────────────────────────────────── */
+
+.settings-toggle {
+  @apply relative;
+  width: 61px;
+  height: 31px;
+  padding: 0;
+  border-radius: var(--radius-lg);
+  /* iOS 26: glass track — translucent fill + visible stroke */
+  background: color-mix(in srgb, var(--text-color-primary) 10%, transparent);
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--text-color-primary) 18%, transparent);
+  border: none;
+  flex-shrink: 0;
+  transition:
+    background 0.25s ease,
+    box-shadow 0.25s ease;
+  -webkit-tap-highlight-color: transparent;
+  /* Horizontal drags belong to the thumb, vertical ones still scroll the popup. */
+  touch-action: pan-y;
+}
+
+.settings-toggle.on {
+  background: #34c759;
+  box-shadow: none;
+}
+
+/* Thumb travel box (61 - 3 - 3 = 55 × 25); the two cells sit at its ends and
+   overlap in the middle, which is fine — they only exist to give
+   pill-drag-core.js its two anchors and to catch taps on the far side. */
+.settings-toggle__items {
+  @apply absolute;
+  inset: 3px;
+}
+
+.settings-toggle__cell {
+  @apply absolute;
+  top: 0;
+  width: 36px;
+  height: 25px;
+  touch-action: pan-y;
+}
+
+.settings-toggle__cell--off {
+  left: 0;
+}
+.settings-toggle__cell--on {
+  left: 19px;
+} /* 55 - 36 = 19 */
+
+/* Thumb: its lifted glass look comes from the shared .seg-pill--lifted rules
+   (segmented-control.css); this is the flat resting state — the frosted white
+   capsule — which gives way to the translucent glass tint while lifted. */
+.settings-toggle .seg-pill-inner {
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow:
+    0 1px 4px rgba(0, 0, 0, 0.2),
+    0 0.5px 1px rgba(0, 0, 0, 0.1),
+    inset 0 0.5px 0 rgba(255, 255, 255, 0.6);
+}
+
+.settings-toggle .seg-pill.seg-pill--lifted .seg-pill-inner {
+  background: var(--seg-pill-bg);
+}
+
+.settings-toggle .seg-hit {
+  touch-action: pan-y;
+}
+
+/* ── Stepper control (−  value  +) ──────────────────────────────────────────── */
+
+.settings-stepper {
+  @apply flex;
+  @apply items-center;
+  background: color-mix(in srgb, var(--text-color-primary) 10%, transparent);
+  border-radius: 10px;
+  padding: 3px;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.settings-stepper__btn {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: transparent;
+  color: var(--text-color-primary);
+  @apply flex;
+  @apply items-center;
+  @apply justify-center;
+  transition: background 0.15s;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.settings-stepper__btn .hgi-stroke {
+  font-size: 16px !important;
+}
+
+@media (hover: hover) {
+  .settings-stepper__btn:not(:disabled):hover {
+    background: color-mix(in srgb, var(--text-color-primary) 12%, transparent);
+  }
+}
+
+.settings-stepper__btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.settings-stepper__value {
+  min-width: 2.25rem;
+  text-align: center;
+  font-size: var(--text-80);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text-color-primary);
+  font-family: inherit;
+}
+
+/* ── Inline warning note (yellow) ───────────────────────────────────────────── */
+
+.settings-warning {
+  @apply flex;
+  @apply items-center;
+  gap: 0.625rem;
+  margin: 0 0.625rem 0.625rem;
+  padding: 0.625rem 0.75rem;
+  background: color-mix(in srgb, #ff9f0a 12%, transparent);
+  border: 1px solid color-mix(in srgb, #ff9f0a 30%, transparent);
+  border-radius: 10px;
+  @apply overflow-hidden;
+  max-height: 5rem;
+  opacity: 1;
+  transition:
+    max-height 0.25s ease,
+    opacity 0.2s ease,
+    margin 0.25s ease,
+    padding 0.25s ease;
+}
+
+.settings-warning--hidden {
+  max-height: 0;
+  opacity: 0;
+  margin-bottom: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  border-color: transparent;
+  @apply pointer-events-none;
+}
+
+.settings-warning__icon {
+  font-size: 18px !important;
+  color: #cc7a00;
+  flex-shrink: 0;
+}
+
+@media (prefers-color-scheme: dark) {
+  .settings-warning__icon {
+    color: #ff9f0a;
+  }
+}
+
+.settings-warning__text {
+  font-size: var(--text-80);
+  font-weight: 600;
+  line-height: 1.35;
+  color: #cc7a00;
+  letter-spacing: -0.015em;
+}
+
+@media (prefers-color-scheme: dark) {
+  .settings-warning__text {
+    color: #ff9f0a;
+  }
+}
+
+/* ── Campus select picker ────────────────────────────────────────────────────── */
+
+.settings-row--campus-picker {
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+}
+
+.settings-campus-select {
+  @apply w-full;
+  appearance: none;
+  -webkit-appearance: none;
+  background: color-mix(in srgb, var(--text-color-primary) 10%, transparent);
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 2rem 0.5rem 0.75rem;
+  font-family:
+    "Nunito",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
+  font-size: var(--text-90);
+  font-weight: 500;
+  color: var(--text-color-primary);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24'%3E%3Cpath fill='%23888' d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.5rem center;
+}
+
+.settings-campus-select:disabled {
+  opacity: 0.4;
+  cursor: default;
+}

@@ -1,0 +1,10 @@
+{
+  "ignorePatterns": [
+    "dist/**",
+    "tools/oxlint/anti-slop/**",
+    "src/routeTree.gen.ts",
+    "public/**",
+    "data/**",
+    "docs/upstream/**"
+  ]
+}

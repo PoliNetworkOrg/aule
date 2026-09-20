@@ -1,0 +1,285 @@
+name: Fetch Occupancy Data
+
+on:
+  # Triggered on a schedule by the poliaule-cron Cloudflare Worker via
+  # workflow_dispatch (see workers/cron). GitHub's own `schedule:` trigger was
+  # dropped because it fired hours late or got skipped under load.
+  workflow_dispatch: # Allow manual runs from the GitHub Actions tab
+    inputs:
+      no_delay:
+        description: "Skip delay between scrape/API calls"
+        type: boolean
+        default: false
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+
+    steps:
+      # ---- main ----
+
+      - name: Checkout main
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      # The script compares this run's per-page slot counts against the previous
+      # run's summary to catch pages that parse fine but silently lose data.
+      - name: Download previous run log (main)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          mkdir -p logs
+          npx --yes wrangler@4 r2 object get "poliaule-data/logs/occupancy/latest.json" --file logs/previous.json --remote \
+            || echo "No previous run log found."
+
+      # data/opening-hours.json isn't committed to git — it's written by the weekly
+      # fetch-opening-hours.yml job and lives only in R2. Pull it down here so the
+      # occupancy fetch doesn't fall back to hardcoded hours.
+      - name: Download opening hours (main)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          mkdir -p data
+          npx --yes wrangler@4 r2 object get "poliaule-data/opening-hours.json" --file data/opening-hours.json --remote \
+            || echo "No opening hours found in R2, will fall back to hardcoded hours."
+
+      - name: Run fetch script (main)
+        id: fetch_main
+        env:
+          PYTHONUNBUFFERED: 1
+          NO_DELAY: ${{ inputs.no_delay }}
+        run: |
+          if [ "$NO_DELAY" = "true" ]; then
+            python scripts/fetch.py --no-delay
+          else
+            python scripts/fetch.py
+          fi
+
+      # Runs are hourly now, so a message per run would be noise: only alert
+      # when the script crashed or reported an anomaly (status=failed).
+      - name: Notify Telegram (main)
+        if: always() && (steps.fetch_main.outcome != 'success' || steps.fetch_main.outputs.status == 'failed')
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          FETCH_OUTCOME: ${{ steps.fetch_main.outcome }}
+          FETCH_STATUS: ${{ steps.fetch_main.outputs.status }}
+          FETCH_MESSAGE: ${{ steps.fetch_main.outputs.message }}
+        run: |
+          if [ "$FETCH_OUTCOME" != "success" ]; then
+            TEXT="❌ PoliAule fetch (main) crashed — check the Actions log."
+          elif [ "$FETCH_STATUS" = "failed" ]; then
+            TEXT=$(printf '⚠️ PoliAule fetch (main)\n%s' "$FETCH_MESSAGE")
+          else
+            TEXT=$(printf '✅ PoliAule fetch (main)\n%s' "$FETCH_MESSAGE")
+          fi
+          curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            --data-urlencode chat_id="${TELEGRAM_CHAT_ID}" \
+            --data-urlencode text="$TEXT"
+
+      # One structured summary per run, keyed by UTC hour (logs/occupancy/YYYY/MM/DD/HH.json),
+      # plus a fixed latest.json for the next run to compare against. Written even
+      # when the script crashed, so the failure is traceable afterwards.
+      - name: Upload run log to R2 (main)
+        if: always() && hashFiles('logs/run.json') != ''
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          KEY=$(jq -r .log_key logs/run.json)
+          npx --yes wrangler@4 r2 object put "poliaule-data/$KEY" --file logs/run.json --content-type application/json --remote
+          npx --yes wrangler@4 r2 object put "poliaule-data/logs/occupancy/latest.json" --file logs/run.json --content-type application/json --remote
+
+      - name: Upload occupancy data to R2 (main)
+        if: hashFiles('occupancy/*.json') != ''
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          for f in occupancy/*.json; do
+            npx --yes wrangler@4 r2 object put "poliaule-data/$f" --file "$f" --content-type application/json --remote
+          done
+
+      - name: Purge API cache (main)
+        if: hashFiles('occupancy/*.json') != ''
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          URLS=$(for f in occupancy/*.json; do
+            key=$(basename "$f" .json)
+            if [ "$key" = "list" ]; then
+              echo "https://api.poliaule.com/v1/occupations"
+            else
+              d=${key#occupation_}
+              echo "https://api.poliaule.com/v1/occupations/${d:0:4}-${d:4:2}-${d:6:2}"
+            fi
+          done | jq -R . | jq -s '{files: .}')
+          curl -sS -X POST "https://api.cloudflare.com/client/v4/zones/7ba55951cabeecf5f38d0c35762ea451/purge_cache" \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data "$URLS"
+
+      # ---- beta ----
+
+      - name: Check beta backend flag
+        if: hashFiles('occupancy/*.json') != ''
+        id: beta_flag
+        env:
+          ENABLED: ${{ vars.BETA_OCCUPANCY_BACKEND_ENABLED }}
+        run: |
+          echo "enabled=${ENABLED:-false}" >> "$GITHUB_OUTPUT"
+
+      - name: Copy main's data to beta (flag off)
+        if: hashFiles('occupancy/*.json') != '' && steps.beta_flag.outputs.enabled != 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          echo "Beta backend disabled, reusing main's fetch (no extra PoliMi calls)."
+          for f in occupancy/*.json; do
+            npx --yes wrangler@4 r2 object put "poliaule-data-beta/$f" --file "$f" --content-type application/json --remote
+          done
+
+      - name: Purge API cache (beta, flag off)
+        if: hashFiles('occupancy/*.json') != '' && steps.beta_flag.outputs.enabled != 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          URLS=$(for f in occupancy/*.json; do
+            key=$(basename "$f" .json)
+            if [ "$key" = "list" ]; then
+              echo "https://api-beta.poliaule.com/v1/occupations"
+            else
+              d=${key#occupation_}
+              echo "https://api-beta.poliaule.com/v1/occupations/${d:0:4}-${d:4:2}-${d:6:2}"
+            fi
+          done | jq -R . | jq -s '{files: .}')
+          curl -sS -X POST "https://api.cloudflare.com/client/v4/zones/7ba55951cabeecf5f38d0c35762ea451/purge_cache" \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data "$URLS"
+
+      - name: Checkout beta
+        if: steps.beta_flag.outputs.enabled == 'true'
+        uses: actions/checkout@v6
+        with:
+          ref: beta
+          path: beta-checkout
+
+      - name: Install Python dependencies (beta)
+        if: steps.beta_flag.outputs.enabled == 'true'
+        working-directory: beta-checkout
+        run: pip install -r requirements.txt
+
+      - name: Download previous run log (beta)
+        if: steps.beta_flag.outputs.enabled == 'true'
+        working-directory: beta-checkout
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          mkdir -p logs
+          npx --yes wrangler@4 r2 object get "poliaule-data-beta/logs/occupancy/latest.json" --file logs/previous.json --remote \
+            || echo "No previous run log found."
+
+      - name: Download opening hours (beta)
+        if: steps.beta_flag.outputs.enabled == 'true'
+        working-directory: beta-checkout
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          mkdir -p data
+          npx --yes wrangler@4 r2 object get "poliaule-data-beta/opening-hours.json" --file data/opening-hours.json --remote \
+            || echo "No opening hours found in R2, will fall back to hardcoded hours."
+
+      - name: Run fetch script (beta)
+        id: fetch_beta
+        if: steps.beta_flag.outputs.enabled == 'true'
+        env:
+          PYTHONUNBUFFERED: 1
+          NO_DELAY: ${{ inputs.no_delay }}
+        working-directory: beta-checkout
+        run: |
+          echo "Beta backend enabled, running beta's own scripts/fetch.py against PoliMi."
+          if [ "$NO_DELAY" = "true" ]; then
+            python scripts/fetch.py --no-delay
+          else
+            python scripts/fetch.py
+          fi
+
+      - name: Notify Telegram (beta)
+        if: always() && steps.beta_flag.outputs.enabled == 'true' && (steps.fetch_beta.outcome != 'success' || steps.fetch_beta.outputs.status == 'failed')
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          FETCH_OUTCOME: ${{ steps.fetch_beta.outcome }}
+          FETCH_STATUS: ${{ steps.fetch_beta.outputs.status }}
+          FETCH_MESSAGE: ${{ steps.fetch_beta.outputs.message }}
+        run: |
+          if [ "$FETCH_OUTCOME" != "success" ]; then
+            TEXT="❌ PoliAule fetch (beta) crashed — check the Actions log."
+          elif [ "$FETCH_STATUS" = "failed" ]; then
+            TEXT=$(printf '⚠️ PoliAule fetch (beta)\n%s' "$FETCH_MESSAGE")
+          else
+            TEXT=$(printf '✅ PoliAule fetch (beta)\n%s' "$FETCH_MESSAGE")
+          fi
+          curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            --data-urlencode chat_id="${TELEGRAM_CHAT_ID}" \
+            --data-urlencode text="$TEXT"
+
+      - name: Upload run log to R2 (beta)
+        if: always() && steps.beta_flag.outputs.enabled == 'true' && hashFiles('beta-checkout/logs/run.json') != ''
+        working-directory: beta-checkout
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          KEY=$(jq -r .log_key logs/run.json)
+          npx --yes wrangler@4 r2 object put "poliaule-data-beta/$KEY" --file logs/run.json --content-type application/json --remote
+          npx --yes wrangler@4 r2 object put "poliaule-data-beta/logs/occupancy/latest.json" --file logs/run.json --content-type application/json --remote
+
+      - name: Upload occupancy data to R2 (beta)
+        if: steps.beta_flag.outputs.enabled == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        working-directory: beta-checkout
+        run: |
+          for f in occupancy/*.json; do
+            npx --yes wrangler@4 r2 object put "poliaule-data-beta/$f" --file "$f" --content-type application/json --remote
+          done
+
+      - name: Purge API cache (beta, flag on)
+        if: steps.beta_flag.outputs.enabled == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        working-directory: beta-checkout
+        run: |
+          URLS=$(for f in occupancy/*.json; do
+            key=$(basename "$f" .json)
+            if [ "$key" = "list" ]; then
+              echo "https://api-beta.poliaule.com/v1/occupations"
+            else
+              d=${key#occupation_}
+              echo "https://api-beta.poliaule.com/v1/occupations/${d:0:4}-${d:4:2}-${d:6:2}"
+            fi
+          done | jq -R . | jq -s '{files: .}')
+          curl -sS -X POST "https://api.cloudflare.com/client/v4/zones/7ba55951cabeecf5f38d0c35762ea451/purge_cache" \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data "$URLS"
