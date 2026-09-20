@@ -90,7 +90,9 @@
           "data-status-description",
           "data-status-time",
           "data-reload-label",
-          "bo-count-label"
+          "bo-count-label",
+          "info-intro",
+          "info-section-text"
         ]
       }
     ],

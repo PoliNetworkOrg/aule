@@ -33,7 +33,7 @@ import {
   classroomsData as staticClassroomsData,
 } from "./classroom-search-data.ts";
 import { classroomDetail } from "./components/classroom-detail.js";
-import { infoPage } from "./components/info-page.js";
+import { infoPage } from "./components/info-page.tsx";
 
 import { initTimeControls } from "./components/time-controls-state.ts";
 import { setupCampusPicker } from "./components/campus-picker.tsx";

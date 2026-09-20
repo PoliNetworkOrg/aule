@@ -8,7 +8,7 @@ import { t, getLocale, onLanguageSwitch } from "../i18n.ts";
 import { haptics, defaultPatterns } from "./haptics.ts";
 import { createTimeFormatter } from "../utils/time-format.ts";
 import { escapeHtml } from "../utils/html.ts";
-import { infoPage } from "./info-page.js";
+import { infoPage } from "./info-page.tsx";
 import { fetchPhotoUrl, photoUrlCache } from "../utils/photo.ts";
 import { isFavourite, toggleFavourite, FILLED_STAR_SVG } from "../utils/favourites.ts";
 import { DynamicPopover } from "./popover.ts";

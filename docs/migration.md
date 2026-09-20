@@ -133,3 +133,9 @@ Production/beta builds and lint pass. Temporary desktop/mobile comparisons match
 Availability sections, headers, partial-free filtering, and building-overview cards now render in React. Every classroom-card consumer uses the same React component; the legacy DOM card builder is removed. The typed overview controller retains the source zoom keyframes, layer positioning, prewarming, scroll restoration, and interruption behavior. React retains ownership of each layer's children while the controller moves its measured host.
 
 Production/beta builds and lint pass. Temporary Chromium comparisons at desktop/mobile sizes matched result ordering, card labels, query metadata, stagger delays, sampled geometry, partial-free filtering, overview counts, returning to results, and links to Campus building pages, without browser errors. Three frontend JavaScript modules remain: Info, classroom detail, and startup.
+
+### React Info checkpoint
+
+Info content, formatted translations, installation instructions, and GitHub statistics now render in React. Typed controllers retain the original transitions, reveal measurements, mobile tabs, and cache behavior. Cleanup releases listeners, observers, timers, and the content root.
+
+Production/beta builds and lint pass. Temporary desktop/mobile comparisons matched text, inline formatting, sampled geometry, platform tabs, route reopening, and partial GitHub failure recovery without browser errors. Both versions made five requests initially, retried all five on reopening after a partial failure, and reused the complete cache on the third opening. Two frontend JavaScript modules remain: classroom detail and startup.
