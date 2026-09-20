@@ -1,5 +1,5 @@
 import { fetchJson } from "../lib/query";
-// Stable (poliaule.com) always talks to the stable API — no override possible.
+// Production hosts always talk to the stable API — no override possible.
 // Every other origin (beta.poliaule.com, localhost, etc.) can toggle between
 // the beta and stable API via the "Use Beta Backend" setting (default: on).
 
@@ -7,7 +7,7 @@ export const STABLE_API_BASE = "https://api.poliaule.com";
 
 export const BETA_API_BASE = "https://api-beta.poliaule.com";
 
-const STABLE_HOSTNAMES = new Set(["poliaule.com", "www.poliaule.com"]);
+const STABLE_HOSTNAMES = new Set(["aule.polinetwork.org", "poliaule.com", "www.poliaule.com"]);
 
 export const IS_STABLE_BUILD = STABLE_HOSTNAMES.has(location.hostname);
 

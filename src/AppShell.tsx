@@ -14,6 +14,7 @@ import { Settings } from "./app/components/settings-host";
 import { useLayoutEffect, useRef, useSyncExternalStore } from "react";
 import { getTranslationVersion, onTranslationChange, t, animateI18nElement } from "./app/i18n";
 import { RichText } from "./app/components/rich-text";
+import { IS_STABLE_BUILD } from "./app/config";
 
 export function AppShell() {
   const translationVersion = useSyncExternalStore(onTranslationChange, getTranslationVersion);
@@ -30,7 +31,7 @@ export function AppShell() {
       ? "Beta"
       : hostname === "dev.poliaule.com"
         ? "Dev"
-        : hostname === "poliaule.com"
+        : IS_STABLE_BUILD
           ? null
           : "Local";
 

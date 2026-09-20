@@ -304,7 +304,7 @@
        fetch() call (issued once the JS bundle has downloaded and run,
        config.js/available-rooms-script.js) doesn't pay DNS/TCP/TLS on top of
        that fetch's own round trip. Points at the stable API by default —
-       correct for poliaule.com, where getApiBase() (config.js) always
+       correct for production hosts, where getApiBase() always
        resolves here; the beta build plugin swaps this to api-beta in its output, matching that build's default backend. -->
     <link rel="preconnect" href="https://api.poliaule.com" crossorigin />
 
