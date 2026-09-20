@@ -99,3 +99,11 @@ Production and beta builds, TypeScript, and lint/format checks pass. No dependen
 The time-range trigger, slider, badges, ticks, handles, typed-entry popups, and their buttons now render in React. Date and time range pickers share the typed popup-motion controller with their original widths and class names. The slider measures again when opening finishes, preserving the mobile duration label. Native input observation retains React's value tracker, mirrors popup constraints, and restores descriptors after the last subscriber unmounts. Shared glass press/drag mechanics are checked TypeScript and expose cleanup.
 
 Production and beta builds, strict TypeScript, and lint/format checks pass. Temporary Chromium comparisons against the pinned upstream source at desktop and mobile widths matched sampled layout, labels, field values, keyboard changes, handle dragging, popup switching, step/preset buttons, time format, and language changes, with no browser errors. Static control markers now visible to the shadcn rule are explicitly allowed, preserving upstream class names. No dependencies or committed tests were added. Sixteen frontend JavaScript modules remain.
+
+### React campus-picker checkpoint
+
+Both campus pickers now render their triggers, native fields, grouped options, and floating panels in React shadow-root portals. Typed controllers retain the original geometry, keyboard/typeahead handling, blur state, docking, selection events, and synchronization between tabs. Their lifecycle releases listeners, glass gestures, pending transitions, and panel hosts. The campus sheet retains a temporary React root adapter until its header is converted.
+
+Popover positioning is checked TypeScript with the existing Floating UI CDN import. Destroyed instances leave the registry, and initialization exposes listener cleanup. The shadcn allowlist explicitly includes existing campus shadow stylesheet classes because that stylesheet is loaded as a URL outside the main CSS entry.
+
+Production/beta builds and lint pass. Temporary Chromium comparisons at 1440×1000 and 390×844 matched campus labels, grouped options, selection, keyboard navigation, geometry, and selection synchronization from the Campus tab, without browser errors. Fourteen frontend JavaScript modules remain.

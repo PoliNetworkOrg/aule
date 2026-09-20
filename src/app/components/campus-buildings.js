@@ -1,4 +1,4 @@
-import { CampusChipPicker } from "./campus-picker.js";
+import { createCampusSheetPicker } from "./campus-picker.tsx";
 import { getContentScroll, setContentScroll } from "./campus-sheet.js";
 import { classroomsData as staticClassroomsData } from "../classroom-search-data.ts";
 import { getClassroomStatusNow } from "../available-rooms-script.ts";
@@ -46,9 +46,6 @@ import { haptics, defaultPatterns } from "./haptics.ts";
 // no-ops once already showing that selection. The back button always
 // returns to the campus page — it never leaves a stack of visited buildings
 // behind.
-class CampusSheetPicker extends CampusChipPicker {}
-
-customElements.define("campus-sheet-picker", CampusSheetPicker);
 
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
 
@@ -144,10 +141,8 @@ export function initCampusBuildingsPage(headerContainer, gridContainer) {
   });
   actions.appendChild(recenterBtn);
 
-  picker = document.createElement("campus-sheet-picker");
-  hiddenInput = document.createElement("input");
-  hiddenInput.type = "hidden";
-  picker.appendChild(hiddenInput);
+  picker = createCampusSheetPicker();
+  hiddenInput = picker.querySelector("input");
   actions.appendChild(picker);
 
   topRow.appendChild(actions);

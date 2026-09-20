@@ -11,7 +11,7 @@ import { escapeHtml } from "../utils/html.ts";
 import { infoPage } from "./info-page.js";
 import { fetchPhotoUrl, photoUrlCache } from "../utils/photo.ts";
 import { isFavourite, toggleFavourite, FILLED_STAR_SVG } from "../utils/favourites.ts";
-import { DynamicPopover } from "./popover.js";
+import { DynamicPopover } from "./popover.ts";
 import { createPillSelector } from "./pill-selector.ts";
 
 function minutesToTimeDisplay(minutes) {

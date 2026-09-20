@@ -1,4 +1,4 @@
-import { selectCampusById } from "./campus-picker.js";
+import { selectCampusById } from "./campus-picker.tsx";
 
 export const PREFERRED_CAMPUS_ENABLED_KEY = "poliAule_preferredCampusEnabled";
 

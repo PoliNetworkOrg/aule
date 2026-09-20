@@ -1,4 +1,4 @@
-import { initPopovers } from "./components/popover.js";
+import { initPopovers } from "./components/popover.ts";
 
 history.scrollRestoration = "manual";
 
@@ -37,7 +37,7 @@ import { classroomDetail } from "./components/classroom-detail.js";
 import { infoPage } from "./components/info-page.js";
 
 import { initTimeControls } from "./components/time-controls-state.ts";
-import { setupCampusPicker } from "./components/campus-picker.js";
+import { setupCampusPicker } from "./components/campus-picker.tsx";
 import { initCampusMap } from "./components/campus-map.js";
 import { initCampusSheet } from "./components/campus-sheet.js";
 import { retranslateCampusBuildingsPage, goToBuilding } from "./components/campus-buildings.js";

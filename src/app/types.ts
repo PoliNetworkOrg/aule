@@ -48,6 +48,8 @@ export interface Campus<Room extends Classroom = Classroom> {
   id: string;
   name: string;
   slug?: string;
+  city?: string;
+  group?: string;
   lat?: number;
   long?: number;
   buildings: Building<Room>[];

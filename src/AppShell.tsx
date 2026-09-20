@@ -1,3 +1,4 @@
+import { CampusPicker } from "./app/components/campus-picker";
 import { TimeRangeChipPicker } from "./app/components/time-range-chip-picker";
 import { DateChipPicker } from "./app/components/date-chip-picker";
 import { Settings } from "./app/components/settings-host";
@@ -108,9 +109,7 @@ export function AppShell() {
 
           <form id="available-classrooms-form" className="form" data-loading="">
             <div className="picker-row">
-              <campus-chip-picker data-loading="">
-                <input type="hidden" id="campus-picker" name="campus" />
-              </campus-chip-picker>
+              <CampusPicker />
 
               <div className="picker-substack">
                 <DateChipPicker />

@@ -18,4 +18,6 @@ Each item depends on the preceding contracts and is complete only after its impl
 
 - Time range selection and typed-entry popups now render in React. Date/time popup motion shares a typed controller, native input subscriptions restore correctly when either consumer unmounts, and shared glass pointer interactions are checked TypeScript. Desktop/mobile comparisons cover keyboard selection, drags, time entry, popup switching, presets, time format, and language.
 
-Step 2 remains in progress. Campus pickers, cards, popovers, and bottom navigation still need React conversion. Other views and startup also remain on the legacy controllers. There are 16 frontend JavaScript modules left; `allowJs` remains enabled until they are converted. The complete frontend migration is not finished.
+- Campus pickers now render both shadow-root option lists and triggers in React. Typed controllers preserve selection, docking, keyboard navigation, and cross-tab synchronization. Popover positioning and cleanup are checked TypeScript. Desktop/mobile comparisons match the source without browser errors.
+
+Step 2 remains in progress. Cards and bottom navigation still need React conversion. Other views and startup also remain on the legacy controllers. There are 14 frontend JavaScript modules left; `allowJs` remains enabled until they are converted. The complete frontend migration is not finished.

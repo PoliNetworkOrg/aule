@@ -6,7 +6,6 @@ import {
 } from "https://cdn.jsdelivr.net/npm/@floating-ui/dom@1/+esm";
 import { haptics, defaultPatterns } from "./haptics.ts";
 import { attachLiquidGlass } from "./liquid-glass.ts";
-import { t } from "../i18n.ts";
 import { BLUR_STATE_EVENT } from "../utils/blur-capability.ts";
 import {
   snapGeometry,
@@ -14,67 +13,7 @@ import {
   hideInnerBoxInstantly,
   unhideInnerBox,
 } from "../utils/flip-morph.ts";
-import CAMPUS_PICKER_CSS_URL from "./campus-picker.css?url";
-
-// The `?url` suffix (not a hardcoded "./components/campus-picker.css"
-// string, and not `new URL(..., import.meta.url)`) routes this through
-// Vite's CSS pipeline — minified and content-hashed like every other
-// stylesheet — while still resolving to a URL the shadow root's <link> can
-// use. A hardcoded path only works in dev (served as-is from the project
-// root); in production it isn't part of the bundle, so the <link> 404s to
-// Cloudflare Pages' SPA fallback (index.html, served as text/html) and
-// every :host custom property silently falls back to its unstyled default.
-// `new URL(..., import.meta.url)` avoids that 404 but Vite treats it as an
-// opaque asset copy, skipping minification entirely.
-
-const STYLE_LINKS = `
-  <link rel="stylesheet" href="/fonts/hugeicons/icons.css">
-  <link rel="stylesheet" href="${CAMPUS_PICKER_CSS_URL}">
-`;
-
-// The trigger (pill + skeleton) lives in a shadow root on <campus-chip-picker>
-// itself, inside the sticky picker bar.
-const TRIGGER_TEMPLATE = document.createElement("template");
-
-TRIGGER_TEMPLATE.innerHTML = `
-  ${STYLE_LINKS}
-
-  <select class="cp-native" tabindex="-1" aria-hidden="true"></select>
-
-  <button type="button" class="campus-select" aria-haspopup="listbox"
-          aria-expanded="false" aria-controls="cp-listbox">
-    <i class="hgi-stroke hgi-university campus-select__icon" aria-hidden="true"></i>
-    <span class="campus-select__box">
-      <span class="campus-select__label"></span>
-      <span class="campus-select__value"></span>
-    </span>
-    <i class="hgi-stroke hgi-arrow-down-01 campus-select__chevron" aria-hidden="true"></i>
-  </button>
-
-  <div class="campus-select-skeleton" aria-hidden="true"></div>
-`;
-
-// The overlay + morphing panel live in a SECOND shadow root, on a host element
-// appended to <body>. That keeps the panel (a position:fixed + backdrop-filter
-// element) out of the sticky picker bar's stacking context — nested inside one,
-// iOS Safari repaints the bottom safe-area toolbar opaque and leaves it stuck —
-// while preserving shadow-scoped styling. Same escape as the date picker's
-// document.body.appendChild, just with encapsulation kept.
-const PANEL_TEMPLATE = document.createElement("template");
-
-PANEL_TEMPLATE.innerHTML = `
-  ${STYLE_LINKS}
-
-  <div class="cp-overlay" hidden></div>
-  <div id="cp-listbox" class="cp-popup" role="listbox" tabindex="-1" aria-label="Campus">
-    <div class="cp-popup__inner">
-      <div class="cp-popup__title" aria-hidden="true">
-        <i class="hgi-stroke hgi-university cp-popup__title-icon"></i>
-        <span class="cp-popup__title-text"></span>
-      </div>
-    </div>
-  </div>
-`;
+import type { Campus } from "../types";
 
 const TYPEAHEAD_RESET_MS = 500;
 
@@ -92,30 +31,29 @@ const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 // Form-association can't reach into the shadow root, so the submittable field
 // stays a hidden <input> in the light DOM (declared in index.html); the
 // <select> value is mirrored onto it on every change.
-export class CampusChipPicker extends HTMLElement {
+export class CampusPickerController {
   // Overridable by a subclass (see components/campus-buildings.js) so a
   // second instance can reuse this whole class without its `change` also
   // triggering the Available tab's own `campuschange` listener.
   changeEventName = "campuschange";
 
-  #select = null;
-  #hiddenInput = null;
-  #trigger = null;
-  #popup = null;
-  #valueEl = null;
-  #labelEl = null;
-  #rows = []; // [{ id, el }] in visual order
+  #select: HTMLSelectElement;
+  #hiddenInput: HTMLInputElement;
+  #trigger: HTMLButtonElement;
+  #popup: HTMLDivElement;
+
+  #rows: { id: string; name: string; el: HTMLElement }[] = []; // [{ id, el }] in visual order
   #activeIndex = -1;
-  #inner = null;
-  #titleEl = null;
-  #overlay = null;
-  #panelHost = null; // <body>-level host element for the panel shadow root
-  #panelRoot = null; // its shadow root (holds #overlay + #popup)
+  #inner: HTMLDivElement;
+
+  #overlay: HTMLDivElement;
+  #panelHost: HTMLDivElement; // <body>-level host element for the panel shadow root
+  #panelRoot: ShadowRoot; // its shadow root (holds #overlay + #popup)
   #isOpen = false;
 
   #docked = false; // inline-expanded in the desktop column (no popup)
   #scrollLocked = false;
-  #preventScroll = null;
+  #preventScroll: ((event: WheelEvent | TouchEvent) => void) | null = null;
   #typeaheadBuffer = "";
   #typeaheadTimer = 0;
   #changeWired = false;
@@ -125,79 +63,99 @@ export class CampusChipPicker extends HTMLElement {
   // fast close→open tears the freshly-opened popup back down.
   #seq = 0;
   #cleanupTimer = 0;
-  #morphCleanup = null;
+  #morphCleanup: (() => void) | null = null;
 
-  connectedCallback() {
-    if (this.shadowRoot) return; // already initialized (re-parenting, etc.)
+  #host: HTMLElement;
+  #onValue: (value: string) => void;
+  #renderOptions: (campuses: Campus[]) => void;
+  #retranslate: () => void;
+  #events = new AbortController();
+  #glassCleanup: (() => void)[] = [];
 
-    // ── Trigger root (on this element, inside the sticky picker bar) ──────
-    const shadow = this.attachShadow({ mode: "open" });
-    shadow.appendChild(TRIGGER_TEMPLATE.content.cloneNode(true));
+  constructor(
+    host: HTMLElement,
+    panelHost: HTMLDivElement,
+    onValue: (value: string) => void,
+    renderOptions: (campuses: Campus[]) => void,
+    retranslate: () => void,
+  ) {
+    this.#host = host;
+    this.#onValue = onValue;
+    this.#renderOptions = renderOptions;
+    this.#retranslate = retranslate;
+    const shadow = host.shadowRoot!;
+    this.#select = shadow.querySelector<HTMLSelectElement>(".cp-native")!;
+    this.#trigger = shadow.querySelector<HTMLButtonElement>(".campus-select")!;
+    this.#hiddenInput = host.querySelector<HTMLInputElement>('input[type="hidden"]')!;
+    this.#panelHost = panelHost;
+    this.#panelRoot = panelHost.shadowRoot!;
+    this.#popup = this.#panelRoot.querySelector<HTMLDivElement>(".cp-popup")!;
+    this.#inner = this.#panelRoot.querySelector<HTMLDivElement>(".cp-popup__inner")!;
+    this.#overlay = this.#panelRoot.querySelector<HTMLDivElement>(".cp-overlay")!;
+    document.body.appendChild(panelHost);
+    const triggerCleanup = attachLiquidGlass(this.#trigger);
 
-    this.#select = shadow.querySelector(".cp-native");
-    this.#trigger = shadow.querySelector(".campus-select");
-    this.#valueEl = shadow.querySelector(".campus-select__value");
-    this.#labelEl = shadow.querySelector(".campus-select__label");
-    this.#hiddenInput = this.querySelector('input[type="hidden"]');
-
-    // ── Panel root (on a <body>-level host, outside every ancestor
-    //    stacking context) ────────────────────────────────────────────────
-    this.#panelHost = document.createElement("div");
-    this.#panelHost.className = "cp-panel-host";
-    this.#panelRoot = this.#panelHost.attachShadow({ mode: "open" });
-    this.#panelRoot.appendChild(PANEL_TEMPLATE.content.cloneNode(true));
-    document.body.appendChild(this.#panelHost);
-
-    this.#popup = this.#panelRoot.querySelector(".cp-popup");
-    this.#inner = this.#panelRoot.querySelector(".cp-popup__inner");
-    this.#titleEl = this.#panelRoot.querySelector(".cp-popup__title-text");
-    this.#overlay = this.#panelRoot.querySelector(".cp-overlay");
-
-    attachLiquidGlass(this.#trigger);
+    if (triggerCleanup) this.#glassCleanup.push(triggerCleanup);
     // Keep the press / drag-deform gesture alive on the open panel, but only
     // when grabbed by its title bar — the body is a scrollable list.
-    attachLiquidGlass(this.#popup, { from: ".cp-popup__title" });
-    this.#trigger.addEventListener("click", () => this.#toggle());
-    this.#trigger.addEventListener("keydown", (e) => this.#onTriggerKeydown(e));
-    this.#popup.addEventListener("keydown", (e) => this.#onKeydown(e));
-    this.#popup.addEventListener("click", (e) => this.#onRowClick(e));
-    this.#popup.addEventListener("pointermove", (e) => this.#onRowHover(e));
+    const popupCleanup = attachLiquidGlass(this.#popup, { from: ".cp-popup__title" });
+
+    if (popupCleanup) this.#glassCleanup.push(popupCleanup);
+    this.#trigger.addEventListener("click", () => this.#toggle(), { signal: this.#events.signal });
+    this.#trigger.addEventListener("keydown", (e) => this.#onTriggerKeydown(e), {
+      signal: this.#events.signal,
+    });
+    this.#popup.addEventListener("keydown", (e) => this.#onKeydown(e), {
+      signal: this.#events.signal,
+    });
+    this.#popup.addEventListener("click", (e) => this.#onRowClick(e), {
+      signal: this.#events.signal,
+    });
+    this.#popup.addEventListener("pointermove", (e) => this.#onRowHover(e), {
+      signal: this.#events.signal,
+    });
     // The pointer-driven active row must not stay lit once the cursor leaves
     // the list (or moves onto the title / a section label).
-    this.#popup.addEventListener("pointerleave", () => this.#clearPointerActive());
-    this.#overlay.addEventListener("click", () => this.#close());
+    this.#popup.addEventListener("pointerleave", () => this.#clearPointerActive(), {
+      signal: this.#events.signal,
+    });
+    this.#overlay.addEventListener("click", () => this.#close(), { signal: this.#events.signal });
 
     // Mirror the perf-gated blur verdict onto both shadow hosts — this
     // component keeps its own concrete --cp-glass-* palette rather than
     // inheriting :root's custom properties (see campus-picker.css), so it
     // can't pick up [data-blur] from document.documentElement on its own.
     this.#syncBlurState();
-    window.addEventListener(BLUR_STATE_EVENT, () => this.#syncBlurState());
+    window.addEventListener(BLUR_STATE_EVENT, () => this.#syncBlurState(), {
+      signal: this.#events.signal,
+    });
   }
 
   #syncBlurState() {
     const blur = document.documentElement.dataset.blur;
 
     if (blur) {
-      this.dataset.blur = blur;
+      this.#host.dataset.blur = blur;
 
       if (this.#panelHost) this.#panelHost.dataset.blur = blur;
     } else {
-      delete this.dataset.blur;
+      delete this.#host.dataset.blur;
 
       if (this.#panelHost) delete this.#panelHost.dataset.blur;
     }
   }
 
-  disconnectedCallback() {
-    this.#unlockScroll();
-    // The panel host is deliberately left on <body> across a disconnect —
-    // this element is only ever re-parented, never destroyed, and the
-    // connectedCallback guard would skip re-creating it anyway.
+  destroy() {
+    this.#forceClose();
+    this.#clearTypeahead();
+    this.#events.abort();
+
+    for (const cleanup of this.#glassCleanup) cleanup();
+    this.#panelHost.remove();
   }
 
   // Programmatically selects a campus by ID. No-op if the ID isn't available.
-  selectCampusById(id, _animate = true) {
+  selectCampusById(id: string, _animate = true) {
     const select = this.#select;
 
     if (!select || !select.querySelector(`option[value="${CSS.escape(id)}"]`)) return;
@@ -211,128 +169,20 @@ export class CampusChipPicker extends HTMLElement {
   // cities" section header + the "CAMPUS" trigger label). Called on language
   // switch from script.js.
   retranslate() {
-    if (this.#labelEl) this.#labelEl.textContent = t("tabs.campus");
-
-    if (this.#titleEl) this.#titleEl.textContent = t("tabs.campus");
-
-    const og = this.#select?.querySelector("optgroup[data-i18n]");
-
-    if (og) og.label = t(og.dataset.i18n);
-
-    const section = this.#popup?.querySelector(".cp-section[data-i18n]");
-
-    if (section) {
-      const lbl = section.querySelector(".cp-section-label");
-
-      if (lbl) lbl.textContent = t(section.dataset.i18n);
-    }
+    this.#retranslate();
   }
 
   // Builds the option list from the static campus data, keeping only campuses
   // that actually have buildings.
-  setup(staticData) {
+  setup(staticData: Campus[]) {
     const select = this.#select;
     const hiddenInput = this.#hiddenInput;
-
-    if (!select) return;
-
-    // Set here rather than in connectedCallback: i18n isn't loaded that early.
-    if (this.#labelEl) this.#labelEl.textContent = t("tabs.campus");
-
-    if (this.#titleEl) this.#titleEl.textContent = t("tabs.campus");
-
-    const available = staticData.filter((c) => c.buildings.length > 0);
-
-    // Group by city, then split: cities that contain a grouped campus (Milano:
-    // Città Studi / Bovisa) get their own section; standalone single-campus
-    // cities are collected under "Other cities".
-    const byCity = new Map();
-
-    for (const campus of available) {
-      if (!byCity.has(campus.city)) byCity.set(campus.city, []);
-      byCity.get(campus.city).push(campus);
-    }
-
-    const mainCities = [];
-    const otherCampuses = [];
-
-    for (const [city, list] of byCity) {
-      if (list.some((c) => c.group)) mainCities.push([city, list]);
-      else otherCampuses.push(...list);
-    }
-
-    // ── Rebuild the hidden <select> and the custom listbox in one pass ──
-    select.innerHTML = "";
-    this.#inner.querySelectorAll(".cp-section").forEach((s) => s.remove());
-    this.#rows = [];
-
-    const addSection = (labelText, i18nKey) => {
-      const og = document.createElement("optgroup");
-      og.label = labelText;
-
-      if (i18nKey) og.dataset.i18n = i18nKey;
-      select.appendChild(og);
-
-      const section = document.createElement("div");
-      section.className = "cp-section";
-
-      if (i18nKey) section.dataset.i18n = i18nKey;
-      const lbl = document.createElement("div");
-      lbl.className = "cp-section-label";
-      lbl.textContent = labelText;
-      section.appendChild(lbl);
-      this.#inner.appendChild(section);
-
-      return { og, section };
-    };
-
-    const addCampus = (campus, og, section) => {
-      const opt = document.createElement("option");
-      opt.value = campus.id;
-      opt.textContent = campus.name;
-      og.appendChild(opt);
-
-      const row = document.createElement("div");
-      row.className = "campus-option";
-      row.setAttribute("role", "option");
-      row.id = `cp-opt-${campus.id}`;
-      row.dataset.id = campus.id;
-      row.setAttribute("aria-selected", "false");
-
-      const check = document.createElement("i");
-      check.className = "hgi-stroke hgi-tick-02 campus-option__check";
-      check.setAttribute("aria-hidden", "true");
-      row.appendChild(check);
-
-      const text = document.createElement("span");
-      text.className = "campus-option__text";
-
-      const name = document.createElement("span");
-      name.className = "campus-option__name";
-      name.textContent = campus.name;
-      text.appendChild(name);
-
-      if (campus.group) {
-        const area = document.createElement("span");
-        area.className = "campus-option__area";
-        area.textContent = campus.group;
-        text.appendChild(area);
-      }
-
-      row.appendChild(text);
-      section.appendChild(row);
-      this.#rows.push({ id: campus.id, name: campus.name.toLowerCase(), el: row });
-    };
-
-    for (const [city, list] of mainCities) {
-      const { og, section } = addSection(city, null);
-      list.forEach((c) => addCampus(c, og, section));
-    }
-
-    if (otherCampuses.length > 0) {
-      const { og, section } = addSection(t("campus.otherLabel"), "campus.otherLabel");
-      otherCampuses.forEach((c) => addCampus(c, og, section));
-    }
+    this.#renderOptions(staticData);
+    this.#rows = [...this.#inner.querySelectorAll<HTMLElement>(".campus-option")].map((el) => ({
+      id: el.dataset.id!,
+      name: el.querySelector(".campus-option__name")!.textContent!.toLowerCase(),
+      el,
+    }));
 
     // Silent auto-select of the first campus, matching the old picker (no
     // `campuschange` event on initial population).
@@ -345,14 +195,18 @@ export class CampusChipPicker extends HTMLElement {
 
     if (!this.#changeWired) {
       this.#changeWired = true;
-      select.addEventListener("change", () => {
-        hiddenInput.value = select.value;
-        this.#syncFromSelect();
-        document.dispatchEvent(
-          new CustomEvent(this.changeEventName, { detail: { id: select.value } }),
-        );
-        haptics.trigger(defaultPatterns.light);
-      });
+      select.addEventListener(
+        "change",
+        () => {
+          hiddenInput.value = select.value;
+          this.#syncFromSelect();
+          document.dispatchEvent(
+            new CustomEvent(this.changeEventName, { detail: { id: select.value } }),
+          );
+          haptics.trigger(defaultPatterns.light);
+        },
+        { signal: this.#events.signal },
+      );
     }
   }
 
@@ -364,7 +218,7 @@ export class CampusChipPicker extends HTMLElement {
     const value = this.#select.value;
     const selected = this.#select.selectedOptions[0];
 
-    if (this.#valueEl) this.#valueEl.textContent = selected ? selected.textContent : "";
+    this.#onValue(selected?.textContent ?? "");
 
     this.#rows.forEach(({ id, el }, i) => {
       const isSel = id === value;
@@ -374,7 +228,7 @@ export class CampusChipPicker extends HTMLElement {
     });
   }
 
-  #commit(id) {
+  #commit(id: string) {
     if (this.#select.value !== id) {
       this.#select.value = id;
       this.#select.dispatchEvent(new Event("change"));
@@ -404,7 +258,7 @@ export class CampusChipPicker extends HTMLElement {
   // morphing out of the pill into a fixed popup. picker-dock.js toggles this.
   // The panel lives in a <body>-level shadow host (#panelHost); docking moves
   // that host into .picker-row (as a sibling of this element) and hides the pill.
-  setDocked(on) {
+  setDocked(on: boolean) {
     on = !!on;
 
     if (on === this.#docked) return;
@@ -415,23 +269,27 @@ export class CampusChipPicker extends HTMLElement {
       this.#overlay.hidden = true;
       this.#popup.classList.remove("cp-popup--closing");
       this.#popup.classList.add("cp-popup--docked", "cp-popup--open");
-      ["left", "top", "width", "height", "borderRadius", "transform", "transition"].forEach((p) => {
+      (
+        ["left", "top", "width", "height", "borderRadius", "transform", "transition"] as const
+      ).forEach((p) => {
         this.#popup.style[p] = "";
       });
       this.#popup.style.display = "flex";
       this.#panelHost.classList.add("cp-panel-host--docked");
-      this.parentElement?.insertBefore(this.#panelHost, this.nextSibling);
-      this.style.display = "none";
+      this.#host.parentElement?.insertBefore(this.#panelHost, this.#host.nextSibling);
+      this.#host.style.display = "none";
       this.#setActive(this.#activeIndex >= 0 ? this.#activeIndex : 0, { scroll: "auto" });
     } else {
       this.#popup.classList.remove("cp-popup--docked", "cp-popup--open");
       this.#popup.style.display = "none";
-      ["left", "top", "width", "height", "borderRadius", "transform", "transition"].forEach((p) => {
+      (
+        ["left", "top", "width", "height", "borderRadius", "transform", "transition"] as const
+      ).forEach((p) => {
         this.#popup.style[p] = "";
       });
       this.#panelHost.classList.remove("cp-panel-host--docked");
       document.body.appendChild(this.#panelHost);
-      this.style.display = "";
+      this.#host.style.display = "";
     }
   }
 
@@ -444,12 +302,12 @@ export class CampusChipPicker extends HTMLElement {
     this.#overlay.classList.remove("is-active");
     this.#popup.style.display = "none";
     this.#popup.style.transition = "";
-    ["left", "top", "width", "height", "borderRadius", "transform"].forEach((p) => {
+    (["left", "top", "width", "height", "borderRadius", "transform"] as const).forEach((p) => {
       this.#popup.style[p] = "";
     });
     unhideInnerBox(this.#inner);
     this.#overlay.hidden = true;
-    this.classList.remove("cp-anim", "cp-content-hidden");
+    this.#host.classList.remove("cp-anim", "cp-content-hidden");
     this.#unlockScroll();
   }
 
@@ -463,21 +321,21 @@ export class CampusChipPicker extends HTMLElement {
     return ++this.#seq;
   }
 
-  #onMorphEnd(cb) {
+  #onMorphEnd(cb: () => void) {
     this.#clearMorphEnd();
 
-    const fallback = setTimeout(() => {
+    const fallback = window.setTimeout(() => {
       this.#clearMorphEnd();
       cb();
     }, MORPH_MS + 60);
 
-    const handler = (e) => {
+    const handler = (e: TransitionEvent) => {
       if (e.target !== this.#popup || e.propertyName !== "transform") return;
       this.#clearMorphEnd();
       cb();
     };
 
-    this.#popup.addEventListener("transitionend", handler);
+    this.#popup.addEventListener("transitionend", handler, { signal: this.#events.signal });
     this.#morphCleanup = () => {
       clearTimeout(fallback);
       this.#popup.removeEventListener("transitionend", handler);
@@ -535,12 +393,12 @@ export class CampusChipPicker extends HTMLElement {
     // A close may have got as far as tagging the shell/pill for its handoff,
     // or hiding the list's content (see #close) — undo both before reopening.
     this.#popup.classList.remove("cp-popup--closing");
-    this.classList.remove("cp-content-hidden");
+    this.#host.classList.remove("cp-content-hidden");
     unhideInnerBox(this.#inner);
 
     this.#overlay.hidden = false;
     this.#popup.style.display = "flex";
-    this.classList.add("cp-anim");
+    this.#host.classList.add("cp-anim");
 
     const target = await this.#panelTarget();
 
@@ -609,12 +467,12 @@ export class CampusChipPicker extends HTMLElement {
       this.#popup.classList.remove("cp-popup--closing");
       this.#popup.style.display = "none";
       this.#popup.style.transition = "";
-      ["left", "top", "width", "height", "borderRadius", "transform"].forEach((p) => {
+      (["left", "top", "width", "height", "borderRadius", "transform"] as const).forEach((p) => {
         this.#popup.style[p] = "";
       });
       unhideInnerBox(this.#inner);
       this.#overlay.hidden = true;
-      this.classList.remove("cp-anim", "cp-content-hidden");
+      this.#host.classList.remove("cp-anim", "cp-content-hidden");
       this.#unlockScroll();
     };
 
@@ -649,8 +507,8 @@ export class CampusChipPicker extends HTMLElement {
             // Hand the frame back to the pill: its glass box matches the collapsed
             // shell, so swap instantly, but fade the pill's contents (icon / label
             // / value / chevron) in while the shell cross-fades out.
-            this.classList.remove("cp-anim");
-            this.classList.add("cp-content-hidden");
+            this.#host.classList.remove("cp-anim");
+            this.#host.classList.add("cp-content-hidden");
             this.#popup.classList.add("cp-popup--closing");
             this.#overlay.hidden = true;
             this.#unlockScroll();
@@ -659,10 +517,10 @@ export class CampusChipPicker extends HTMLElement {
             requestAnimationFrame(() =>
               requestAnimationFrame(() => {
                 if (seq !== this.#seq) return;
-                this.classList.remove("cp-content-hidden");
+                this.#host.classList.remove("cp-content-hidden");
               }),
             );
-            this.#cleanupTimer = setTimeout(clear, 240);
+            this.#cleanupTimer = window.setTimeout(clear, 240);
           });
         },
       });
@@ -692,14 +550,18 @@ export class CampusChipPicker extends HTMLElement {
   #unlockScroll() {
     if (!this.#scrollLocked) return;
     this.#scrollLocked = false;
-    window.removeEventListener("wheel", this.#preventScroll);
-    window.removeEventListener("touchmove", this.#preventScroll);
+
+    if (this.#preventScroll) {
+      window.removeEventListener("wheel", this.#preventScroll);
+      window.removeEventListener("touchmove", this.#preventScroll);
+    }
+
     this.#preventScroll = null;
   }
 
   // ── Keyboard ──────────────────────────────────────────────────────────
 
-  #onTriggerKeydown(e) {
+  #onTriggerKeydown(e: KeyboardEvent) {
     if (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Enter" || e.key === " ") {
       // Let Enter/Space fall through to the native button click on keyup,
       // but ArrowDown/Up should open + move.
@@ -710,7 +572,7 @@ export class CampusChipPicker extends HTMLElement {
     }
   }
 
-  #onKeydown(e) {
+  #onKeydown(e: KeyboardEvent) {
     switch (e.key) {
       case "ArrowDown":
         e.preventDefault();
@@ -748,7 +610,7 @@ export class CampusChipPicker extends HTMLElement {
     }
   }
 
-  #moveActive(delta) {
+  #moveActive(delta: number) {
     const n = this.#rows.length;
 
     if (!n) return;
@@ -759,7 +621,10 @@ export class CampusChipPicker extends HTMLElement {
     this.#setActive(next);
   }
 
-  #setActive(index, { scroll = "nearest" } = {}) {
+  #setActive(
+    index: number,
+    { scroll = "nearest" }: { scroll?: ScrollLogicalPosition | "auto" } = {},
+  ) {
     if (index < 0 || index >= this.#rows.length) return;
     this.#rows.forEach(({ el }, i) => el.classList.toggle("is-active", i === index));
     this.#activeIndex = index;
@@ -769,10 +634,10 @@ export class CampusChipPicker extends HTMLElement {
     if (scroll !== "auto") el.scrollIntoView({ block: scroll });
   }
 
-  #typeahead(char) {
+  #typeahead(char: string) {
     this.#typeaheadBuffer += char.toLowerCase();
     clearTimeout(this.#typeaheadTimer);
-    this.#typeaheadTimer = setTimeout(() => this.#clearTypeahead(), TYPEAHEAD_RESET_MS);
+    this.#typeaheadTimer = window.setTimeout(() => this.#clearTypeahead(), TYPEAHEAD_RESET_MS);
 
     const match = this.#rows.findIndex((r) => r.name.startsWith(this.#typeaheadBuffer));
 
@@ -786,14 +651,16 @@ export class CampusChipPicker extends HTMLElement {
 
   // ── Pointer ───────────────────────────────────────────────────────────
 
-  #onRowClick(e) {
-    const row = e.target.closest('[role="option"]');
+  #onRowClick(e: MouseEvent) {
+    const row =
+      e.target instanceof Element ? e.target.closest<HTMLElement>('[role="option"]') : null;
 
-    if (row) this.#commit(row.dataset.id);
+    if (row) this.#commit(row.dataset.id!);
   }
 
-  #onRowHover(e) {
-    const row = e.target.closest('[role="option"]');
+  #onRowHover(e: PointerEvent) {
+    const row =
+      e.target instanceof Element ? e.target.closest<HTMLElement>('[role="option"]') : null;
 
     if (!row) {
       // Pointer is inside the panel but not over a row (title, section label,
@@ -819,17 +686,4 @@ export class CampusChipPicker extends HTMLElement {
     this.#activeIndex = this.#rows.findIndex((r) => r.id === this.#select.value);
     this.#popup.removeAttribute("aria-activedescendant");
   }
-}
-
-customElements.define("campus-chip-picker", CampusChipPicker);
-
-// Backward-compatible module-level API — existing call sites (script.js,
-// settings.js) import these directly rather than holding an element
-// reference, so keep the same exported shape and just delegate.
-export function setupCampusPicker(staticData) {
-  document.querySelector("campus-chip-picker")?.setup(staticData);
-}
-
-export function selectCampusById(id, animate = true) {
-  document.querySelector("campus-chip-picker")?.selectCampusById(id, animate);
 }

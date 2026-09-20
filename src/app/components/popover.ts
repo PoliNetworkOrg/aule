@@ -5,19 +5,32 @@ import {
   shift,
   offset,
   arrow,
+  type Placement,
 } from "https://cdn.jsdelivr.net/npm/@floating-ui/dom@1/+esm";
+
+interface PopoverOptions {
+  placement: Placement;
+  offset: number;
+  shiftPadding: number;
+  strategy?: "absolute" | "fixed";
+}
 
 export const supportsAnchor = CSS.supports("anchor-name: --a");
 
 let _anchorCounter = 0;
 
 // All Popovers currently in the page
-const allPopovers = [];
+const allPopovers: Popover[] = [];
 
 // Shared positioning math used by both Popover (fixed trigger) and DynamicPopover
 // (trigger reassigned at runtime, e.g. one popover reused across many hover targets).
 
-async function computeFloatingPosition(trigger, popover, arrowEl, options) {
+async function computeFloatingPosition(
+  trigger: HTMLElement,
+  popover: HTMLElement,
+  arrowEl: HTMLElement | null,
+  options: PopoverOptions,
+) {
   const middleware = [offset(options.offset), flip(), shift({ padding: options.shiftPadding })];
 
   if (arrowEl) middleware.push(arrow({ element: arrowEl }));
@@ -33,9 +46,10 @@ async function computeFloatingPosition(trigger, popover, arrowEl, options) {
   if (arrowEl && middlewareData.arrow) {
     const { x: arrowX, y: arrowY } = middlewareData.arrow;
 
-    const staticSide = { top: "bottom", bottom: "top", left: "right", right: "left" }[
-      placement.split("-")[0]
-    ];
+    const side = placement.split("-")[0];
+
+    const staticSide =
+      side === "top" ? "bottom" : side === "bottom" ? "top" : side === "left" ? "right" : "left";
 
     Object.assign(arrowEl.style, {
       left: arrowX != null ? `${arrowX}px` : "",
@@ -45,8 +59,6 @@ async function computeFloatingPosition(trigger, popover, arrowEl, options) {
     arrowEl.dataset.side = staticSide;
 
     // Set transform-origin to point at the arrow
-    const side = placement.split("-")[0];
-
     if (side === "bottom" || side === "top") {
       const originX = arrowX != null ? `${arrowX + 5}px` : "50%"; // +5 = half arrow width
       const originY = side === "bottom" ? "top" : "bottom";
@@ -64,7 +76,11 @@ async function computeFloatingPosition(trigger, popover, arrowEl, options) {
 // When CSS anchor positioning handles placement, floating-ui is skipped but we
 // still need to point the arrow and set transform-origin toward the trigger.
 // We only need the trigger's rect — no async call required.
-function updateAnchorOriginAndArrow(trigger, popover, arrowEl) {
+function updateAnchorOriginAndArrow(
+  trigger: HTMLElement,
+  popover: HTMLElement,
+  arrowEl: HTMLElement | null,
+) {
   const triggerRect = trigger.getBoundingClientRect();
   // offsetWidth is a layout value — unaffected by transform: scale(0).
   const popoverWidth = popover.offsetWidth;
@@ -105,10 +121,18 @@ function updateAnchorOriginAndArrow(trigger, popover, arrowEl) {
 
 // Implements a Popover component
 export class Popover {
-  constructor(triggerEl, popoverEl, options = {}) {
+  trigger: HTMLElement;
+  popover: HTMLElement;
+  arrowEl: HTMLElement | null;
+  options: PopoverOptions;
+  constructor(
+    triggerEl: HTMLElement,
+    popoverEl: HTMLElement,
+    options: Partial<PopoverOptions> = {},
+  ) {
     this.trigger = triggerEl;
     this.popover = popoverEl;
-    this.arrowEl = popoverEl.querySelector("#arrow, [data-arrow]");
+    this.arrowEl = popoverEl.querySelector<HTMLElement>("#arrow, [data-arrow]");
     this.options = {
       placement: "bottom",
       offset: 8,
@@ -135,7 +159,7 @@ export class Popover {
     await computeFloatingPosition(this.trigger, this.popover, this.arrowEl, this.options);
   }
 
-  _onClick(e) {
+  _onClick(e: MouseEvent) {
     e.stopPropagation();
     const isOpen = this.popover.hasAttribute("data-show");
 
@@ -151,7 +175,9 @@ export class Popover {
   }
 
   // Hides the popover when clicking outside of it
-  _onDocumentClick(e) {
+  _onDocumentClick(e: MouseEvent) {
+    if (!(e.target instanceof Node)) return;
+
     if (!this.popover.contains(e.target) && !this.trigger.contains(e.target)) {
       this.popover.removeAttribute("data-show");
     }
@@ -187,6 +213,9 @@ export class Popover {
   destroy() {
     this.trigger.removeEventListener("click", this._onClick);
     document.removeEventListener("click", this._onDocumentClick);
+    const index = allPopovers.indexOf(this);
+
+    if (index !== -1) allPopovers.splice(index, 1);
   }
 }
 
@@ -205,9 +234,13 @@ export class Popover {
 // floating-ui uniformly means flip()'s resolved `placement` always matches what
 // actually got applied, so the arrow never points the wrong way.
 export class DynamicPopover {
-  constructor(popoverEl, options = {}) {
+  trigger: HTMLElement | null;
+  popover: HTMLElement;
+  arrowEl: HTMLElement | null;
+  options: PopoverOptions;
+  constructor(popoverEl: HTMLElement, options: Partial<PopoverOptions> = {}) {
     this.popover = popoverEl;
-    this.arrowEl = popoverEl.querySelector("#arrow, [data-arrow]");
+    this.arrowEl = popoverEl.querySelector<HTMLElement>("#arrow, [data-arrow]");
     this.trigger = null;
     this.options = {
       placement: "top",
@@ -218,7 +251,7 @@ export class DynamicPopover {
     };
   }
 
-  show(triggerEl) {
+  show(triggerEl: HTMLElement) {
     this.trigger = triggerEl;
     computeFloatingPosition(this.trigger, this.popover, this.arrowEl, this.options);
     this.popover.setAttribute("data-show", "");
@@ -230,31 +263,48 @@ export class DynamicPopover {
   }
 }
 
-// Close all popovers on scroll — only needed as a fallback when anchor positioning
-// isn't available, since position-visibility: anchors-visible handles it natively.
-if (!supportsAnchor) {
-  window.addEventListener(
-    "scroll",
-    () => {
-      allPopovers.forEach((p) => p.close());
-    },
-    { capture: true, passive: true },
-  );
-}
-
-// On page load finds all popover components and initializes them
+// Startup owns these static trigger listeners; dynamic views own their instances.
 export function initPopovers() {
-  document.querySelectorAll("[data-popover]").forEach((trigger) => {
-    const popoverEl = document.getElementById(trigger.dataset.popover);
+  const created: Popover[] = [];
 
-    if (!popoverEl) return;
-    const options = {};
+  const placements: Placement[] = [
+    "top",
+    "top-start",
+    "top-end",
+    "bottom",
+    "bottom-start",
+    "bottom-end",
+    "left",
+    "left-start",
+    "left-end",
+    "right",
+    "right-start",
+    "right-end",
+  ];
+
+  document.querySelectorAll<HTMLElement>("[data-popover]").forEach((trigger) => {
+    const popover = document.getElementById(trigger.dataset.popover!);
+
+    if (!popover) return;
+    const options: Partial<PopoverOptions> = {};
 
     if (trigger.dataset.popoverShiftPadding !== undefined)
       options.shiftPadding = Number(trigger.dataset.popoverShiftPadding);
 
-    if (trigger.dataset.popoverPlacement !== undefined)
-      options.placement = trigger.dataset.popoverPlacement;
-    new Popover(trigger, popoverEl, options);
+    const placement = placements.find(
+      (candidate) => candidate === trigger.dataset.popoverPlacement,
+    );
+
+    if (placement) options.placement = placement;
+    created.push(new Popover(trigger, popover, options));
   });
+  const closeAll = () => allPopovers.forEach((popover) => popover.close());
+
+  if (!supportsAnchor)
+    window.addEventListener("scroll", closeAll, { capture: true, passive: true });
+
+  return () => {
+    window.removeEventListener("scroll", closeAll, { capture: true });
+    created.forEach((popover) => popover.destroy());
+  };
 }
