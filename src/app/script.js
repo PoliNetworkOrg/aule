@@ -37,9 +37,9 @@ import { infoPage } from "./components/info-page.js";
 
 import { initTimeControls } from "./components/time-controls-state.ts";
 import { setupCampusPicker } from "./components/campus-picker.tsx";
-import { initCampusMap } from "./components/campus-map.js";
-import { initCampusSheet } from "./components/campus-sheet.js";
-import { retranslateCampusBuildingsPage, goToBuilding } from "./components/campus-buildings.js";
+import { initCampusMap } from "./components/campus-map.tsx";
+import { initCampusSheet } from "./components/campus-sheet.tsx";
+import { retranslateCampusBuildingsPage, goToBuilding } from "./components/campus-buildings.tsx";
 import { activateGroupTab } from "./components/bottom-nav.tsx";
 import { setupDatePicker } from "./components/date-picker.tsx";
 import { initPickerDock } from "./components/picker-dock.ts";

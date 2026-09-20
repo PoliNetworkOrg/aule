@@ -24,4 +24,6 @@ Each item depends on the preceding contracts and is complete only after its impl
 
 - Search results, lesson/exam cards, favourites, and the data-status popup now render in React. Typed controllers retain search transitions, viewport tracking, retry timing, popup geometry, and reload behavior. Desktop/mobile comparisons cover result ordering, highlights, detail navigation, favourite state, reloads, and locale changes.
 
-Step 2 remains in progress. The React classroom card is used by search and favourites; availability and Campus still use the legacy card builder. Other views and startup also remain on the legacy controllers. There are 8 frontend JavaScript modules left; `allowJs` remains enabled until they are converted. The complete frontend migration is not finished.
+- The Campus sheet, building browser, floor groups, and map marker content now render in React. The sheet gestures, page transitions, Mapbox camera integration, and event contracts are checked TypeScript. Desktop/mobile comparisons and live map marker/recenter checks match the source.
+
+Steps 2 and 3 remain in progress. The React classroom card is used by search and favourites; availability still uses the legacy card builder. Other views and startup also remain on the legacy controllers. There are 5 frontend JavaScript modules left; `allowJs` remains enabled until they are converted. The complete frontend migration is not finished.

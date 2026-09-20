@@ -1,10 +1,13 @@
-import { createCampusSheetPicker } from "./campus-picker.tsx";
-import { getContentScroll, setContentScroll } from "./campus-sheet.js";
+import { CampusSheetPicker, type CampusPickerElement } from "./campus-picker.tsx";
+import { getContentScroll, setContentScroll } from "./campus-sheet.tsx";
 import { classroomsData as staticClassroomsData } from "../classroom-search-data.ts";
 import { getClassroomStatusNow } from "../available-rooms-script.ts";
-import { buildCardForClassroom } from "./classroom-list.js";
+import { ClassroomCard } from "./classroom-card";
+import { Fragment } from "react";
+import { createRoot, type Root } from "react-dom/client";
+import { flushSync } from "react-dom";
+import type { Building } from "../types";
 import { t } from "../i18n.ts";
-import { escapeHtml } from "../utils/html.ts";
 import { haptics, defaultPatterns } from "./haptics.ts";
 
 // The Campus tab's own "pages" inside the campus sheet (components/campus-sheet.js):
@@ -53,29 +56,29 @@ const SLIDE_DUR = 420; // ms
 
 const SLIDE_EASE = "cubic-bezier(0.16, 1, 0.3, 1)";
 
-let picker = null;
+let picker: CampusPickerElement;
 
-let hiddenInput = null;
+let hiddenInput: HTMLInputElement;
 
-let recenterBtn = null;
+let recenterBtn: HTMLButtonElement;
 
-let backBtn = null;
+let backBtn: HTMLButtonElement;
 
-let titleBox = null; // wraps titleEl + subtitleEl — see flipTitleBox()
+let titleBox: HTMLElement; // wraps titleEl + subtitleEl — see flipTitleBox()
 
-let titleEl = null;
+let titleEl: HTMLElement;
 
-let subtitleEl = null;
+let subtitleEl: HTMLElement;
 
-let pageSwap = null; // wraps whichever page is on screen; slid horizontally between the two
+let pageSwap: HTMLElement; // wraps whichever page is on screen; slid horizontally between the two
 
-let currentPage = null; // the in-flow (position:static) page element
+let currentPage: HTMLElement | null = null; // the in-flow (position:static) page element
 
 let transitioning = false; // a slideTo()/crossfadePage() animation is in flight — see cancelPageTransition()
 
 let view = "campus"; // 'campus' | 'building'
 
-let selectedBuildingId = null; // building.name (unique within a campus — see findBuilding()), or null
+let selectedBuildingId: string | null = null; // building.name (unique within a campus — see findBuilding()), or null
 
 // The campus grid's own scroll offset, saved the moment a building is opened
 // from it and restored on the way back — so the two pages scroll
@@ -84,118 +87,192 @@ let selectedBuildingId = null; // building.name (unique within a campus — see 
 // every time a building is visited.
 let savedCampusScroll = 0;
 
-export function initCampusBuildingsPage(headerContainer, gridContainer) {
-  headerContainer.innerHTML = "";
-  gridContainer.innerHTML = "";
+const pageRoots = new Map<Element, Root>();
 
-  // [Back?] Title            [Recenter] [Picker?]
-  const topRow = document.createElement("div");
-  topRow.className = "campus-sheet-toprow";
+let headerRoot: Root | null = null;
 
-  const leftGroup = document.createElement("div");
-  leftGroup.className = "campus-sheet-leftgroup";
+let gridRoot: Root | null = null;
 
-  backBtn = document.createElement("button");
-  backBtn.type = "button";
-  backBtn.className = "campus-sheet-backbtn liquid-glass";
-  backBtn.hidden = true;
-  backBtn.setAttribute("aria-label", t("campus.back"));
-  backBtn.innerHTML = '<i class="hgi-stroke hgi-chevron-left" aria-hidden="true"></i>';
-  backBtn.addEventListener("click", () => {
-    haptics.trigger(defaultPatterns.light);
-    goToCampusPage({ animate: true });
+let headerTitle = "";
+
+let headerSubtitle = "";
+
+let events = new AbortController();
+
+const timers = new Set<number>();
+
+const frames = new Set<number>();
+
+function later(callback: () => void, delay: number) {
+  const id = window.setTimeout(() => {
+    timers.delete(id);
+    callback();
+  }, delay);
+
+  timers.add(id);
+
+  return id;
+}
+
+function frame(callback: FrameRequestCallback) {
+  const id = requestAnimationFrame((time) => {
+    frames.delete(id);
+    callback(time);
   });
-  leftGroup.appendChild(backBtn);
 
-  titleBox = document.createElement("div");
-  titleBox.className = "campus-sheet-titlebox";
+  frames.add(id);
 
-  titleEl = document.createElement("h3");
-  titleEl.className = "campus-sheet-title";
-  titleBox.appendChild(titleEl);
+  return id;
+}
 
-  subtitleEl = document.createElement("span");
-  subtitleEl.className = "campus-sheet-subtitle secondary";
-  titleBox.appendChild(subtitleEl);
+function renderHeader() {
+  flushSync(() =>
+    headerRoot?.render(
+      <div className="campus-sheet-toprow">
+        <div className="campus-sheet-leftgroup">
+          <button
+            type="button"
+            className="campus-sheet-backbtn liquid-glass"
+            hidden
+            aria-label={t("campus.back")}
+            onClick={() => {
+              haptics.trigger(defaultPatterns.light);
+              goToCampusPage({ animate: true });
+            }}
+          >
+            <i className="hgi-stroke hgi-chevron-left" aria-hidden="true" />
+          </button>
+          <div className="campus-sheet-titlebox">
+            <h3 className="campus-sheet-title">{headerTitle}</h3>
+            <span className="campus-sheet-subtitle secondary">{headerSubtitle}</span>
+          </div>
+        </div>
+        <div className="campus-sheet-actions">
+          <button
+            type="button"
+            className="campus-sheet-recenter liquid-glass"
+            hidden
+            aria-label={t("campus.recenter")}
+            onClick={() => {
+              haptics.trigger(defaultPatterns.light);
+              document.dispatchEvent(new CustomEvent("campusrecenter"));
+            }}
+          >
+            <i className="hgi-stroke hgi-gps-01" aria-hidden="true" />
+          </button>
+          <CampusSheetPicker />
+        </div>
+      </div>,
+    ),
+  );
+}
 
-  leftGroup.appendChild(titleBox);
-  topRow.appendChild(leftGroup);
+function disposePage(page: Element) {
+  pageRoots.get(page)?.unmount();
+  pageRoots.delete(page);
+}
 
-  const actions = document.createElement("div");
-  actions.className = "campus-sheet-actions";
+function replacePage(next: HTMLElement) {
+  if (currentPage) {
+    disposePage(currentPage);
+    currentPage.replaceWith(next);
+  }
 
-  // Recenters the map (components/campus-map.js) on the current selection —
-  // whichever campus/building this sheet is currently showing — only shown
-  // once the map is actually panned/zoomed away from it (see the
-  // 'campusmapshifted' listener below), so it doesn't clutter the sheet the
-  // rest of the time.
-  recenterBtn = document.createElement("button");
-  recenterBtn.type = "button";
-  recenterBtn.className = "campus-sheet-recenter liquid-glass";
-  recenterBtn.hidden = true;
-  recenterBtn.setAttribute("aria-label", t("campus.recenter"));
-  recenterBtn.innerHTML = '<i class="hgi-stroke hgi-gps-01" aria-hidden="true"></i>';
-  recenterBtn.addEventListener("click", () => {
-    haptics.trigger(defaultPatterns.light);
-    document.dispatchEvent(new CustomEvent("campusrecenter"));
-  });
-  actions.appendChild(recenterBtn);
+  currentPage = next;
+}
 
-  picker = createCampusSheetPicker();
-  hiddenInput = picker.querySelector("input");
-  actions.appendChild(picker);
+export function destroyCampusBuildingsPage() {
+  events.abort();
+  timers.forEach(clearTimeout);
+  timers.clear();
+  frames.forEach(cancelAnimationFrame);
+  frames.clear();
 
-  topRow.appendChild(actions);
-  headerContainer.appendChild(topRow);
+  const roots = [...pageRoots.values(), headerRoot, gridRoot];
+  pageRoots.clear();
+  headerRoot = null;
+  gridRoot = null;
+  // This owner can be released by a parent React effect during its commit.
+  queueMicrotask(() => roots.forEach((root) => root?.unmount()));
+  currentPage = null;
+}
 
-  pageSwap = document.createElement("div");
-  pageSwap.className = "campus-sheet-pageswap";
-  gridContainer.appendChild(pageSwap);
-
-  picker.setup(staticClassroomsData);
+export function initCampusBuildingsPage(headerContainer: HTMLElement, gridContainer: HTMLElement) {
+  events = new AbortController();
+  headerRoot = createRoot(headerContainer);
+  renderHeader();
+  picker = headerContainer.querySelector<CampusPickerElement>("campus-sheet-picker")!;
+  hiddenInput = picker.querySelector<HTMLInputElement>("input")!;
+  backBtn = headerContainer.querySelector<HTMLButtonElement>(".campus-sheet-backbtn")!;
+  recenterBtn = headerContainer.querySelector<HTMLButtonElement>(".campus-sheet-recenter")!;
+  titleBox = headerContainer.querySelector<HTMLElement>(".campus-sheet-titlebox")!;
+  titleEl = headerContainer.querySelector<HTMLElement>(".campus-sheet-title")!;
+  subtitleEl = headerContainer.querySelector<HTMLElement>(".campus-sheet-subtitle")!;
+  gridRoot = createRoot(gridContainer);
+  flushSync(() => gridRoot?.render(<div className="campus-sheet-pageswap" />));
+  pageSwap = gridContainer.querySelector<HTMLElement>(".campus-sheet-pageswap")!;
+  picker.setup(staticClassroomsData ?? []);
 
   currentPage = buildCampusPage(hiddenInput.value);
   pageSwap.appendChild(currentPage);
   renderCampusHeader(hiddenInput.value);
 
-  document.addEventListener("campuschange", (e) => {
-    // A different campus was picked (from either picker) — whatever building
-    // was selected belongs to the old campus, so drop it and show the new
-    // campus's own grid. No slide (the campus itself just changed, nothing
-    // was "navigated") and no 'buildingchange' dispatch of our own: the map
-    // is already flying to the new campus via its own 'campuschange'
-    // listener, and dispatching one here would just race it.
-    selectedBuildingId = null;
-    view = "campus";
-    savedCampusScroll = 0; // a saved scroll belongs to the old campus's grid, not this one
-    setContentScroll(0);
-    swapCampusPage(e.detail.id, { animate: false });
-  });
-  document.addEventListener("campusmapshifted", (e) => {
-    recenterBtn.hidden = !e.detail.shifted;
-  });
+  document.addEventListener(
+    "campuschange",
+    (e) => {
+      // A different campus was picked (from either picker) — whatever building
+      // was selected belongs to the old campus, so drop it and show the new
+      // campus's own grid. No slide (the campus itself just changed, nothing
+      // was "navigated") and no 'buildingchange' dispatch of our own: the map
+      // is already flying to the new campus via its own 'campuschange'
+      // listener, and dispatching one here would just race it.
+      selectedBuildingId = null;
+      view = "campus";
+      savedCampusScroll = 0; // a saved scroll belongs to the old campus's grid, not this one
+      setContentScroll(0);
+      swapCampusPage(e.detail.id, { animate: false });
+    },
+    { signal: events.signal },
+  );
+  document.addEventListener(
+    "campusmapshifted",
+    (e) => {
+      recenterBtn.hidden = !e.detail.shifted;
+    },
+    { signal: events.signal },
+  );
 
   // Two-way sync with the Available tab's own picker (see the file header
   // comment) — whichever one changed, bring the other along. No-ops on
   // whichever picker is already showing this campus (itself included), so
   // this can't bounce back and forth forever.
-  document.addEventListener("campuschange", (e) => {
-    picker.selectCampusById(e.detail.id);
-    document.querySelector("campus-chip-picker")?.selectCampusById(e.detail.id);
-  });
+  document.addEventListener(
+    "campuschange",
+    (e) => {
+      picker.selectCampusById(e.detail.id);
+      document
+        .querySelector<CampusPickerElement>("campus-chip-picker")
+        ?.selectCampusById(e.detail.id);
+    },
+    { signal: events.signal },
+  );
 
   // The map's own building markers (components/campus-map.js) dispatch this
   // same event on tap — see the file header comment.
-  document.addEventListener("buildingchange", (e) => {
-    const { campusId, buildingId } = e.detail;
+  document.addEventListener(
+    "buildingchange",
+    (e) => {
+      const { campusId, buildingId } = e.detail;
 
-    if (campusId !== hiddenInput.value) return; // stale — a campus switch is already in flight
+      if (campusId !== hiddenInput.value) return; // stale — a campus switch is already in flight
 
-    if (buildingId === selectedBuildingId) return; // already showing this, incl. our own dispatch
+      if (buildingId === selectedBuildingId) return; // already showing this, incl. our own dispatch
 
-    if (buildingId) openBuilding(buildingId, { animate: view === "campus", notify: false });
-    else goToCampusPage({ animate: true, notify: false });
-  });
+      if (buildingId) openBuilding(buildingId, { animate: view === "campus", notify: false });
+      else goToCampusPage({ animate: true, notify: false });
+    },
+    { signal: events.signal },
+  );
 }
 
 // The campus currently picked here — read by campus-map.js so the map opens
@@ -220,10 +297,12 @@ export function getSelectedBuildingId() {
 // components/campus-picker.js) — so openBuilding() below finds the right
 // campus already selected. No slide animation: this is a teleport, not an
 // in-sheet navigation.
-export function goToBuilding(campusId, buildingId) {
+export function goToBuilding(campusId: string, buildingId: string) {
   if (hiddenInput.value !== campusId) {
     picker.selectCampusById(campusId, false);
-    document.querySelector("campus-chip-picker")?.selectCampusById(campusId, false);
+    document
+      .querySelector<CampusPickerElement>("campus-chip-picker")
+      ?.selectCampusById(campusId, false);
   }
 
   openBuilding(buildingId, { animate: false });
@@ -244,8 +323,7 @@ export function clearSelectedBuildingSilently() {
   renderCampusHeader(campusId);
   setContentScroll(savedCampusScroll);
   const next = buildCampusPage(campusId);
-  currentPage?.replaceWith(next);
-  currentPage = next;
+  replacePage(next);
 }
 
 // Called from script.js alongside the Available tab's own picker retranslate,
@@ -263,8 +341,7 @@ export function retranslateCampusBuildingsPage() {
 
     if (building) {
       renderBuildingHeader(building);
-      currentPage?.replaceWith(buildBuildingPage(building));
-      currentPage = pageSwap.firstElementChild;
+      replacePage(buildBuildingPage(building));
     }
   }
 }
@@ -280,9 +357,10 @@ export function retranslateCampusBuildingsPage() {
 // re-added (with a forced reflow between, or the browser won't replay an
 // already-applied animation) so repeated calls (marker tap after marker tap)
 // each get their own fresh run instead of only the first one animating.
-function setHeaderText(title, subtitle, fade) {
-  titleEl.textContent = title;
-  subtitleEl.textContent = subtitle;
+function setHeaderText(title: string, subtitle: string, fade: boolean) {
+  headerTitle = title;
+  headerSubtitle = subtitle;
+  renderHeader();
 
   if (!fade || reduceMotion.matches) return;
 
@@ -301,7 +379,7 @@ function setHeaderText(title, subtitle, fade) {
 // slide, goToCampusPage's back slide) — the in-place building-to-building
 // crossfade never touches the back button's visibility, so there's nothing
 // to flip there.
-function flipTitleBox(mutate) {
+function flipTitleBox(mutate: () => void) {
   if (reduceMotion.matches) {
     mutate();
 
@@ -330,12 +408,16 @@ function flipTitleBox(mutate) {
       backBtn.style.position = "";
     };
 
-    backBtn.addEventListener("transitionend", function onEnd(e) {
-      if (e.target !== backBtn) return;
-      backBtn.removeEventListener("transitionend", onEnd);
-      clearAbsolute();
-    });
-    setTimeout(clearAbsolute, 300);
+    backBtn.addEventListener(
+      "transitionend",
+      function onEnd(e) {
+        if (e.target !== backBtn) return;
+        backBtn.removeEventListener("transitionend", onEnd);
+        clearAbsolute();
+      },
+      { signal: events.signal },
+    );
+    later(clearAbsolute, 300);
   }
 
   const after = titleBox.getBoundingClientRect();
@@ -353,93 +435,102 @@ function flipTitleBox(mutate) {
     titleBox.style.transform = "";
   };
 
-  titleBox.addEventListener("transitionend", function onEnd(e) {
-    if (e.target !== titleBox || e.propertyName !== "transform") return;
-    titleBox.removeEventListener("transitionend", onEnd);
-    clear();
-  });
-  setTimeout(clear, SLIDE_DUR + 150);
+  titleBox.addEventListener(
+    "transitionend",
+    function onEnd(e) {
+      if (e.target !== titleBox || e.propertyName !== "transform") return;
+      titleBox.removeEventListener("transitionend", onEnd);
+      clear();
+    },
+    { signal: events.signal },
+  );
+  later(clear, SLIDE_DUR + 150);
 }
 
-function renderCampusHeader(campusId, { fade = false } = {}) {
-  const campus = staticClassroomsData.find((c) => c.id === campusId);
+function renderCampusHeader(campusId: string, { fade = false } = {}) {
+  const campus = staticClassroomsData?.find((c) => c.id === campusId);
   const buildings = campus?.buildings ?? [];
   setHeaderText(
     t("overview.title"),
-    t("campus.buildingsCount").replace("{n}", buildings.length),
+    t("campus.buildingsCount").replace("{n}", String(buildings.length)),
     fade,
   );
   backBtn.hidden = true;
   picker.style.display = "";
 }
 
-function buildCampusPage(campusId) {
+function buildCampusPage(campusId: string) {
   const page = document.createElement("div");
   page.className = "campus-sheet-page";
-  const grid = document.createElement("div");
-  grid.className = "bo-grid campus-sheet-grid";
-  page.appendChild(grid);
-
-  const campus = staticClassroomsData.find((c) => c.id === campusId);
-
-  for (const building of campus?.buildings ?? []) {
-    grid.appendChild(buildBuildingCard(building));
-  }
+  const root = createRoot(page);
+  pageRoots.set(page, root);
+  const campus = staticClassroomsData?.find((c) => c.id === campusId);
+  flushSync(() =>
+    root.render(
+      <div className="bo-grid campus-sheet-grid">
+        {campus?.buildings.map((building) => (
+          <CampusBuildingCard key={building.name} building={building} />
+        ))}
+      </div>,
+    ),
+  );
 
   return page;
 }
 
 // Re-renders the campus page's grid in place (no page-swap animation — used
 // whenever the campus itself changes while already showing the campus page).
-function swapCampusPage(campusId, { animate = true } = {}) {
+function swapCampusPage(campusId: string, { animate = true } = {}) {
   renderCampusHeader(campusId, { fade: animate });
   const next = buildCampusPage(campusId);
 
   if (animate && !reduceMotion.matches) {
     crossfadePage(next);
   } else {
-    currentPage?.replaceWith(next);
-    currentPage = next;
+    replacePage(next);
   }
 }
 
-function buildBuildingCard(building) {
-  const card = document.createElement("div");
-  card.className = "bo-card campus-sheet-card";
-  card.setAttribute("role", "button");
-  card.setAttribute("tabindex", "0");
-
-  const total = building.classrooms.length;
-  card.innerHTML = `
-    <div class="bo-card-body">
-      <div class="bo-card-head">
-        <span class="bo-card-name">${escapeHtml(t("building.prefix"))} ${escapeHtml(building.name)}</span>
-        ${building.altName ? `<span class="bo-card-alt">${escapeHtml(building.altName)}</span>` : ""}
-        <span class="bo-card-total secondary">${escapeHtml(t("overview.subtitle").replace("{n}", total))}</span>
-      </div>
-      ${building.address ? `<span class="campus-sheet-card-address secondary">${escapeHtml(building.address)}</span>` : ""}
-    </div>
-  `;
-
+function CampusBuildingCard({ building }: { building: Building }) {
   const go = () => {
     haptics.trigger(defaultPatterns.light);
     openBuilding(building.name, { animate: true });
   };
 
-  card.addEventListener("click", go);
-  card.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
-      go();
-    }
-  });
-
-  return card;
+  return (
+    <div
+      className="bo-card campus-sheet-card"
+      role="button"
+      tabIndex={0}
+      onClick={go}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          go();
+        }
+      }}
+    >
+      <div className="bo-card-body">
+        <div className="bo-card-head">
+          <span className="bo-card-name">
+            {t("building.prefix")} {building.name}
+          </span>
+          {building.altName && <span className="bo-card-alt">{building.altName}</span>}
+          <span className="bo-card-total secondary">
+            {t("overview.subtitle").replace("{n}", String(building.classrooms.length))}
+          </span>
+        </div>
+        {building.address && (
+          <span className="campus-sheet-card-address secondary">{building.address}</span>
+        )}
+      </div>
+    </div>
+  );
 }
 
 // ---------- BUILDING PAGE ----------
 
-function buildingLabel(building) {
+function buildingLabel(building: Building) {
   const alt = (building.altName || "").trim();
 
   return alt || `${t("building.prefix")} ${building.name}`;
@@ -449,16 +540,16 @@ function buildingLabel(building) {
 // of buildings — not a usable identity. `name` is what's actually unique
 // within a campus (same choice building-overview.js's own zoom-out grid
 // already made, for the same reason).
-function findBuilding(campusId, buildingId) {
-  const campus = staticClassroomsData.find((c) => c.id === campusId);
+function findBuilding(campusId: string, buildingId: string | null) {
+  const campus = staticClassroomsData?.find((c) => c.id === campusId);
 
   return campus?.buildings.find((b) => b.name === buildingId) ?? null;
 }
 
-function renderBuildingHeader(building, { fade = false } = {}) {
+function renderBuildingHeader(building: Building, { fade = false } = {}) {
   setHeaderText(
     buildingLabel(building),
-    t("overview.subtitle").replace("{n}", building.classrooms.length),
+    t("overview.subtitle").replace("{n}", String(building.classrooms.length)),
     fade,
   );
   backBtn.hidden = false;
@@ -468,22 +559,21 @@ function renderBuildingHeader(building, { fade = false } = {}) {
 // Ground floor and basement get their own wording (Italian convention),
 // everything else is just "Floor {n}"; `null` (2 classrooms, missing data)
 // sorts last under its own "unknown" label rather than being dropped.
-function floorLabel(floor) {
+function floorLabel(floor: number | null | undefined) {
   if (floor === null || floor === undefined) return t("overview.floorUnknown");
 
   if (floor === 0) return t("overview.floorGround");
 
   if (floor === -1) return t("overview.floorBasement");
 
-  return t("overview.floor").replace("{n}", floor);
+  return t("overview.floor").replace("{n}", String(floor));
 }
 
-function buildBuildingPage(building) {
+function buildBuildingPage(building: Building) {
   const page = document.createElement("div");
   page.className = "campus-sheet-page";
-  const grid = document.createElement("div");
-  grid.className = "bo-grid campus-sheet-grid campus-sheet-classroom-grid";
-  page.appendChild(grid);
+  const root = createRoot(page);
+  pageRoots.set(page, root);
 
   const sorted = [...building.classrooms].sort((a, b) => {
     const fa = a.floor,
@@ -491,41 +581,34 @@ function buildBuildingPage(building) {
 
     if (fa === fb) return 0;
 
-    if (fa === null || fa === undefined) return 1;
+    if (fa == null) return 1;
 
-    if (fb === null || fb === undefined) return -1;
+    if (fb == null) return -1;
 
     return fa - fb;
   });
 
-  let lastFloor;
-  let first = true;
-
-  for (const classroom of sorted) {
-    if (first || classroom.floor !== lastFloor) {
-      const label = document.createElement("div");
-      label.className = "bo-floor-label";
-      label.innerHTML = `<i class="hgi-stroke hgi-stairs-01" aria-hidden="true"></i><span>${floorLabel(classroom.floor)}</span>`;
-      grid.appendChild(label);
-      lastFloor = classroom.floor;
-      first = false;
-    }
-
-    const status = getClassroomStatusNow(classroom.id);
-
-    const card = buildCardForClassroom(
-      { ...classroom, status },
-      building,
-      null,
-      null,
-      false,
-      null,
-      "",
-      true,
-    );
-
-    grid.appendChild(card);
-  }
+  flushSync(() =>
+    root.render(
+      <div className="bo-grid campus-sheet-grid campus-sheet-classroom-grid">
+        {sorted.map((classroom, index) => (
+          <Fragment key={classroom.id}>
+            {(index === 0 || classroom.floor !== sorted[index - 1].floor) && (
+              <div className="bo-floor-label">
+                <i className="hgi-stroke hgi-stairs-01" aria-hidden="true" />
+                <span>{floorLabel(classroom.floor)}</span>
+              </div>
+            )}
+            <ClassroomCard
+              classroom={{ ...classroom, status: getClassroomStatusNow(classroom.id) }}
+              building={building}
+              showFavouriteStar
+            />
+          </Fragment>
+        ))}
+      </div>,
+    ),
+  );
 
   return page;
 }
@@ -539,7 +622,10 @@ function buildBuildingPage(building) {
 // 'buildingchange' event that triggered the call has already reached every
 // other listener (map.js included), so re-dispatching here would just be a
 // redundant, immediately-superseded second copy of the same event.
-function openBuilding(buildingId, { animate, notify = true }) {
+function openBuilding(
+  buildingId: string,
+  { animate, notify = true }: { animate: boolean; notify?: boolean },
+) {
   const campusId = hiddenInput.value;
   const building = findBuilding(campusId, buildingId);
 
@@ -575,8 +661,7 @@ function openBuilding(buildingId, { animate, notify = true }) {
   if (animate && wasCampusPage) slideTo("forward", next);
   else if (!reduceMotion.matches) crossfadePage(next);
   else {
-    currentPage?.replaceWith(next);
-    currentPage = next;
+    replacePage(next);
   }
 
   if (notify)
@@ -588,7 +673,7 @@ function openBuilding(buildingId, { animate, notify = true }) {
   document.dispatchEvent(new CustomEvent("buildingpageopen"));
 }
 
-function goToCampusPage({ animate, notify = true }) {
+function goToCampusPage({ animate, notify = true }: { animate: boolean; notify?: boolean }) {
   if (view !== "building") return;
   const campusId = hiddenInput.value;
   selectedBuildingId = null;
@@ -605,8 +690,7 @@ function goToCampusPage({ animate, notify = true }) {
 
   if (animate) slideTo("back", next);
   else {
-    currentPage?.replaceWith(next);
-    currentPage = next;
+    replacePage(next);
   }
 
   if (notify)
@@ -643,14 +727,14 @@ function cancelPageTransition() {
 
   if (!pageSwap) return;
 
-  // oxlint-disable-next-line unicorn/no-useless-spread -- Snapshot the live HTMLCollection before removing its children.
-  for (const child of [...pageSwap.children]) {
+  for (const child of pageSwap.querySelectorAll<HTMLElement>(":scope > *")) {
     if (child === currentPage) {
       child.style.position = "";
       child.style.inset = "";
       child.style.transform = "";
       child.classList.remove("csp-fade-in", "csp-fade-out");
     } else {
+      disposePage(child);
       child.remove();
     }
   }
@@ -664,10 +748,9 @@ function cancelPageTransition() {
 // layers absolutely stacked inside `pageSwap` for the duration. Settles back
 // to a single, normal in-flow page once done, so campus-sheet.js's own
 // scrollHeight-driven sizing sees a plain single-page layout again.
-function slideTo(direction, next) {
+function slideTo(direction: "forward" | "back", next: HTMLElement) {
   if (!pageSwap || !currentPage || reduceMotion.matches) {
-    currentPage?.replaceWith(next);
-    currentPage = next;
+    replacePage(next);
 
     return;
   }
@@ -696,7 +779,7 @@ function slideTo(direction, next) {
   void pageSwap.offsetHeight; // flush before animating
 
   for (const el of [prev, next]) el.style.transition = `transform ${SLIDE_DUR}ms ${SLIDE_EASE}`;
-  requestAnimationFrame(() => {
+  frame(() => {
     next.style.transform = "translateX(0)";
     prev.style.transform = `translateX(${-sign * 100}%)`;
   });
@@ -707,12 +790,16 @@ function slideTo(direction, next) {
     if (transitioning) cancelPageTransition();
   };
 
-  next.addEventListener("transitionend", function onEnd(e) {
-    if (e.target !== next || e.propertyName !== "transform") return;
-    next.removeEventListener("transitionend", onEnd);
-    finish();
-  });
-  pendingCleanup = setTimeout(finish, SLIDE_DUR + 150);
+  next.addEventListener(
+    "transitionend",
+    function onEnd(e) {
+      if (e.target !== next || e.propertyName !== "transform") return;
+      next.removeEventListener("transitionend", onEnd);
+      finish();
+    },
+    { signal: events.signal },
+  );
+  pendingCleanup = later(finish, SLIDE_DUR + 150);
 }
 
 // Plain cross-fade, in place — used when the page identity doesn't change
@@ -732,10 +819,9 @@ function slideTo(direction, next) {
 // already leans on for exactly this kind of fade-in (.classroom-card's own
 // card-appear, classroom-list.css) — reusing something already proven
 // reliable here rather than another bespoke JS-timed implementation.
-function crossfadePage(next) {
+function crossfadePage(next: HTMLElement) {
   if (!pageSwap || !currentPage || reduceMotion.matches) {
-    currentPage?.replaceWith(next);
-    currentPage = next;
+    replacePage(next);
 
     return;
   }
@@ -760,13 +846,17 @@ function crossfadePage(next) {
     if (transitioning) cancelPageTransition();
   };
 
-  prev.addEventListener("animationend", function onEnd(e) {
-    if (e.target !== prev) return;
-    prev.removeEventListener("animationend", onEnd);
-    finish();
-  });
+  prev.addEventListener(
+    "animationend",
+    function onEnd(e) {
+      if (e.target !== prev) return;
+      prev.removeEventListener("animationend", onEnd);
+      finish();
+    },
+    { signal: events.signal },
+  );
   // Backstop: an animationend can be missed (the element torn down mid-
   // flight by a faster interruption, or a browser quirk) — settle on our
   // own clock either way.
-  pendingCleanup = setTimeout(finish, FADE_DUR + 150);
+  pendingCleanup = later(finish, FADE_DUR + 150);
 }

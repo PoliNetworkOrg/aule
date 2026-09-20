@@ -1,3 +1,5 @@
+import { useLayoutEffect, useSyncExternalStore } from "react";
+import { flushSync } from "react-dom";
 // Glass sheet that floats over the campus map — inset on all sides at the
 // bottom on mobile, pinned to the right on desktop (see campus-sheet.css).
 // Apple Maps-style nested drag, from anywhere on the sheet (not just the
@@ -21,7 +23,7 @@
 // footer / bottom-nav chrome, same stacking story as the map's own controls.
 
 import { Spring, onSpringFrame } from "../utils/spring.ts";
-import { initCampusBuildingsPage } from "./campus-buildings.js";
+import { initCampusBuildingsPage, destroyCampusBuildingsPage } from "./campus-buildings.tsx";
 
 const CONTAINER_ID = "search-classrooms-container";
 
@@ -84,15 +86,23 @@ const SQUIRCLE_RADIUS_SCALE =
 
 // Asymptotic rubber-band (approaches ±give, never past it) — same falloff
 // used by the bottom-nav pill and the liquid-glass press/drag deform.
-const rubber = (x, give) => (x * give) / (give + Math.abs(x));
+const rubber = (x: number, give: number) => (x * give) / (give + Math.abs(x));
 
-let sheet, glass, clip, handle, header, content, guard;
+let sheet: HTMLElement,
+  glass: HTMLElement,
+  header: HTMLElement,
+  content: HTMLElement,
+  guard: HTMLElement;
+
+let events = new AbortController();
+
+let guardFrame = 0;
 
 let detent = "collapsed"; // 'collapsed' | 'half' | 'full'
 
-const size = new Spring(COLLAPSED);
+let size = new Spring(COLLAPSED);
 
-const scrollPos = new Spring(0);
+let scrollPos = new Spring(0);
 
 // Read/write the sheet's own scroll offset — used by campus-buildings.js to
 // keep the campus grid's and each building page's scroll positions
@@ -106,7 +116,7 @@ export function getContentScroll() {
   return scrollPos.value;
 }
 
-export function setContentScroll(value) {
+export function setContentScroll(value: number) {
   scrollPos.set(value);
 
   if (content) content.scrollTop = value;
@@ -192,13 +202,13 @@ function detentPoints() {
   ];
 }
 
-function detentValue(key) {
+function detentValue(key: string) {
   const b = bounds();
 
   return key === "collapsed" ? b.min : key === "half" ? b.half : b.max;
 }
 
-function nearestDetentKey(value) {
+function nearestDetentKey(value: number) {
   return detentPoints().reduce((best, p) =>
     Math.abs(p.value - value) < Math.abs(best.value - value) ? p : best,
   ).key;
@@ -207,7 +217,7 @@ function nearestDetentKey(value) {
 // The next detent in the given direction from `value` (+1 = up/larger,
 // -1 = down/smaller) — a fast flick commits one step at a time rather than
 // skipping straight to an end detent.
-function nextDetentKey(value, dir) {
+function nextDetentKey(value: number, dir: number) {
   const pts = detentPoints();
 
   if (dir > 0) {
@@ -224,7 +234,7 @@ function nextDetentKey(value, dir) {
 // A release/commit's actual target: the adjacent detent for an ordinary
 // flick, but the *end* detent (skipping past "half" entirely) for a hard
 // enough one — so a strong throw from collapsed can land straight on full.
-function flungDetentKey(value, dir, speed) {
+function flungDetentKey(value: number, dir: number, speed: number) {
   if (speed > HARD_FLING_VELOCITY) {
     const pts = detentPoints();
 
@@ -348,16 +358,16 @@ function watchGuard() {
 function requestGuardWatch() {
   if (guardWatchQueued) return;
   guardWatchQueued = true;
-  requestAnimationFrame(watchGuard);
+  guardFrame = requestAnimationFrame(watchGuard);
 }
 
 // Deduped against the actual value (not just "a spring frame ran") — this
 // loop also renders while only `scrollPos` is animating (a plain content
 // scroll), which shouldn't spam campus-map.js with same-height resize
 // events.
-let lastDispatchedHeight = null;
+let lastDispatchedHeight: number | null = null;
 
-onSpringFrame(() => {
+function renderSheet() {
   if (!sheet) return;
   sheet.style.setProperty("--campus-sheet-size", `${size.value}px`);
 
@@ -388,7 +398,7 @@ onSpringFrame(() => {
     wheelMode = null;
     wheelCommitted = false;
   }
-});
+}
 
 // Shared by both springs so a released drag settles at one consistent feel —
 // smooth (no visible bounce) but not sluggish. Both onPointerEnd handlers
@@ -399,7 +409,7 @@ onSpringFrame(() => {
 // than two separate ones.
 const SETTLE_SPRING = { stiffness: 260, damping: 30, mass: 1 };
 
-function snapToDetent(key) {
+function snapToDetent(key: string) {
   detent = key;
   glass.classList.toggle("is-collapsed", key !== "full");
   sheet.dataset.detent = key;
@@ -415,9 +425,9 @@ function settleScroll() {
    this always resizes; at full height it scrolls the content instead,
    deciding which on first movement and handing off mid-gesture at either
    boundary (see file header). */
-let activePointerId = null;
+let activePointerId: number | null = null;
 
-let dragMode = null; // null (undecided) | 'resize' | 'scroll'
+let dragMode: "resize" | "scroll" | null = null; // null (undecided) | 'resize' | 'scroll'
 
 let dragStartY = 0;
 
@@ -425,9 +435,9 @@ let dragStartSize = 0;
 
 let dragStartScroll = 0;
 
-let samples = [];
+let samples: { y: number; t: number }[] = [];
 
-function pushSample(y) {
+function pushSample(y: number) {
   const now = performance.now();
   samples.push({ y, t: now });
 
@@ -442,7 +452,7 @@ function velocity() {
   return b && a && b.t > a.t ? (b.y - a.y) / (b.t - a.t) : 0;
 }
 
-function onPointerDown(e) {
+function onPointerDown(e: PointerEvent) {
   if (e.pointerType === "mouse" && e.button !== 0) return;
   activePointerId = e.pointerId;
   dragStartY = e.clientY;
@@ -457,12 +467,12 @@ function onPointerDown(e) {
   size.stop();
   scrollPos.stop();
   watchGuard();
-  window.addEventListener("pointermove", onPointerMove);
-  window.addEventListener("pointerup", onPointerEnd);
-  window.addEventListener("pointercancel", onPointerEnd);
+  window.addEventListener("pointermove", onPointerMove, { signal: events.signal });
+  window.addEventListener("pointerup", onPointerEnd, { signal: events.signal });
+  window.addEventListener("pointercancel", onPointerEnd, { signal: events.signal });
 }
 
-function onPointerMove(e) {
+function onPointerMove(e: PointerEvent) {
   if (e.pointerId !== activePointerId) return;
   const y = e.clientY;
   pushSample(y);
@@ -524,7 +534,7 @@ function onPointerMove(e) {
   }
 }
 
-function onPointerEnd(e) {
+function onPointerEnd(e: PointerEvent) {
   if (e.pointerId !== activePointerId) return;
   window.removeEventListener("pointermove", onPointerMove);
   window.removeEventListener("pointerup", onPointerEnd);
@@ -583,17 +593,17 @@ function onPointerEnd(e) {
    as one motion instead of two. A slower, deliberate scroll never crosses
    the threshold and still just settles to the nearest detent once idle,
    as before. */
-let wheelMode = null;
+let wheelMode: "resize" | "scroll" | null = null;
 
-let wheelIdleTimer = null;
+let wheelIdleTimer = 0;
 
 let wheelCommitted = false;
 
-let wheelLastT = null;
+let wheelLastT: number | null = null;
 
 let wheelVel = 0; // smoothed px/ms, same sign as deltaY (size += deltaY)
 
-function onWheel(e) {
+function onWheel(e: WheelEvent) {
   e.preventDefault();
 
   // Once committed, the spring is flying on its own and no longer needs
@@ -681,7 +691,7 @@ function onWheel(e) {
     }
   }
 
-  wheelIdleTimer = setTimeout(() => {
+  wheelIdleTimer = window.setTimeout(() => {
     if (wheelMode === "resize" && !wheelCommitted) snapToDetent(nearestDetentKey(size.value));
     else if (wheelMode === "scroll") settleScroll();
     wheelMode = null;
@@ -708,112 +718,109 @@ function onViewportResize() {
   if (scrollPos.value > max) scrollPos.set(max);
 }
 
-addEventListener("resize", onViewportResize);
-
-desktopMQ.addEventListener("change", onViewportResize);
-
-export function initCampusSheet() {
-  const container = document.getElementById(CONTAINER_ID);
-
-  if (!container || sheet) return;
-
-  // Exposed for campus-map.css: lets the map's own bottom-left/right
-  // controls (attribution/copyright included) clear the sheet's collapsed
-  // height instead of just the bottom-nav's.
+function attachSheet() {
+  events = new AbortController();
+  size.destroy();
+  scrollPos.destroy();
+  size = new Spring(COLLAPSED);
+  scrollPos = new Spring(0);
+  detent = "collapsed";
+  activePointerId = null;
+  dragMode = null;
+  wheelMode = null;
+  wheelCommitted = false;
+  guardWatchQueued = false;
+  lastDispatchedHeight = null;
+  const container = document.getElementById(CONTAINER_ID)!;
+  sheet = container.querySelector<HTMLElement>(".campus-sheet")!;
+  glass = container.querySelector<HTMLElement>(".campus-sheet-glass")!;
+  header = container.querySelector<HTMLElement>(".campus-sheet-header")!;
+  content = container.querySelector<HTMLElement>(".campus-sheet-content")!;
+  guard = container.querySelector<HTMLElement>(".campus-sheet-wheel-guard")!;
   document.documentElement.style.setProperty("--campus-sheet-collapsed-height", `${COLLAPSED}px`);
+  guard.addEventListener("wheel", (e) => e.preventDefault(), {
+    passive: false,
+    signal: events.signal,
+  });
+  sheet.addEventListener("pointerdown", onPointerDown, { signal: events.signal });
+  sheet.addEventListener("wheel", onWheel, { passive: false, signal: events.signal });
+  window.addEventListener("resize", onViewportResize, { signal: events.signal });
+  desktopMQ.addEventListener("change", onViewportResize, { signal: events.signal });
 
-  // The sheet shrinks/grows under the cursor mid-gesture, so the cursor can
-  // easily end up over the map while a drag or fling is still live. Rather
-  // than chasing that in JS (event redirection, state tracked across
-  // bursts, all of it fighting stray trailing wheel ticks), just put a
-  // plain element between the map and the sheet that becomes the actual
-  // hit-test target for that whole area while busy — invisible, and its
-  // one job is to swallow wheel events so they can't reach the map (or
-  // trigger the page's own — deliberately overflowing, see
-  // campus-map.css — scroll). `pointer-events` toggles with `.busy` (see
-  // watchGuard() above): off at rest, so idle clicks/scrolls reach the
-  // map normally; the sheet itself sits above this at the same z-index
-  // (appended after it, in DOM-order tie-break) so it keeps getting events
-  // directly regardless of this guard's state.
-  guard = document.createElement("div");
-  guard.className = "campus-sheet-wheel-guard";
-  guard.addEventListener("wheel", (e) => e.preventDefault(), { passive: false });
-  container.appendChild(guard);
-
-  sheet = document.createElement("div");
-  sheet.className = "campus-sheet";
-  sheet.dataset.detent = detent;
-  sheet.addEventListener("pointerdown", onPointerDown);
-  sheet.addEventListener("wheel", onWheel, { passive: false });
-
-  // All the actual glass chrome (background/blur/radius/shadow) and the
-  // squash/stretch transform itself live on this inner, plain `absolute`
-  // div rather than on `sheet` — `sheet` is `position: fixed` right up
-  // against `env(safe-area-inset-bottom)` (campus-sheet.css), and a
-  // `transform` on a `position: fixed` element nested inside another
-  // positioned ancestor (here, #search-classrooms-container) is exactly the
-  // combination that made iOS Safari mispaint/miscompose the bottom safe
-  // area elsewhere in this app (see campus-picker.js's and
-  // data-fetch-card.js's own "portal to <body>" comments for the same bug)
-  // — the fast-resize squash was reproducing it by transforming `sheet`
-  // directly. Keeping `sheet` itself always transform-free sidesteps that
-  // regardless of how strong the deform gets.
-  glass = document.createElement("div");
-  glass.className = "campus-sheet-glass is-collapsed";
-  sheet.appendChild(glass);
-
-  // `glass` carries the box-shadow, which needs to paint past its own
-  // bounds — so it can't also be the thing with `overflow: hidden`. This
-  // separate, exactly-matching inner layer is what actually clips
-  // handle/header/content to the rounded shape (see its CSS comment).
-  clip = document.createElement("div");
-  clip.className = "campus-sheet-clip";
-  glass.appendChild(clip);
-
-  handle = document.createElement("div");
-  handle.className = "campus-sheet-handle";
-  handle.innerHTML = '<span class="campus-sheet-grabber"></span>';
-  clip.appendChild(handle);
-
-  // A fixed overlay, like the handle above it: stays in place while `content`
-  // (below) scrolls underneath, its own top fade mask blending scrolled
-  // cards out as they reach it. `content`'s top padding reserves exactly
-  // this much room — see the ResizeObserver below, which keeps that in sync
-  // with the header's actual (i18n/font-dependent) height instead of a
-  // hardcoded guess.
-  header = document.createElement("div");
-  header.className = "campus-sheet-header";
-  clip.appendChild(header);
-
-  content = document.createElement("div");
-  content.className = "campus-sheet-content";
-  clip.appendChild(content);
-
-  container.appendChild(sheet);
-
-  // Only now is `content`/`header` actually connected to the document — the
-  // picker custom element inside the header needs that before .setup() can
-  // reach its shadow root.
-  initCampusBuildingsPage(header, content);
-
-  new ResizeObserver(() => {
+  const observer = new ResizeObserver(() =>
     sheet.style.setProperty(
       "--campus-sheet-header-height",
       `${header.getBoundingClientRect().height}px`,
-    );
-  }).observe(header);
+    ),
+  );
 
+  observer.observe(header);
+  const stopFrame = onSpringFrame(renderSheet);
   size.set(COLLAPSED);
   scrollPos.set(0);
   sheet.style.setProperty("--campus-sheet-size", `${size.value}px`);
+  document.addEventListener(
+    "buildingpageopen",
+    () => {
+      if (detent === "collapsed") snapToDetent(desktopMQ.matches ? "full" : "half");
+    },
+    { signal: events.signal },
+  );
 
-  // components/campus-buildings.js dispatches this whenever a building
-  // becomes selected (from its grid, or a map marker tap) — surface the
-  // sheet if it's currently just a collapsed peek. A no-op at 'half'/'full':
-  // there's no reason to shrink an already-open sheet back down just because
-  // a different building was picked, and desktop's panel has room to sit at
-  // 'half' comfortably without this forcing it to 'full'.
-  document.addEventListener("buildingpageopen", () => {
-    if (detent === "collapsed") snapToDetent(desktopMQ.matches ? "full" : "half");
-  });
+  return () => {
+    events.abort();
+    observer.disconnect();
+    stopFrame();
+    size.destroy();
+    scrollPos.destroy();
+    clearTimeout(wheelIdleTimer);
+    cancelAnimationFrame(guardFrame);
+    destroyCampusBuildingsPage();
+  };
+}
+
+let ready = false;
+
+const listeners = new Set<() => void>();
+
+function subscribe(listener: () => void) {
+  listeners.add(listener);
+
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+export function initCampusSheet() {
+  if (ready) return;
+  ready = true;
+  flushSync(() => listeners.forEach((listener) => listener()));
+  initCampusBuildingsPage(header, content);
+}
+
+function SheetContents() {
+  useLayoutEffect(attachSheet, []);
+
+  return (
+    <>
+      <div className="campus-sheet-wheel-guard" />
+      <div className="campus-sheet" data-detent="collapsed">
+        <div className="campus-sheet-glass is-collapsed">
+          <div className="campus-sheet-clip">
+            <div className="campus-sheet-handle">
+              <span className="campus-sheet-grabber" />
+            </div>
+            <div className="campus-sheet-header" />
+            <div className="campus-sheet-content" />
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+export function CampusSheet() {
+  const mounted = useSyncExternalStore(subscribe, () => ready);
+
+  return mounted ? <SheetContents /> : null;
 }

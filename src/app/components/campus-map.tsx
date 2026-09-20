@@ -2,14 +2,32 @@ import { isNumber } from "../../lib/guards";
 import { getMapboxToken } from "../config.ts";
 import { classroomsData } from "../classroom-search-data.ts";
 import { t } from "../i18n.ts";
-import { escapeHtml } from "../utils/html.ts";
+import { useLayoutEffect, useSyncExternalStore } from "react";
+import { createRoot, type Root } from "react-dom/client";
+import { flushSync } from "react-dom";
+import type { Building, Campus } from "../types";
+import type {
+  MapboxLibrary,
+  MapboxMap,
+  MapboxMarker,
+  CameraOptions,
+  LngLat,
+  Coordinates,
+} from "./mapbox";
+
+function hasCoordinates<T extends { lat?: number; long?: number }>(
+  value: T,
+): value is T & Coordinates {
+  return isNumber(value.lat) && isNumber(value.long);
+}
+
 import { haptics, defaultPatterns } from "./haptics.ts";
 import {
   getSelectedCampusId,
   getSelectedBuildingId,
   clearSelectedBuildingSilently,
-} from "./campus-buildings.js";
-import { getSheetHeightPx, heightAfterBuildingSelect, isUserResizing } from "./campus-sheet.js";
+} from "./campus-buildings.tsx";
+import { getSheetHeightPx, heightAfterBuildingSelect, isUserResizing } from "./campus-sheet.tsx";
 
 // Fullscreen Mapbox map that fills the Campus tab. The app chrome (header,
 // footer, bottom-nav) floats above it — see components/campus-map.css, which
@@ -27,7 +45,7 @@ const CONTAINER_ID = "search-classrooms-container";
 
 // Milano metro — 4 of 7 campuses and almost every classroom sit here; the
 // others (Cremona, Lecco, Mantova) are a pan away and always keep their marker.
-const INITIAL_CENTER = [9.195, 45.488];
+const INITIAL_CENTER: LngLat = [9.195, 45.488];
 
 const INITIAL_ZOOM = 11.3;
 
@@ -90,13 +108,25 @@ const darkScheme = window.matchMedia("(prefers-color-scheme: dark)");
 
 let started = false;
 
-let map = null;
+let map: MapboxMap;
 
-let mapboxglLib = null; // set once loaded — reused by the picker's change listener below
+let mapboxglLib: MapboxLibrary | null = null; // set once loaded — reused by the picker's change listener below
 
 let mode = "campus"; // 'campus' | 'buildings'
 
-let markers = []; // currently-rendered mapboxgl.Marker[]
+let markers: MapboxMarker[] = [];
+
+const markerRoots: Root[] = [];
+
+let markerEvents = new AbortController();
+
+const controlRoots: Root[] = [];
+
+const observers: (MutationObserver | ResizeObserver)[] = [];
+
+let events = new AbortController();
+
+let generation = 0; // currently-rendered mapboxgl.Marker[]
 
 // The mobile sheet's current live height (px) — seeded from its resting
 // value up front (safe even before campus-sheet.js's own init runs, see
@@ -115,7 +145,7 @@ let autoFlying = false;
 // flight (see followSheetResize()) retarget the same destination with the
 // sheet's actual current padding, rather than the flight finishing against
 // whatever padding it happened to snapshot when it started.
-let flyDestination = null;
+let flyDestination: CameraOptions | null = null;
 
 let lastFlyRetargetAt = 0;
 
@@ -136,7 +166,7 @@ const FLY_RETARGET_THROTTLE_MS = 120;
 // recenter button (components/campus-buildings.js).
 let shifted = false;
 
-function setShifted(v) {
+function setShifted(v: boolean) {
   if (shifted === v) return;
   shifted = v;
   document.dispatchEvent(new CustomEvent("campusmapshifted", { detail: { shifted } }));
@@ -173,42 +203,52 @@ function updateShifted() {
   setShifted(!(centered && zoomed && pitched && facingNorth));
 }
 
-export function initCampusMap() {
+function attachCampusMap() {
   const container = document.getElementById(CONTAINER_ID);
 
   if (!container) return;
+  events = new AbortController();
+  const currentGeneration = ++generation;
 
   // Either campus picker changing — the Available tab's or the campus
   // sheet's own (components/campus-buildings.js), now kept in sync as the
   // same logical picker — drives the map: whichever campus it's on, the map
   // flies there and shows its buildings, same motion as tapping that
   // campus's marker directly.
-  document.addEventListener("campuschange", (e) => {
-    if (!map || !mapboxglLib) return;
-    const campus = campuses().find((c) => c.id === e.detail.id);
+  document.addEventListener(
+    "campuschange",
+    (e) => {
+      if (!map || !mapboxglLib) return;
+      const campus = campuses().find((c) => c.id === e.detail.id);
 
-    if (!campus || !isNumber(campus.lat) || !isNumber(campus.long)) return;
-    flyToCampus(mapboxglLib, campus);
-  });
+      if (!campus || !isNumber(campus.lat) || !isNumber(campus.long)) return;
+      flyToCampus(mapboxglLib, campus);
+    },
+    { signal: events.signal },
+  );
 
   // The sheet's own recenter button (shown once `shifted` above goes true) —
   // targets whichever level (building or campus) is actually selected right
   // now, same as updateShifted()'s own check.
-  document.addEventListener("campusrecenter", () => {
-    if (!map || !mapboxglLib) return;
-    const building = selectedBuilding();
+  document.addEventListener(
+    "campusrecenter",
+    () => {
+      if (!map || !mapboxglLib) return;
+      const building = selectedBuilding();
 
-    if (building) {
-      flyToBuilding(mapboxglLib, building);
+      if (building) {
+        flyToBuilding(mapboxglLib, building);
 
-      return;
-    }
+        return;
+      }
 
-    const campus = selectedCampus();
+      const campus = selectedCampus();
 
-    if (!campus) return;
-    flyToCampus(mapboxglLib, campus);
-  });
+      if (!campus) return;
+      flyToCampus(mapboxglLib, campus);
+    },
+    { signal: events.signal },
+  );
 
   // The sheet's own building page (components/campus-buildings.js) — a
   // building card tap, its back button, or a language-switch re-render, all
@@ -216,39 +256,48 @@ export function initCampusMap() {
   // marker tap (below) also dispatches it, so this one listener drives the
   // camera for every source uniformly, rather than each source flying the
   // map itself.
-  document.addEventListener("buildingchange", (e) => {
-    if (!map || !mapboxglLib) return;
-    const campus = campuses().find((c) => c.id === e.detail.campusId);
+  document.addEventListener(
+    "buildingchange",
+    (e) => {
+      if (!map || !mapboxglLib) return;
+      const campus = campuses().find((c) => c.id === e.detail.campusId);
 
-    if (!campus) return;
+      if (!campus) return;
 
-    if (e.detail.buildingId) {
-      const building = (campus.buildings || []).find((b) => b.name === e.detail.buildingId);
+      if (e.detail.buildingId) {
+        const building = (campus.buildings || []).find((b) => b.name === e.detail.buildingId);
 
-      if (building && isNumber(building.lat) && isNumber(building.long)) {
-        flyToBuilding(mapboxglLib, building);
+        if (building && isNumber(building.lat) && isNumber(building.long)) {
+          flyToBuilding(mapboxglLib, building);
+        }
+      } else if (isNumber(campus.lat) && isNumber(campus.long)) {
+        // Back to the campus page — zoom the camera back out to the
+        // campus-level view (building markers stay up, same as a plain campus
+        // pick).
+        flyToCampus(mapboxglLib, campus);
       }
-    } else if (isNumber(campus.lat) && isNumber(campus.long)) {
-      // Back to the campus page — zoom the camera back out to the
-      // campus-level view (building markers stay up, same as a plain campus
-      // pick).
-      flyToCampus(mapboxglLib, campus);
-    }
-  });
+    },
+    { signal: events.signal },
+  );
 
   // Sheet resize (drag/wheel, its settle spring, or an auto-expand — see
   // components/campus-sheet.js's own dispatch comment) — keep the padding
   // (and, while something's focused, the camera itself) glued to its actual
   // live footprint instead of just the detent it started at.
-  document.addEventListener("campussheetresize", (e) => {
-    sheetHeightPx = e.detail.height;
-    followSheetResize();
-  });
+  document.addEventListener(
+    "campussheetresize",
+    (e) => {
+      sheetHeightPx = e.detail.height;
+      followSheetResize();
+    },
+    { signal: events.signal },
+  );
 
   const onVisible = () => {
     if (!started) {
       started = true;
       boot(container).catch((err) => {
+        if (currentGeneration !== generation) return;
         console.error("Campus map failed to load", err);
         showError(container);
       });
@@ -258,7 +307,7 @@ export function initCampusMap() {
     }
   };
 
-  container.addEventListener("tabvisible", onVisible);
+  container.addEventListener("tabvisible", onVisible, { signal: events.signal });
 
   if (container.classList.contains("visible")) onVisible();
 
@@ -285,15 +334,15 @@ export function initCampusMap() {
     (e) => {
       if (!isScrollLocked()) return;
 
-      if (container.contains(e.target)) return;
+      if (e.target instanceof Node && container.contains(e.target)) return;
 
       // The settings popup renders outside this container, in document.body,
       // and manages its own scroll lock — leave its wheel events alone rather
       // than blocking them as if they were page scroll.
-      if (e.target.closest?.(".settings-popup")) return;
+      if (e.target instanceof Element && e.target.closest(".settings-popup")) return;
       e.preventDefault();
     },
-    { passive: false },
+    { passive: false, signal: events.signal },
   );
 
   // Same idea for the keyboard: Space, Page Up/Down, Home, End, and the
@@ -315,24 +364,28 @@ export function initCampusMap() {
     "ArrowRight",
   ]);
 
-  window.addEventListener("keydown", (e) => {
-    if (!isScrollLocked()) return;
+  window.addEventListener(
+    "keydown",
+    (e) => {
+      if (!isScrollLocked()) return;
 
-    if (!SCROLL_KEYS.has(e.key)) return;
-    const el = document.activeElement;
-    const tag = el?.tagName;
+      if (!SCROLL_KEYS.has(e.key)) return;
+      const el = document.activeElement;
+      const tag = el?.tagName;
 
-    if (
-      tag === "INPUT" ||
-      tag === "TEXTAREA" ||
-      tag === "SELECT" ||
-      tag === "BUTTON" ||
-      el?.isContentEditable ||
-      el?.closest?.("a[href]")
-    )
-      return;
-    e.preventDefault();
-  });
+      if (
+        tag === "INPUT" ||
+        tag === "TEXTAREA" ||
+        tag === "SELECT" ||
+        tag === "BUTTON" ||
+        (el instanceof HTMLElement && el.isContentEditable) ||
+        el?.closest?.("a[href]")
+      )
+        return;
+      e.preventDefault();
+    },
+    { signal: events.signal },
+  );
 
   // iOS Safari's own scroll indicator (the thin translucent strip on the
   // right edge, shown because the page is deliberately overflowing — see
@@ -349,20 +402,37 @@ export function initCampusMap() {
 
       if (scrollY !== 0) window.scrollTo(0, 0);
     },
-    { passive: true },
+    { passive: true, signal: events.signal },
   );
+
+  return () => {
+    generation++;
+    events.abort();
+    observers.forEach((observer) => observer.disconnect());
+    observers.length = 0;
+    clearMarkers();
+    const oldControls = controlRoots.splice(0);
+    queueMicrotask(() => oldControls.forEach((root) => root.unmount()));
+
+    if (map) map.remove();
+    started = false;
+    mapboxglLib = null;
+    autoFlying = false;
+    flyDestination = null;
+  };
 }
 
-async function boot(container) {
+async function boot(_container: HTMLElement) {
+  const currentGeneration = generation;
   const token = await getMapboxToken();
   const mapboxgl = await loadMapboxGl();
+
+  if (currentGeneration !== generation) return;
   mapboxglLib = mapboxgl;
 
-  const el = document.createElement("div");
-  el.className = "campus-map";
-  el.setAttribute("role", "application");
-  el.setAttribute("aria-label", t("tabs.campus"));
-  container.appendChild(el);
+  hostReady = true;
+  notifyView();
+  const el = document.querySelector<HTMLElement>(".campus-map")!;
 
   // Opens straight onto whichever campus the sheet's picker already has
   // selected, at the same spot/zoom a marker tap flies to — rather than the
@@ -402,7 +472,7 @@ async function boot(container) {
   // Wheel zoom is kept only for the pinch gesture, which the browser reports
   // as a ctrl-wheel event.
   map.scrollZoom.disable();
-  el.addEventListener("wheel", (e) => onWheel(e, el), { passive: false });
+  el.addEventListener("wheel", (e) => onWheel(e, el), { passive: false, signal: events.signal });
 
   // Safari trackpad pinch doesn't come through as a ctrl+wheel event like
   // Chrome/Firefox synthesize — it fires the non-standard Safari-only
@@ -428,17 +498,25 @@ async function boot(container) {
   // Gate it to non-touch devices so it's trackpad-only, same as intended.
   if ("ongesturestart" in window && navigator.maxTouchPoints === 0) {
     let gestureStartZoom = 0;
-    el.addEventListener("gesturestart", (e) => {
-      e.preventDefault();
-      gestureStartZoom = map.getZoom();
-    });
-    el.addEventListener("gesturechange", (e) => {
-      e.preventDefault();
-      const rect = el.getBoundingClientRect();
-      const around = map.unproject([e.clientX - rect.left, e.clientY - rect.top]);
-      map.easeTo({ zoom: gestureStartZoom + Math.log2(e.scale), around, duration: 0 });
-    });
-    el.addEventListener("gestureend", (e) => e.preventDefault());
+    el.addEventListener(
+      "gesturestart",
+      (e) => {
+        e.preventDefault();
+        gestureStartZoom = map.getZoom();
+      },
+      { signal: events.signal },
+    );
+    el.addEventListener(
+      "gesturechange",
+      (e) => {
+        e.preventDefault();
+        const rect = el.getBoundingClientRect();
+        const around = map.unproject([e.clientX - rect.left, e.clientY - rect.top]);
+        map.easeTo({ zoom: gestureStartZoom + Math.log2(e.scale), around, duration: 0 });
+      },
+      { signal: events.signal },
+    );
+    el.addEventListener("gestureend", (e) => e.preventDefault(), { signal: events.signal });
   }
 
   const navControl = new mapboxgl.NavigationControl({ showZoom: false, showCompass: true });
@@ -477,34 +555,44 @@ async function boot(container) {
   // GeolocateControl builds its actual <button> asynchronously (behind a
   // `navigator.permissions.query(...)` check), so it doesn't exist yet right
   // after addControl() returns — watch for it instead of assuming it's there.
-  new MutationObserver((_records, observer) => {
+  const geolocateObserver = new MutationObserver((_records, observer) => {
     const button = geolocateControl._container.querySelector("button");
 
     if (!button) return;
     button.classList.add("liquid-glass");
-    button.querySelector(".mapboxgl-ctrl-icon").innerHTML =
-      '<i class="hgi-stroke hgi-gps-01" aria-hidden="true"></i>';
+    const root = createRoot(button.querySelector(".mapboxgl-ctrl-icon")!);
+    controlRoots.push(root);
+    flushSync(() => root.render(<i className="hgi-stroke hgi-gps-01" aria-hidden="true" />));
     observer.disconnect();
-  }).observe(geolocateControl._container, { childList: true });
+  });
+
+  observers.push(geolocateObserver);
+  geolocateObserver.observe(geolocateControl._container, { childList: true });
 
   // Same glass + liquid-glass treatment for the attribution control's
   // compact toggle badge (campus-map.css). Mapbox adds this control itself
   // (there's no explicit instance to hold onto like NavigationControl/
   // GeolocateControl above), so watch the whole map container for its
   // button to show up instead.
-  new MutationObserver((_records, observer) => {
+  const attributionObserver = new MutationObserver((_records, observer) => {
     const button = map.getContainer().querySelector(".mapboxgl-ctrl-attrib-button");
 
     if (!button) return;
     button.classList.add("liquid-glass");
-    button.querySelector(".mapboxgl-ctrl-icon").innerHTML =
-      '<i class="hgi-stroke hgi-information-circle" aria-hidden="true"></i>';
+    const root = createRoot(button.querySelector(".mapboxgl-ctrl-icon")!);
+    controlRoots.push(root);
+    flushSync(() =>
+      root.render(<i className="hgi-stroke hgi-information-circle" aria-hidden="true" />),
+    );
     observer.disconnect();
-  }).observe(map.getContainer(), { childList: true, subtree: true });
+  });
+
+  observers.push(attributionObserver);
+  attributionObserver.observe(map.getContainer(), { childList: true, subtree: true });
 
   // Match the map's daylight to the app theme (Standard style only).
   map.on("style.load", applyLightPreset);
-  darkScheme.addEventListener("change", applyLightPreset);
+  darkScheme.addEventListener("change", applyLightPreset, { signal: events.signal });
 
   map.on("load", () => {
     map.resize();
@@ -539,12 +627,15 @@ async function boot(container) {
   map.on("moveend", updateShifted);
 
   // Keep the GL canvas glued to the panel through rotations / dynamic toolbars.
-  new ResizeObserver(() => {
+  const resizeObserver = new ResizeObserver(() => {
     if (map) map.resize();
-  }).observe(el);
+  });
+
+  observers.push(resizeObserver);
+  resizeObserver.observe(el);
 }
 
-function onWheel(e, el) {
+function onWheel(e: WheelEvent, el: HTMLElement) {
   if (!map) return;
   e.preventDefault(); // stop page scroll / trackpad back-swipe navigation
 
@@ -586,17 +677,17 @@ function loadMapboxGl() {
 
   const base = `https://api.mapbox.com/mapbox-gl-js/v${MAPBOX_VERSION}`;
 
-  const css = new Promise((resolve) => {
+  const css = new Promise<void>((resolve) => {
     const link = document.createElement("link");
     link.rel = "stylesheet";
     link.href = `${base}/mapbox-gl.css`;
     // Non-fatal if it fails — the map still renders, controls just sit slightly off.
-    link.onload = resolve;
-    link.onerror = resolve;
+    link.onload = () => resolve();
+    link.onerror = () => resolve();
     document.head.appendChild(link);
   });
 
-  const js = new Promise((resolve, reject) => {
+  const js = new Promise<void>((resolve, reject) => {
     const script = document.createElement("script");
     script.src = `${base}/mapbox-gl.js`;
     script.onload = () => resolve();
@@ -634,7 +725,7 @@ function selectedCampus() {
   if (!id) return null;
   const campus = campuses().find((c) => c.id === id);
 
-  return campus && isNumber(campus.lat) && isNumber(campus.long) ? campus : null;
+  return campus && hasCoordinates(campus) ? campus : null;
 }
 
 // The campus sheet's building page's current selection (components/
@@ -649,7 +740,7 @@ function selectedBuilding() {
   if (!id) return null;
   const building = (campus.buildings || []).find((b) => b.name === id);
 
-  return building && isNumber(building.lat) && isNumber(building.long) ? building : null;
+  return building && hasCoordinates(building) ? building : null;
 }
 
 // The camera target implied by the current selection — a building if one's
@@ -667,11 +758,16 @@ function selectedFocus() {
 }
 
 function clearMarkers() {
+  markerEvents.abort();
+  markerEvents = new AbortController();
+  const oldRoots = markerRoots.splice(0);
+  queueMicrotask(() => oldRoots.forEach((root) => root.unmount()));
+  markerRoots.length = 0;
   markers.forEach((m) => m.remove());
   markers = [];
 }
 
-function flyOpts(extra, mobileHeightOverride) {
+function flyOpts(extra: CameraOptions, mobileHeightOverride?: number) {
   return {
     duration: reduceMotion.matches ? 0 : 1200,
     essential: true,
@@ -685,7 +781,7 @@ function flyOpts(extra, mobileHeightOverride) {
 // `mobileHeightOverride` lets a caller target a height the sheet hasn't
 // actually reached yet (see flyToBuilding()'s own comment) instead of its
 // current live one.
-function mapPadding(mobileHeightOverride) {
+function mapPadding(mobileHeightOverride?: number) {
   if (desktopMQ.matches) {
     return { top: 0, bottom: 0, left: 0, right: SHEET_DESKTOP_WIDTH + SHEET_DESKTOP_GAP };
   }
@@ -703,7 +799,7 @@ function mapPadding(mobileHeightOverride) {
 // Shared by flyToCampus/flyToBuilding below — starts (or, mid-flight,
 // swapped in as the new target of — see followSheetResize()) a flyTo towards
 // `destination`, tracking it in `flyDestination` for the duration.
-function startFly(destination, mobileHeightOverride) {
+function startFly(destination: CameraOptions, mobileHeightOverride?: number) {
   flyDestination = destination;
   autoFlying = true;
   lastFlyRetargetAt = performance.now();
@@ -716,7 +812,8 @@ function startFly(destination, mobileHeightOverride) {
 
 // Flies to a campus and swaps to its building markers — shared by a marker
 // tap and either picker's 'campuschange' (see initCampusMap()).
-function flyToCampus(mapboxgl, campus) {
+function flyToCampus(mapboxgl: MapboxLibrary, campus: Campus) {
+  if (!hasCoordinates(campus)) return;
   showBuildingMarkers(mapboxgl, campus);
   // `bearing: 0` resets any rotation too — see updateShifted()'s facingNorth
   // check, and moveend re-derives `shifted` once this settles.
@@ -727,7 +824,8 @@ function flyToCampus(mapboxgl, campus) {
 // the building markers themselves don't change (every building in the
 // campus stays visible and tappable, see the sheet's own back-button note),
 // only the camera moves.
-function flyToBuilding(mapboxgl, building) {
+function flyToBuilding(_mapboxgl: MapboxLibrary, building: Building) {
+  if (!hasCoordinates(building)) return;
   // Selecting a building auto-expands a collapsed sheet (campus-sheet.js's
   // own 'buildingpageopen' listener), running concurrently with this fly —
   // aim at the padding it's about to settle at (heightAfterBuildingSelect())
@@ -777,13 +875,13 @@ function followSheetResize() {
   map.easeTo({ center: [focus.long, focus.lat], padding: mapPadding(), duration: 0 });
 }
 
-function buildingLabel(b) {
+function buildingLabel(b: Building) {
   const alt = (b.altName || "").trim();
 
   return alt || `${t("building.prefix")} ${b.name}`;
 }
 
-function showCampusMarkers(mapboxgl) {
+function showCampusMarkers(mapboxgl: MapboxLibrary) {
   clearMarkers();
   mode = "campus";
 
@@ -795,11 +893,24 @@ function showCampusMarkers(mapboxgl) {
     const el = document.createElement("button");
     el.type = "button";
     el.className = "campus-marker";
-    el.innerHTML = `<span class="campus-marker__dot"></span><span>${escapeHtml(campus.name)}</span>`;
-    el.addEventListener("click", () => {
-      haptics.trigger(defaultPatterns.light);
-      flyToCampus(mapboxgl, campus);
-    });
+    const root = createRoot(el);
+    markerRoots.push(root);
+    flushSync(() =>
+      root.render(
+        <>
+          <span className="campus-marker__dot" />
+          <span>{campus.name}</span>
+        </>,
+      ),
+    );
+    el.addEventListener(
+      "click",
+      () => {
+        haptics.trigger(defaultPatterns.light);
+        flyToCampus(mapboxgl, campus);
+      },
+      { signal: markerEvents.signal },
+    );
 
     markers.push(
       new mapboxgl.Marker({ element: el, anchor: "bottom" }).setLngLat([long, lat]).addTo(map),
@@ -807,7 +918,7 @@ function showCampusMarkers(mapboxgl) {
   }
 }
 
-function showBuildingMarkers(mapboxgl, campus) {
+function showBuildingMarkers(mapboxgl: MapboxLibrary, campus: Campus) {
   clearMarkers();
   mode = "buildings";
 
@@ -821,16 +932,31 @@ function showBuildingMarkers(mapboxgl, campus) {
     const el = document.createElement("button");
     el.type = "button";
     el.className = "campus-marker campus-marker--building";
-    el.innerHTML = `<span class="campus-marker__dot"></span><span>${escapeHtml(label)}</span>`;
+    const root = createRoot(el);
+    markerRoots.push(root);
+    flushSync(() =>
+      root.render(
+        <>
+          <span className="campus-marker__dot" />
+          <span>{label}</span>
+        </>,
+      ),
+    );
     // Selects the building in the sheet's own building page (components/
     // campus-buildings.js) and, via the 'buildingchange' listener above,
     // flies the camera in — same tap-to-drill-in as a building card there.
-    el.addEventListener("click", () => {
-      haptics.trigger(defaultPatterns.light);
-      document.dispatchEvent(
-        new CustomEvent("buildingchange", { detail: { campusId: campus.id, buildingId: b.name } }),
-      );
-    });
+    el.addEventListener(
+      "click",
+      () => {
+        haptics.trigger(defaultPatterns.light);
+        document.dispatchEvent(
+          new CustomEvent("buildingchange", {
+            detail: { campusId: campus.id, buildingId: b.name },
+          }),
+        );
+      },
+      { signal: markerEvents.signal },
+    );
 
     markers.push(
       new mapboxgl.Marker({ element: el, anchor: "bottom" }).setLngLat([long, lat]).addTo(map),
@@ -838,9 +964,53 @@ function showBuildingMarkers(mapboxgl, campus) {
   }
 }
 
-function showError(container) {
-  const el = document.createElement("div");
-  el.className = "campus-map-error";
-  el.textContent = t("campus.mapError");
-  container.appendChild(el);
+function showError(_container: HTMLElement) {
+  mapError = true;
+  notifyView();
+}
+
+let enabled = false;
+
+let hostReady = false;
+
+let mapError = false;
+
+let revision = 0;
+
+const listeners = new Set<() => void>();
+
+function subscribe(listener: () => void) {
+  listeners.add(listener);
+
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+function notifyView() {
+  revision++;
+  flushSync(() => listeners.forEach((listener) => listener()));
+}
+
+export function initCampusMap() {
+  enabled = true;
+  notifyView();
+}
+
+function MapContents() {
+  useSyncExternalStore(subscribe, () => revision);
+  useLayoutEffect(attachCampusMap, []);
+
+  return (
+    <>
+      {hostReady && <div className="campus-map" role="application" aria-label={t("tabs.campus")} />}{" "}
+      {mapError && <div className="campus-map-error">{t("campus.mapError")}</div>}
+    </>
+  );
+}
+
+export function CampusMap() {
+  useSyncExternalStore(subscribe, () => revision);
+
+  return enabled ? <MapContents /> : null;
 }

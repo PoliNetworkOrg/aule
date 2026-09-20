@@ -1,6 +1,5 @@
 import { useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal, flushSync } from "react-dom";
-import { createRoot } from "react-dom/client";
 import { getTranslationVersion, onTranslationChange, t } from "../i18n";
 import type { Campus } from "../types";
 import { CampusPickerController } from "./campus-picker-controller";
@@ -205,27 +204,15 @@ export function CampusPicker() {
   );
 }
 
-// The campus sheet still constructs its outer header. React owns this picker's
-// contents while that view is migrated; dispose its root with the header.
-export function createCampusSheetPicker() {
-  const host = Object.assign(document.createElement("campus-sheet-picker"), {
-    setup: (_campuses: Campus[]) => {},
-    selectCampusById: (_id: string, _animate = true) => {},
-    retranslate: () => {},
-    setDocked: (_docked: boolean) => {},
-  });
+export function CampusSheetPicker() {
+  const [host, setHost] = useState<HTMLElement | null>(null);
 
-  const root = createRoot(host);
-  flushSync(() =>
-    root.render(
-      <>
-        <input type="hidden" />
-        <CampusPickerHost host={host} />
-      </>,
-    ),
+  return (
+    <campus-sheet-picker ref={setHost}>
+      <input type="hidden" />
+      {host && <CampusPickerHost host={host} />}
+    </campus-sheet-picker>
   );
-
-  return Object.assign(host, { destroy: () => root.unmount() });
 }
 
 export function setupCampusPicker(campuses: Campus[]) {

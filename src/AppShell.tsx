@@ -1,3 +1,5 @@
+import { CampusMap } from "./app/components/campus-map";
+import { CampusSheet } from "./app/components/campus-sheet";
 import { DataFetchCard } from "./app/components/data-fetch-card";
 import { SearchOverlay } from "./app/components/search-overlay";
 import { Favourites } from "./app/components/favourites";
@@ -131,7 +133,10 @@ export function AppShell() {
           </div>
         </div>
 
-        <div id="search-classrooms-container" className="tab-content"></div>
+        <div id="search-classrooms-container" className="tab-content">
+          <CampusSheet />
+          <CampusMap />
+        </div>
 
         <div id="classroom-detail-overlay" hidden></div>
 

@@ -121,3 +121,9 @@ Search and favourites use a shared React classroom card with lazy photos, query 
 The data-status popup, labels, reload button, and loading state now render in React. Its typed motion controller retains the source geometry and dismissals. Static markers from the original markup are explicitly allowed by the class lint rule.
 
 Production/beta builds and lint pass. Temporary desktop/mobile Chromium comparisons matched search results, highlights, sampled card layout, detail links, favourites, empty/cleared results, data-status text, reload behavior, and Italian labels. The migrated app reported no browser errors. The source emitted a skipped-view-transition error during search-to-detail navigation; this did not change the compared results. Eight frontend JavaScript modules remain.
+
+### React Campus checkpoint
+
+The Campus sheet, header, building cards, floor groups, classroom cards, map host, errors, and marker/control content now render in React. Typed controllers retain the original sheet gestures, scroll handoffs, page transitions, map camera behavior, and custom events. The temporary campus-picker adapter is removed. Measured page and Mapbox hosts own React roots with explicit disposal; component cleanup releases observers, pointer and wheel listeners, timers, springs, markers, and the map instance.
+
+Production/beta builds and lint pass. Temporary desktop/mobile comparisons matched sheet detents, settled geometry, building navigation, scroll state, card text, and Italian labels with no browser errors. During mobile dragging, both implementations retain the source's transformed-header measurement; frame timing can leave a subpixel difference in cached content padding. Repeating measurements after a viewport resize matched exactly. Live Mapbox checks matched marker labels, building selection, panning, and recentering. Five frontend JavaScript modules remain.
