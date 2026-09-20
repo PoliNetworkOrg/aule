@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal, flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
-import { getTranslationVersion, onLanguageSwitch, t } from "../i18n";
+import { getTranslationVersion, onTranslationChange, t } from "../i18n";
 import type { Campus } from "../types";
 import { CampusPickerController } from "./campus-picker-controller";
 import CAMPUS_PICKER_CSS_URL from "./campus-picker.css?url";
@@ -59,7 +59,7 @@ function CampusPickerContent({
   const [campuses, setCampuses] = useState<Campus[]>([]);
   const [value, setValue] = useState("");
   const [, setRevision] = useState(0);
-  useSyncExternalStore(onLanguageSwitch, getTranslationVersion);
+  useSyncExternalStore(onTranslationChange, getTranslationVersion);
   const controller = useRef<CampusPickerController | null>(null);
   const sections = groupCampuses(campuses);
   useLayoutEffect(() => {

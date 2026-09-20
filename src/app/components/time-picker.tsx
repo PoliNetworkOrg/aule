@@ -1,7 +1,7 @@
 import { observeInputProperty } from "./time-input";
 import { useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
-import { getTranslationVersion } from "../i18n";
+import { getTranslationVersion, onTranslationChange } from "../i18n";
 
 export interface TimeCard extends HTMLButtonElement {
   _popup: HTMLDivElement;
@@ -321,7 +321,7 @@ export function TimePicker({ input }: { input: HTMLInputElement }) {
     t(isFrom ? "timepicker.currentSlot" : "timepicker.fromPlusOne"),
   );
 
-  const language = useSyncExternalStore(onLanguageSwitch, getTranslationVersion);
+  const language = useSyncExternalStore(onTranslationChange, getTranslationVersion);
   const previousLanguage = useRef(language);
   useLayoutEffect(() => {
     if (previousLanguage.current === language) return;

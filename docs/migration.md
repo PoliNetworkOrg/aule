@@ -107,3 +107,9 @@ Both campus pickers now render their triggers, native fields, grouped options, a
 Popover positioning is checked TypeScript with the existing Floating UI CDN import. Destroyed instances leave the registry, and initialization exposes listener cleanup. The shadcn allowlist explicitly includes existing campus shadow stylesheet classes because that stylesheet is loaded as a URL outside the main CSS entry.
 
 Production/beta builds and lint pass. Temporary Chromium comparisons at 1440×1000 and 390×844 matched campus labels, grouped options, selection, keyboard navigation, geometry, and selection synchronization from the Campus tab, without browser errors. Fourteen frontend JavaScript modules remain.
+
+### React navigation checkpoint
+
+React now renders bottom navigation, its animated duplicate labels, keyboard shortcut help, and tooltips. Navigation retains the source gesture and spring calculations with cleanup for observers, listeners, frames, timers, and springs. Dictionary subscriptions notify React after initial locale loading as well as subsequent switches, without triggering legacy language-switch actions during startup.
+
+Production/beta builds and lint pass. Temporary Chromium comparisons at desktop and mobile widths matched navigation geometry, tab clicks, arrow-key changes, pill dragging, search opening, help text, and Italian labels with no browser errors. Eleven frontend JavaScript modules remain.

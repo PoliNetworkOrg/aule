@@ -13,6 +13,21 @@ let translationVersion = 0;
 
 const switchCallbacks: ((lang: string) => void)[] = [];
 
+const translationListeners = new Set<() => void>();
+
+export function onTranslationChange(listener: () => void) {
+  translationListeners.add(listener);
+
+  return () => {
+    translationListeners.delete(listener);
+  };
+}
+
+function notifyTranslations() {
+  translationVersion++;
+  translationListeners.forEach((listener) => listener());
+}
+
 let _isLangSwitch = false;
 
 export async function initI18n() {
@@ -25,6 +40,7 @@ export async function initI18n() {
         ? detected
         : "en";
   await loadLocale(currentLocale);
+  notifyTranslations();
 }
 
 async function loadLocale(lang: string) {
@@ -93,6 +109,6 @@ export async function setLocale(lang: string) {
   _isLangSwitch = true;
   applyTranslations();
   _isLangSwitch = false;
-  translationVersion++;
+  notifyTranslations();
   switchCallbacks.forEach((cb) => cb(lang));
 }

@@ -20,4 +20,6 @@ Each item depends on the preceding contracts and is complete only after its impl
 
 - Campus pickers now render both shadow-root option lists and triggers in React. Typed controllers preserve selection, docking, keyboard navigation, and cross-tab synchronization. Popover positioning and cleanup are checked TypeScript. Desktop/mobile comparisons match the source without browser errors.
 
-Step 2 remains in progress. Cards and bottom navigation still need React conversion. Other views and startup also remain on the legacy controllers. There are 14 frontend JavaScript modules left; `allowJs` remains enabled until they are converted. The complete frontend migration is not finished.
+- Bottom navigation, keyboard shortcut help, and tooltips now render in React. Navigation retains its springs, pointer dragging, keyboard controls, saved tab, and responsive layout. Initial dictionary loading now notifies React subscribers separately from language-switch callbacks. Desktop/mobile comparisons match the source.
+
+Step 2 remains in progress. Shared cards and the data-status popup still need React conversion. Other views and startup also remain on the legacy controllers. There are 11 frontend JavaScript modules left; `allowJs` remains enabled until they are converted. The complete frontend migration is not finished.

@@ -41,7 +41,7 @@ import { setupCampusPicker } from "./components/campus-picker.tsx";
 import { initCampusMap } from "./components/campus-map.js";
 import { initCampusSheet } from "./components/campus-sheet.js";
 import { retranslateCampusBuildingsPage, goToBuilding } from "./components/campus-buildings.js";
-import { activateGroupTab } from "./components/bottom-nav.js";
+import { activateGroupTab } from "./components/bottom-nav.tsx";
 import { setupDatePicker } from "./components/date-picker.tsx";
 import { initPickerDock } from "./components/picker-dock.ts";
 import "./components/data-fetch-card.js";
@@ -61,7 +61,6 @@ import {
   animateI18nElement,
 } from "./i18n.ts";
 import { escapeHtml } from "./utils/html.ts";
-import "./components/tooltip.js";
 import {
   initSettings,
   applyPreferredCampusIfEnabled,
@@ -71,7 +70,6 @@ import {
   AUTO_SEARCH_KEY,
   LIVE_SEARCH_KEY,
 } from "./components/settings.tsx";
-import { initKeybindings } from "./components/keybindings.js";
 import {
   resolveBlurCapability,
   applyBlurState,
@@ -417,9 +415,6 @@ export async function startApplication() {
     document.querySelector("time-range-chip-picker")?.retranslate();
 
     initSettings();
-
-    // Desktop keyboard shortcuts (no-ops on touch / narrow viewports)
-    initKeybindings();
 
     // Init info page overlay immediately — no data dependency
     infoPage.init();

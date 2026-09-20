@@ -1,6 +1,12 @@
 import { useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
-import { getLocale, getTranslationVersion, onLanguageSwitch, t, animateI18nElement } from "../i18n";
+import {
+  getLocale,
+  getTranslationVersion,
+  onTranslationChange,
+  t,
+  animateI18nElement,
+} from "../i18n";
 import { DatePicker } from "./date-picker";
 import { PickerMotion } from "./picker-motion";
 import { getDatePickerData, subscribeDates } from "./date-picker-state";
@@ -24,7 +30,7 @@ export function DateChipPicker() {
   const inner = useRef<HTMLDivElement>(null);
   const [popup] = useState(createPopupContainer);
   const data = useSyncExternalStore(subscribeDates, getDatePickerData);
-  const translationVersion = useSyncExternalStore(onLanguageSwitch, getTranslationVersion);
+  const translationVersion = useSyncExternalStore(onTranslationChange, getTranslationVersion);
   const previousTranslation = useRef(translationVersion);
   const [startupTranslation, setStartupTranslation] = useState(0);
   const [value, setValue] = useState("");

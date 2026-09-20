@@ -1,6 +1,6 @@
 import { useLayoutEffect, useCallback, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
-import { animateI18nElement, getTranslationVersion, onLanguageSwitch, t } from "../i18n";
+import { animateI18nElement, getTranslationVersion, onTranslationChange, t } from "../i18n";
 import { createTimeFormatter } from "../utils/time-format";
 import { PickerMotion } from "./picker-motion";
 import { TimePicker } from "./time-picker";
@@ -49,7 +49,7 @@ export function TimeRangeChipPicker() {
   });
 
   const ready = useSyncExternalStore(subscribeTimeControls, timeControlsReady);
-  const language = useSyncExternalStore(onLanguageSwitch, getTranslationVersion);
+  const language = useSyncExternalStore(onTranslationChange, getTranslationVersion);
   const previousLanguage = useRef(language);
   const [, setRevision] = useState(0);
   const [values, setValues] = useState({ from: "", to: "" });

@@ -14,7 +14,7 @@ import {
   getLocale,
   getTranslationVersion,
   setLocale,
-  onLanguageSwitch,
+  onTranslationChange,
   animateI18nElement,
 } from "../i18n";
 import { classroomsData } from "../available-rooms-script";
@@ -291,7 +291,7 @@ function SettingsPopup() {
   const overlay = useRef<HTMLDivElement>(null);
   const refreshCampus = useRef<(() => void) | null>(null);
   const controls = useRef(new Set<PillControl>());
-  const translationVersion = useSyncExternalStore(onLanguageSwitch, getTranslationVersion);
+  const translationVersion = useSyncExternalStore(onTranslationChange, getTranslationVersion);
   const previousTranslation = useRef(translationVersion);
   const locale = getLocale();
   const [language, setLanguage] = useState(locale);

@@ -1,3 +1,6 @@
+import { BottomNavigation } from "./app/components/bottom-nav";
+import { KeyboardShortcuts } from "./app/components/keybindings";
+import { Tooltip } from "./app/components/tooltip";
 import { CampusPicker } from "./app/components/campus-picker";
 import { TimeRangeChipPicker } from "./app/components/time-range-chip-picker";
 import { DateChipPicker } from "./app/components/date-chip-picker";
@@ -13,6 +16,8 @@ export function AppShell() {
   return (
     <>
       <Settings />
+      <KeyboardShortcuts />
+      <Tooltip />
       <div className="header-top-strip" aria-hidden="true"></div>
       <header className="header">
         <div className="header-top-line-container">
@@ -244,33 +249,7 @@ export function AppShell() {
         </div>
       </div>
 
-      <div className="bn-wrapper" id="bn-wrapper">
-        <div className="bn-group" id="bn-group">
-          <nav className="bn-tabbar" id="bn-bar" aria-label="Main navigation">
-            <div className="bn-tabbar-items" id="bn-bar-items"></div>
-          </nav>
-          <div className="bn-pill-outer" id="bn-pill" aria-hidden="true">
-            <div className="bn-pill-inner">
-              <div className="bn-active-row" id="bn-active-row"></div>
-            </div>
-          </div>
-          <div className="bn-pill-hit" id="bn-pill-hit"></div>
-        </div>
-
-        <button
-          className="bn-search-btn liquid-glass"
-          id="bn-search-btn"
-          type="button"
-          aria-label="Search"
-        >
-          <span className="bn-search-btn-inner">
-            <i className="hgi-stroke hgi-search-01"></i>
-            <span className="bn-tab-label" data-i18n="tabs.search">
-              Search
-            </span>
-          </span>
-        </button>
-      </div>
+      <BottomNavigation />
     </>
   );
 }
