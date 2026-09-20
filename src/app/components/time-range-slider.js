@@ -2,7 +2,7 @@
 // Horizontal drag-based time range selector. Replaces the two-card picker UI
 // as the primary input; tapping a badge opens the morph popup for typed entry.
 
-import { haptics, defaultPatterns } from "./haptics.js";
+import { haptics, defaultPatterns } from "./haptics.ts";
 
 // Defer haptic out of the pointer event to avoid mobile browser suppression
 // of navigator.vibrate() during active touch handling.
@@ -11,8 +11,8 @@ function triggerHaptic() {
 }
 
 import { openPicker, getPickerCards } from "./time-picker.js";
-import { createTimeFormatter } from "../utils/time-format.js";
-import { t } from "../i18n.js";
+import { createTimeFormatter } from "../utils/time-format.ts";
+import { t } from "../i18n.ts";
 
 const SNAP = 60; // one-hour grid — snaps only to HH:15 marks
 

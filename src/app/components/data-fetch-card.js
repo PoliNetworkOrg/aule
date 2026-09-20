@@ -1,17 +1,17 @@
-import { haptics, defaultPatterns } from "./haptics.js";
+import { haptics, defaultPatterns } from "./haptics.ts";
 import {
   snapGeometry,
   morphGeometry,
   hideInnerBoxInstantly,
   unhideInnerBox,
-} from "../utils/flip-morph.js";
+} from "../utils/flip-morph.ts";
 
 // The header's data-fetch indicator button morphs into a glass card holding the
 // freshness status + reload button, and back — the exact shell technique used
 // by <campus-chip-picker> / <date-chip-picker> / time-picker.js: the shell's
 // real box snaps straight to its resting geometry and a `transform` fakes the
 // trigger's box, with the trigger hidden mid-morph and the inner content
-// fading in once expanded (see utils/flip-morph.js).
+// fading in once expanded (see utils/flip-morph.ts).
 //
 // Unlike those pickers this one keeps the `liquid-glass` class on the expanded
 // card, so the press / drag-deform gesture stays alive on the open state (the

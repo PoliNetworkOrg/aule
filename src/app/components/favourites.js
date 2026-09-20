@@ -1,6 +1,6 @@
 import { buildCardForClassroom } from "./classroom-list.js";
-import { getClassroomStatusNow } from "../available-rooms-script.js";
-import { getFavouriteIds, initFavouriteMarkers } from "../utils/favourites.js";
+import { getClassroomStatusNow } from "../available-rooms-script.ts";
+import { getFavouriteIds, initFavouriteMarkers } from "../utils/favourites.ts";
 
 let _index = null; // Map<classroomId(number), { classroom, building }>
 

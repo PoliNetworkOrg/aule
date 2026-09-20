@@ -26,12 +26,12 @@ import {
   findAvailableClassrooms,
   fetchClassroomsData,
   SKIP_DAYS,
-} from "./available-rooms-script.js";
+} from "./available-rooms-script.ts";
 
 import {
   ensureClassroomDirectory,
   classroomsData as staticClassroomsData,
-} from "./classroom-search-data.js";
+} from "./classroom-search-data.ts";
 import { initSearchOverlay } from "./components/search-overlay.js";
 import { classroomDetail } from "./components/classroom-detail.js";
 import { infoPage } from "./components/info-page.js";
@@ -49,7 +49,7 @@ import "./components/time-range-chip-picker.js";
 import { initPickerDock } from "./components/picker-dock.js";
 import "./components/data-fetch-card.js";
 
-import { haptics, defaultPatterns } from "./components/haptics.js";
+import { haptics, defaultPatterns } from "./components/haptics.ts";
 import { buildCardForClassroom } from "./components/classroom-list.js";
 import { buildingOverview } from "./components/building-overview.js";
 import { initLiquidGlass } from "./components/liquid-glass.js";
@@ -62,8 +62,8 @@ import {
   applyTranslations,
   onLanguageSwitch,
   animateI18nElement,
-} from "./i18n.js";
-import { escapeHtml } from "./utils/html.js";
+} from "./i18n.ts";
+import { escapeHtml } from "./utils/html.ts";
 import "./components/tooltip.js";
 import {
   initSettings,
@@ -79,7 +79,7 @@ import {
   resolveBlurCapability,
   applyBlurState,
   scheduleIdleBenchmark,
-} from "./utils/blur-capability.js";
+} from "./utils/blur-capability.ts";
 
 // ---------- SPLASH SCREEN ----------
 const _splashStartTime = Date.now();
@@ -479,7 +479,7 @@ export async function startApplication() {
 
     // Apply the cached blur verdict (or the safe "off" default if none yet)
     // instantly — the actual benchmark never runs during load, see
-    // utils/blur-capability.js for why.
+    // utils/blur-capability.ts for why.
     applyBlurState(resolveBlurCapability());
 
     await document.fonts.ready;

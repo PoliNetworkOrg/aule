@@ -3,14 +3,14 @@ import {
   classroomsData as occupancyData,
   SKIP_DAYS,
   getClassroomStatusNow,
-} from "../available-rooms-script.js";
-import { t, getLocale, onLanguageSwitch } from "../i18n.js";
-import { haptics, defaultPatterns } from "./haptics.js";
-import { createTimeFormatter } from "../utils/time-format.js";
-import { escapeHtml } from "../utils/html.js";
+} from "../available-rooms-script.ts";
+import { t, getLocale, onLanguageSwitch } from "../i18n.ts";
+import { haptics, defaultPatterns } from "./haptics.ts";
+import { createTimeFormatter } from "../utils/time-format.ts";
+import { escapeHtml } from "../utils/html.ts";
 import { infoPage } from "./info-page.js";
-import { fetchPhotoUrl, photoUrlCache } from "../utils/photo.js";
-import { isFavourite, toggleFavourite, FILLED_STAR_SVG } from "../utils/favourites.js";
+import { fetchPhotoUrl, photoUrlCache } from "../utils/photo.ts";
+import { isFavourite, toggleFavourite, FILLED_STAR_SVG } from "../utils/favourites.ts";
 import { DynamicPopover } from "./popover.js";
 import { createPillSelector } from "./pill-selector.js";
 

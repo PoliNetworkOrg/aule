@@ -1,8 +1,8 @@
 import { openPage, closePage, goBack } from "../../lib/navigation";
 import { queryClient } from "../../lib/query";
-import { onLanguageSwitch, t } from "../i18n.js";
-import { haptics, defaultPatterns } from "./haptics.js";
-import { escapeHtml, safeUrl } from "../utils/html.js";
+import { onLanguageSwitch, t } from "../i18n.ts";
+import { haptics, defaultPatterns } from "./haptics.ts";
+import { escapeHtml, safeUrl } from "../utils/html.ts";
 
 const GITHUB_REPO = "SummaCristian/poliaule";
 

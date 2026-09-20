@@ -1,5 +1,5 @@
 /**
- * utils/html.js — helpers for safely injecting external data into the DOM.
+ * utils/html.ts — helpers for safely injecting external data into the DOM.
  *
  * WHY THIS FILE EXISTS
  * --------------------
@@ -48,11 +48,21 @@
  *   element.textContent = name;   ← always safe, no HTML parsing happens
  *   img.src = url;                ← safe for src; use safeUrl() for href/action
  */
-export function escapeHtml(str) {
-  return String(str).replace(
-    /[&<>"']/g,
-    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c],
-  );
+export function escapeHtml(str: string | number | null | undefined) {
+  return String(str).replace(/[&<>"']/g, (c) => {
+    switch (c) {
+      case "&":
+        return "&amp;";
+      case "<":
+        return "&lt;";
+      case ">":
+        return "&gt;";
+      case '"':
+        return "&quot;";
+      default:
+        return "&#39;";
+    }
+  });
 }
 
 /**
@@ -74,7 +84,7 @@ export function escapeHtml(str) {
  *
  * Note: safeUrl does NOT replace escapeHtml — the returned string still needs to
  * be escaped if interpolated into an HTML attribute:
- *   `href="${escapeHtml(safeUrl(url))}"` ← correct for arbitrary href values
+ *   `href="${escapeHtml(safeUrl(url: string))}"` ← correct for arbitrary href values
  * In practice, https: URLs from trusted APIs (GitHub, Polimi) won't contain `"`
  * or `<`, so a bare safeUrl() call is acceptable there, but the belt-and-suspenders
  * form is always correct.
@@ -86,7 +96,7 @@ export function escapeHtml(str) {
  * Used to highlight the part of a classroom/building/campus name that matched
  * a user's search query (e.g. in the Campus tab's search results).
  */
-export function highlight(text, query) {
+export function highlight(text: string, query: string) {
   const safe = escapeHtml(text);
 
   if (!query) return safe;
@@ -99,7 +109,7 @@ export function highlight(text, query) {
   return safe.replace(new RegExp(`(${safeQ})`, "gi"), "<mark>$1</mark>");
 }
 
-export function safeUrl(url) {
+export function safeUrl(url: string) {
   try {
     return new URL(url).protocol === "https:" ? url : "#";
   } catch {

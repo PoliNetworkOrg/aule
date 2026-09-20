@@ -3,7 +3,7 @@
 // on drag and commits to the nearer end on release — the same behavior as
 // segmented-control.js. The root is a <button>, so Space/Enter toggle natively.
 import { createPillDragCore } from "./pill-drag-core.js";
-import { haptics, defaultPatterns } from "./haptics.js";
+import { haptics, defaultPatterns } from "./haptics.ts";
 
 // Returns { el, set, refresh, on, onChange }. Assign `onChange(isOn)` to react
 // to user changes; set(isOn) is programmatic (silent) and animates by default.

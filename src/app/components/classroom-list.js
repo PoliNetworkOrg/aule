@@ -1,7 +1,7 @@
-import { t } from "../i18n.js";
-import { escapeHtml, highlight } from "../utils/html.js";
-import { fetchPhotoUrl, photoUrlCache } from "../utils/photo.js";
-import { isFavourite, FILLED_STAR_SVG } from "../utils/favourites.js";
+import { t } from "../i18n.ts";
+import { escapeHtml, highlight } from "../utils/html.ts";
+import { fetchPhotoUrl, photoUrlCache } from "../utils/photo.ts";
+import { isFavourite, FILLED_STAR_SVG } from "../utils/favourites.ts";
 
 // ---------- PHOTO ----------
 
@@ -54,7 +54,7 @@ const STATUS_KEYS = {
 //
 // showFavouriteStar is optional — pass true (Available results, Campus/Search
 // results) to render a top-right star marker when the room is a favourite, and
-// to opt the card into live updates from favourites.js. Omit it in the
+// to opt the card into live updates from favourites.ts. Omit it in the
 // Favourites carousel itself, where every card is already a favourite.
 export function buildCardForClassroom(
   classroom,

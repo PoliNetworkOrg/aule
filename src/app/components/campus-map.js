@@ -1,9 +1,9 @@
 import { isNumber } from "../../lib/guards";
-import { getMapboxToken } from "../config.js";
-import { classroomsData } from "../classroom-search-data.js";
-import { t } from "../i18n.js";
-import { escapeHtml } from "../utils/html.js";
-import { haptics, defaultPatterns } from "./haptics.js";
+import { getMapboxToken } from "../config.ts";
+import { classroomsData } from "../classroom-search-data.ts";
+import { t } from "../i18n.ts";
+import { escapeHtml } from "../utils/html.ts";
+import { haptics, defaultPatterns } from "./haptics.ts";
 import {
   getSelectedCampusId,
   getSelectedBuildingId,

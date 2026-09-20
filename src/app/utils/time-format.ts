@@ -1,4 +1,4 @@
-// utils/time-format.js
+// utils/time-format.ts
 // Shared time formatting utility that respects the user's 12H/24H preference.
 
 export const STORAGE_KEY = "poliAule_timeFormat"; // 'system' | '12' | '24'
@@ -19,10 +19,10 @@ export function getHour12Option() {
 
 // Creates an Intl.DateTimeFormat instance with the user's time format preference applied.
 // Pass extraOptions to override or extend the defaults (hour/minute are set by default).
-export function createTimeFormatter(extraOptions = {}) {
+export function createTimeFormatter(extraOptions: Intl.DateTimeFormatOptions = {}) {
   const hour12 = getHour12Option();
 
-  const options = { hour: "2-digit", minute: "2-digit" };
+  const options: Intl.DateTimeFormatOptions = { hour: "2-digit", minute: "2-digit" };
 
   if (hour12 !== undefined) options.hour12 = hour12;
 

@@ -17,8 +17,8 @@
 //
 // Measurement uses offset* (not getBoundingClientRect) so it stays correct
 // while an ancestor is mid-transform, e.g. the settings popup's morph-open.
-import { Spring, onSpringFrame } from "../utils/spring.js";
-import { haptics, defaultPatterns } from "./haptics.js";
+import { Spring, onSpringFrame } from "../utils/spring.ts";
+import { haptics, defaultPatterns } from "./haptics.ts";
 
 const RAIL_GIVE = 11; // elastic px the pill can be pulled past the end anchors
 

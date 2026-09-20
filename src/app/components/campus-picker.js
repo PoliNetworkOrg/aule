@@ -4,16 +4,16 @@ import {
   shift,
   offset,
 } from "https://cdn.jsdelivr.net/npm/@floating-ui/dom@1/+esm";
-import { haptics, defaultPatterns } from "./haptics.js";
+import { haptics, defaultPatterns } from "./haptics.ts";
 import { attachLiquidGlass } from "./liquid-glass.js";
-import { t } from "../i18n.js";
-import { BLUR_STATE_EVENT } from "../utils/blur-capability.js";
+import { t } from "../i18n.ts";
+import { BLUR_STATE_EVENT } from "../utils/blur-capability.ts";
 import {
   snapGeometry,
   morphGeometry,
   hideInnerBoxInstantly,
   unhideInnerBox,
-} from "../utils/flip-morph.js";
+} from "../utils/flip-morph.ts";
 import CAMPUS_PICKER_CSS_URL from "./campus-picker.css?url";
 
 // The `?url` suffix (not a hardcoded "./components/campus-picker.css"

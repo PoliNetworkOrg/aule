@@ -1,11 +1,19 @@
+import type {
+  AvailableClassroom,
+  Building,
+  OccupancyDay,
+  OpeningHours,
+  Occupation,
+  Classroom,
+} from "./types";
 import { fetchJson } from "../lib/query";
-import { getApiBase } from "./config.js";
+import { getApiBase } from "./config.ts";
 
 // ---------- DATA ----------
 
 // Data fetched from the API will be stored here,
 // one entry per day inside the array, starting with 0 = today.
-export let classroomsData = [];
+export const classroomsData: OccupancyDay[] = [];
 
 // Day of the week to skip. If one of the next 7 days is a
 // day listed here, skip to the next day.
@@ -20,7 +28,7 @@ const BUILDING_ID_RE = /^([a-z]*\d+[a-z]?)/i;
 
 // Mirrors scripts/fetch.py's _building_hours_key(), so both sides resolve
 // the same building to the same opening-hours.json entry.
-function buildingHoursKey(building) {
+function buildingHoursKey(building: Building) {
   const match = BUILDING_ID_RE.exec(String(building.name ?? ""));
 
   return (match ? match[1] : String(building.name ?? "")).toUpperCase();
@@ -28,7 +36,7 @@ function buildingHoursKey(building) {
 
 // Resolves a building's opening hours: explicit match > campus default > global default.
 // Mirrors scripts/fetch.py's resolve_building_hours().
-function resolveBuildingHours(building, campusId, openingHours) {
+function resolveBuildingHours(building: Building, campusId: string, openingHours: OpeningHours) {
   const key = buildingHoursKey(building);
 
   if (openingHours.buildings[key]) return openingHours.buildings[key];
@@ -43,17 +51,17 @@ function resolveBuildingHours(building, campusId, openingHours) {
 export async function fetchClassroomsData() {
   try {
     const apiBase = getApiBase();
-    const { dates } = await fetchJson(`${apiBase}/v1/occupations`);
+    const { dates } = await fetchJson<{ dates: string[] }>(`${apiBase}/v1/occupations`);
 
     const [results, openingHours] = await Promise.all([
       Promise.allSettled(
         dates.map((date) => {
           const isoDate = `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}`;
 
-          return fetchJson(`${apiBase}/v1/occupations/${isoDate}`);
+          return fetchJson<OccupancyDay>(`${apiBase}/v1/occupations/${isoDate}`);
         }),
       ).then((settled) => settled.flatMap((r) => (r.status === "fulfilled" ? [r.value] : []))),
-      fetchJson(`${apiBase}/v1/opening-hours`).catch((error) => {
+      fetchJson<OpeningHours>(`${apiBase}/v1/opening-hours`).catch((error) => {
         // Non-fatal: fall through with openingHours = null so classroomsData
         // still loads (and gets used) even if opening hours can't be fetched.
         console.error("Error fetching opening hours data:", error);
@@ -91,7 +99,12 @@ export async function fetchClassroomsData() {
 // This allows to define 'partial availability', which is
 // useful to return relevant data,
 // especially when full availability is not possible.
-export function findAvailableClassrooms(campusId, date, fromTime, toTime) {
+export function findAvailableClassrooms(
+  campusId: string,
+  date: string,
+  fromTime: string,
+  toTime: string,
+) {
   const formattedDate = formatDateYYYYMMDD(new Date(date));
 
   // Find the day's data
@@ -115,7 +128,7 @@ export function findAvailableClassrooms(campusId, date, fromTime, toTime) {
   const results = [];
 
   for (const building of campusData.buildings) {
-    const availableRooms = [];
+    const availableRooms: AvailableClassroom[] = [];
 
     for (const classroom of building.classrooms) {
       const freeSlots = getFreeSlots(classroom.occupancy, fromTime, toTime);
@@ -153,7 +166,7 @@ export function findAvailableClassrooms(campusId, date, fromTime, toTime) {
 // ---------- HELPERS ----------
 
 // Formats Date objects in the format used by the API (YYYYMMDD)
-function formatDateYYYYMMDD(date) {
+function formatDateYYYYMMDD(date: Date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
@@ -163,7 +176,7 @@ function formatDateYYYYMMDD(date) {
 
 // Returns the free time slots within [fromTime, toTime]
 // given an array of occupancy slots from the JSON.
-function getFreeSlots(occupancy, fromTime, toTime) {
+function getFreeSlots(occupancy: Occupation[], fromTime: string, toTime: string) {
   const freeSlots = [];
   let cursor = fromTime;
 
@@ -198,7 +211,7 @@ function getFreeSlots(occupancy, fromTime, toTime) {
  * the availability status relative to that instant.
  * Possible return values: 'free', 'occupied', 'free-soon', 'occupied-soon'.
  */
-export function computeClassroomStatus(occupancy, refDate) {
+export function computeClassroomStatus(occupancy: Occupation[] | null | undefined, refDate: Date) {
   const slots = occupancy ?? [];
   const currentTime = `${String(refDate.getHours()).padStart(2, "0")}:${String(refDate.getMinutes()).padStart(2, "0")}`;
 
@@ -212,9 +225,9 @@ export function computeClassroomStatus(occupancy, refDate) {
     const currentSlot = slots.find((slot) => currentTime >= slot.inizio && currentTime < slot.fine);
 
     // If current slot ends within 30 mins AND no other slot starts before that 30 min window ends
-    if (currentSlot.fine < thirtyMinsLaterTime) {
+    if (currentSlot!.fine < thirtyMinsLaterTime) {
       const nextOccupancy = slots.some(
-        (slot) => slot.inizio >= currentSlot.fine && slot.inizio < thirtyMinsLaterTime,
+        (slot) => slot.inizio >= currentSlot!.fine && slot.inizio < thirtyMinsLaterTime,
       );
 
       if (!nextOccupancy) {
@@ -241,7 +254,7 @@ export function computeClassroomStatus(occupancy, refDate) {
  * Returns the current availability status of a classroom relative to NOW.
  * Possible return values: 'free', 'occupied', 'free-soon', 'occupied-soon', or null if no data.
  */
-export function getClassroomStatusNow(classroomId) {
+export function getClassroomStatusNow(classroomId: number | string) {
   if (!classroomsData || classroomsData.length === 0) return null;
 
   const now = new Date();
@@ -252,7 +265,7 @@ export function getClassroomStatusNow(classroomId) {
 
   if (!dayData) return null;
 
-  let classroom = null;
+  let classroom: Classroom | undefined;
 
   outer: for (const campus of dayData.campuses) {
     for (const building of campus.buildings) {
@@ -279,7 +292,12 @@ export function getClassroomStatusNow(classroomId) {
  * Returns [{ building, counts: {free, 'partially-free', occupied} }]
  * in the campus's building order.
  */
-export function getCampusBuildingsOverview(campusId, date, fromTime, toTime) {
+export function getCampusBuildingsOverview(
+  campusId: string,
+  date: string,
+  fromTime: string,
+  toTime: string,
+) {
   const formattedDate = formatDateYYYYMMDD(new Date(date));
   const dayData = classroomsData.find((day) => day.date === formattedDate);
 

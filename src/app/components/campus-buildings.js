@@ -1,11 +1,11 @@
 import { CampusChipPicker } from "./campus-picker.js";
 import { getContentScroll, setContentScroll } from "./campus-sheet.js";
-import { classroomsData as staticClassroomsData } from "../classroom-search-data.js";
-import { getClassroomStatusNow } from "../available-rooms-script.js";
+import { classroomsData as staticClassroomsData } from "../classroom-search-data.ts";
+import { getClassroomStatusNow } from "../available-rooms-script.ts";
 import { buildCardForClassroom } from "./classroom-list.js";
-import { t } from "../i18n.js";
-import { escapeHtml } from "../utils/html.js";
-import { haptics, defaultPatterns } from "./haptics.js";
+import { t } from "../i18n.ts";
+import { escapeHtml } from "../utils/html.ts";
+import { haptics, defaultPatterns } from "./haptics.ts";
 
 // The Campus tab's own "pages" inside the campus sheet (components/campus-sheet.js):
 //

@@ -27,13 +27,13 @@ export function getApiBase() {
 // by the worker's MAPBOX_TOKEN secret) so the token never lands in this public
 // repo. It is a URL-restricted public (`pk.`) token — safe in the browser, just
 // not in git. Fetched once and memoised; a failed fetch isn't cached.
-let _mapboxTokenPromise = null;
+let _mapboxTokenPromise: Promise<string> | null = null;
 
 export function getMapboxToken() {
   if (!_mapboxTokenPromise) {
     // Only the validated token promise is reusable; an incomplete response
     // must be fetched again when the next call retries after a failure.
-    _mapboxTokenPromise = fetchJson(`${getApiBase()}/v1/config`)
+    _mapboxTokenPromise = fetchJson<{ mapboxToken?: string }>(`${getApiBase()}/v1/config`)
       .then((cfg) => {
         if (!cfg?.mapboxToken) throw new Error("/v1/config returned no mapboxToken");
 

@@ -7,10 +7,10 @@
 // Available/Campus pair: Available+Campus share one sliding/draggable pill,
 // Search is a separate standalone circular button (tap-only, own lift spring).
 
-import { haptics, defaultPatterns } from "./haptics.js";
-import { t, onLanguageSwitch } from "../i18n.js";
+import { haptics, defaultPatterns } from "./haptics.ts";
+import { t, onLanguageSwitch } from "../i18n.ts";
 import { DEFAULT_TAB_KEY, LAST_TAB_KEY, getStartupTabId } from "./settings.js";
-import { Spring, onSpringFrame } from "../utils/spring.js";
+import { Spring, onSpringFrame } from "../utils/spring.ts";
 import { openSearchOverlay } from "./search-overlay.js";
 
 const GROUP_TABS = [

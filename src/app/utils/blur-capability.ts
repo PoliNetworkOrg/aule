@@ -1,4 +1,4 @@
-// utils/blur-capability.js
+// utils/blur-capability.ts
 //
 // Perf-gated glass blur. backdrop-filter is expensive to composite on weak
 // GPUs, so instead of shipping it to every device we benchmark it once and
@@ -51,7 +51,7 @@ export function getBlurMode() {
   return localStorage.getItem(BLUR_MODE_KEY) ?? "auto";
 }
 
-export function setBlurMode(mode) {
+export function setBlurMode(mode: string) {
   localStorage.setItem(BLUR_MODE_KEY, mode);
 }
 
@@ -60,7 +60,7 @@ function readCachedResult() {
     const raw = localStorage.getItem(BENCHMARK_CACHE_KEY);
 
     if (!raw) return null;
-    const parsed = JSON.parse(raw);
+    const parsed: { version: number; capable: boolean } = JSON.parse(raw);
 
     return parsed.version === BENCHMARK_VERSION ? parsed.capable : null;
   } catch {
@@ -68,7 +68,7 @@ function readCachedResult() {
   }
 }
 
-function writeCachedResult(capable) {
+function writeCachedResult(capable: boolean) {
   try {
     localStorage.setItem(
       BENCHMARK_CACHE_KEY,
@@ -91,7 +91,7 @@ function supportsBackdropFilter() {
 // gaps while it's composited, so the sample reflects real compositing cost
 // rather than a trivial element.
 function runBenchmark() {
-  return new Promise((resolve) => {
+  return new Promise<boolean>((resolve) => {
     if (!supportsBackdropFilter()) {
       resolve(false);
 
@@ -116,7 +116,7 @@ function runBenchmark() {
     let totalFrames = 0;
     let jankFrames = 0;
 
-    function tick(now) {
+    function tick(now: number) {
       totalFrames++;
 
       if (totalFrames > WARMUP_FRAMES && now - lastTime > JANK_THRESHOLD_MS) jankFrames++;
@@ -190,7 +190,7 @@ export function scheduleIdleBenchmark() {
 // see components/campus-picker.css — can mirror the verdict onto themselves.
 export const BLUR_STATE_EVENT = "poliaule:blurstatechange";
 
-export function applyBlurState(capable) {
+export function applyBlurState(capable: boolean) {
   document.documentElement.dataset.blur = capable ? "on" : "off";
   window.dispatchEvent(new CustomEvent(BLUR_STATE_EVENT, { detail: { capable } }));
 }

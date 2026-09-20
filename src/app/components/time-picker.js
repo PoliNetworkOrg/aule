@@ -2,15 +2,15 @@
 // Morph-card time picker component.
 // Replaces each .time-picker wrapper with a card that morphs into a popup.
 
-import { haptics, defaultPatterns } from "./haptics.js";
-import { t, onLanguageSwitch, animateI18nElement } from "../i18n.js";
-import { createTimeFormatter } from "../utils/time-format.js";
+import { haptics, defaultPatterns } from "./haptics.ts";
+import { t, onLanguageSwitch, animateI18nElement } from "../i18n.ts";
+import { createTimeFormatter } from "../utils/time-format.ts";
 import {
   snapGeometry,
   morphGeometry,
   hideInnerBoxInstantly,
   unhideInnerBox,
-} from "../utils/flip-morph.js";
+} from "../utils/flip-morph.ts";
 
 const TRANSITION_DURATION = 420; // ms — must match CSS
 

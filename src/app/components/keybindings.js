@@ -16,7 +16,7 @@
 // touch device with no hardware keyboard never needs them, and it keeps the
 // help affordance off small screens.
 
-import { t, applyTranslations, onLanguageSwitch } from "../i18n.js";
+import { t, applyTranslations, onLanguageSwitch } from "../i18n.ts";
 import { activateGroupTab } from "./bottom-nav.js";
 import { openSearchOverlay } from "./search-overlay.js";
 import { toggleSettings } from "./settings.js";

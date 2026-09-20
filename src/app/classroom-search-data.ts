@@ -1,19 +1,58 @@
+import type { Campus, Classroom, Building } from "./types";
+
+export interface SearchRoom extends Classroom {
+  buildingName: string;
+  buildingAltName?: string;
+  campusName: string;
+}
+
+export interface OccupationSession {
+  date: string;
+  inizio: string;
+  fine: string;
+  roomId: number;
+  roomName: string;
+  buildingName: string;
+  buildingAltName?: string;
+  campusName: string;
+}
+
+export interface OccupationGroup {
+  title: string;
+  code: number | string | null;
+  section: string | null;
+  professors: string[];
+  isExam: boolean;
+  sessions: OccupationSession[];
+  sessionCount?: number;
+}
+
+interface OccupationRow extends OccupationSession {
+  category: string | null;
+  isExam: boolean;
+  title: string;
+  code: number | string | null;
+  section: string | null;
+  professors: string[];
+  haystack: string;
+}
+
 import { fetchJson } from "../lib/query";
 import {
   getClassroomStatusNow,
   classroomsData as occupancyDays,
-} from "./available-rooms-script.js";
+} from "./available-rooms-script.ts";
 import { buildCardForClassroom } from "./components/classroom-list.js";
-import { getApiBase } from "./config.js";
+import { getApiBase } from "./config.ts";
 
 // Static classroom directory (campus → buildings → classrooms) plus the text /
 // occupation search that runs against it. The search UI itself lives in the
 // search overlay (components/search-overlay.js); this module owns the data, the
 // indexes, and the result-card builders it drives.
 
-export let classroomsData = null;
+export let classroomsData: Campus[] | null = null;
 
-let searchIndex = null;
+let searchIndex: SearchRoom[] | null = null;
 
 export const SEARCH_MAX_RESULTS = 40;
 
@@ -21,7 +60,7 @@ export const SEARCH_MAX_RESULTS = 40;
 
 async function loadData() {
   if (classroomsData) return;
-  classroomsData = await fetchJson(`${getApiBase()}/v1/classrooms`, Infinity);
+  classroomsData = await fetchJson<Campus[]>(`${getApiBase()}/v1/classrooms`, Infinity);
 }
 
 // Loads the static classroom directory. Blocks the splash — it's what the page
@@ -38,7 +77,7 @@ export async function ensureSearchData() {
   if (!searchIndex) searchIndex = buildSearchIndex();
 }
 
-export function runClassroomSearch(query) {
+export function runClassroomSearch(query: string) {
   if (!classroomsData) return { visible: [], total: 0, capped: false };
 
   if (!searchIndex) searchIndex = buildSearchIndex();
@@ -65,7 +104,7 @@ export function runClassroomSearch(query) {
 
 // Results span multiple campuses, so fold the campus name into the building
 // line (the card only has room for one line of building/location context).
-export function buildSearchResultCard(room, query = "") {
+export function buildSearchResultCard(room: SearchRoom, query = "") {
   return buildClassroomCard(
     room,
     {
@@ -77,9 +116,9 @@ export function buildSearchResultCard(room, query = "") {
 }
 
 function buildSearchIndex() {
-  const index = [];
+  const index: SearchRoom[] = [];
 
-  for (const campus of classroomsData) {
+  for (const campus of classroomsData!) {
     for (const building of campus.buildings) {
       for (const room of building.classrooms) {
         index.push({
@@ -97,7 +136,11 @@ function buildSearchIndex() {
 
 // Classroom cards reuse the exact card built for the Available tab
 // (components/classroom-list.js).
-function buildClassroomCard(room, building, query = "") {
+function buildClassroomCard(
+  room: Classroom,
+  building: Pick<Building, "name" | "altName">,
+  query = "",
+) {
   const status = getClassroomStatusNow(room.id);
 
   return buildCardForClassroom({ ...room, status }, building, null, null, false, null, query, true);
@@ -105,7 +148,7 @@ function buildClassroomCard(room, building, query = "") {
 
 // ---------- OCCUPATION (lesson / exam) SEARCH ----------
 //
-// Searches the loaded occupancy data (available-rooms-script.js, up to 7 days)
+// Searches the loaded occupancy data (available-rooms-script.ts, up to 7 days)
 // for slots whose course name, code, section, professors, or raw string match
 // the query. Identical events (same course/code/professors, recurring across
 // days and rooms) are folded into one group with a list of sessions.
@@ -114,7 +157,7 @@ export const OCC_MAX_GROUPS = 24;
 
 const OCC_MAX_SESSIONS = 6;
 
-let occIndex = null;
+let occIndex: OccupationRow[] | null = null;
 
 let occIndexDayCount = -1;
 
@@ -124,14 +167,14 @@ export function hasOccupationData() {
 
 // Occupancy JSON stores the day as "YYYYMMDD"; normalise to ISO so Date() and
 // Intl can parse it.
-function isoDate(d) {
+function isoDate(d: string) {
   const s = String(d ?? "");
 
   return /^\d{8}$/.test(s) ? `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}` : s;
 }
 
 function buildOccupationIndex() {
-  const rows = [];
+  const rows: OccupationRow[] = [];
 
   for (const day of occupancyDays) {
     const date = isoDate(day.date);
@@ -185,22 +228,22 @@ function ensureOccIndex() {
   }
 }
 
-export function runOccupationSearch(query) {
+export function runOccupationSearch(query: string) {
   ensureOccIndex();
   const q = query.trim().toLowerCase();
 
-  if (!q || occIndex.length === 0)
+  if (!q || occIndex!.length === 0)
     return { groups: [], total: 0, capped: false, maxSessions: OCC_MAX_SESSIONS };
 
   // Codes are stored as ints, so a leading zero the user typed ("061182") is
   // gone from the haystack ("61182") — match on both.
   const qAlt = q.replace(/^0+/, "");
 
-  const matched = occIndex.filter(
+  const matched = occIndex!.filter(
     (r) => r.haystack.includes(q) || (qAlt && qAlt !== q && r.haystack.includes(qAlt)),
   );
 
-  const groups = new Map();
+  const groups = new Map<string, OccupationGroup>();
 
   for (const r of matched) {
     const key = [r.category, r.code, r.title, r.section, r.professors.join(",")]

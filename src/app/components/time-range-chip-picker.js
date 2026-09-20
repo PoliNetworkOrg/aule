@@ -1,12 +1,12 @@
-import { haptics, defaultPatterns } from "./haptics.js";
-import { t, onLanguageSwitch } from "../i18n.js";
-import { createTimeFormatter } from "../utils/time-format.js";
+import { haptics, defaultPatterns } from "./haptics.ts";
+import { t, onLanguageSwitch } from "../i18n.ts";
+import { createTimeFormatter } from "../utils/time-format.ts";
 import {
   snapGeometry,
   morphGeometry,
   hideInnerBoxInstantly,
   unhideInnerBox,
-} from "../utils/flip-morph.js";
+} from "../utils/flip-morph.ts";
 
 // <time-range-chip-picker> is a thin wrapper around the drag-based time range
 // slider (components/time-range-slider.js), which stays completely untouched.

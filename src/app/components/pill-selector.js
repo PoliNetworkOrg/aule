@@ -8,7 +8,7 @@
 // but otherwise have independent selection logic (hidden <select> vs.
 // schedule row highlight).
 import { createPillDragCore } from "./pill-drag-core.js";
-import { haptics, defaultPatterns } from "./haptics.js";
+import { haptics, defaultPatterns } from "./haptics.ts";
 
 // container: the `.date-picker-container` element (already position:relative,
 // already holding a `.date-indicator` sibling and some

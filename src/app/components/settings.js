@@ -2,18 +2,18 @@
 // Settings button that morphs into a centered popup.
 // Contains the language switcher and any future settings.
 
-import { haptics, defaultPatterns } from "./haptics.js";
-import { t, getLocale, setLocale, onLanguageSwitch, animateI18nElement } from "../i18n.js";
-import { classroomsData } from "../available-rooms-script.js";
+import { haptics, defaultPatterns } from "./haptics.ts";
+import { t, getLocale, setLocale, onLanguageSwitch, animateI18nElement } from "../i18n.ts";
+import { classroomsData } from "../available-rooms-script.ts";
 import { selectCampusById } from "./campus-picker.js";
-import { STORAGE_KEY as TIME_FORMAT_KEY } from "../utils/time-format.js";
-import { IS_STABLE_BUILD, USE_BETA_BACKEND_KEY } from "../config.js";
+import { STORAGE_KEY as TIME_FORMAT_KEY } from "../utils/time-format.ts";
+import { IS_STABLE_BUILD, USE_BETA_BACKEND_KEY } from "../config.ts";
 import {
   getBlurMode,
   setBlurMode,
   reevaluateBlurCapability,
   applyBlurState,
-} from "../utils/blur-capability.js";
+} from "../utils/blur-capability.ts";
 import { createSegmentedControl } from "./segmented-control.js";
 import { createToggle } from "./toggle.js";
 import {
@@ -21,7 +21,7 @@ import {
   morphGeometry,
   hideInnerBoxInstantly,
   unhideInnerBox,
-} from "../utils/flip-morph.js";
+} from "../utils/flip-morph.ts";
 
 const TRANSITION_DURATION = 420;
 

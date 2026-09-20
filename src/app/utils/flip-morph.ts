@@ -1,4 +1,4 @@
-// utils/flip-morph.js
+// utils/flip-morph.ts
 // FLIP (First-Last-Invert-Play) helper for card→popup morph animations.
 //
 // Animating left/top/width/height directly forces layout + paint on the main
@@ -7,14 +7,22 @@
 // single `transform`, which the compositor can animate to identity without
 // touching layout at all.
 
-function toRectLike({ left, top, width, height }) {
+type Geometry = Pick<DOMRect, "left" | "top" | "width" | "height">;
+
+interface MorphOptions {
+  fromRadius?: string;
+  toRadius?: string;
+  onSettle?: () => void;
+}
+
+function toRectLike({ left, top, width, height }: Geometry) {
   return { left, top, width, height };
 }
 
 // Pins the element's real box directly at `rect`, clears any in-flight
 // transform, and sets `borderRadius`. Instant — transition is disabled for
 // the write so a stale `transform` doesn't animate back to none.
-export function snapGeometry(el, rect, borderRadius) {
+export function snapGeometry(el: HTMLElement, rect: Geometry, borderRadius?: string) {
   const r = toRectLike(rect);
   const prevTransition = el.style.transition;
   el.style.transition = "none";
@@ -32,7 +40,12 @@ export function snapGeometry(el, rect, borderRadius) {
 // Morphs `el` from `fromRect`/`fromRadius` to `toRect`/`toRadius`.
 // The element's CSS must declare `transition: transform ..., border-radius ..., box-shadow ...`
 // (not top/left/width/height) for this to run off the compositor thread.
-export function morphGeometry(el, fromRect, toRect, { fromRadius, toRadius, onSettle } = {}) {
+export function morphGeometry(
+  el: HTMLElement,
+  fromRect: Geometry,
+  toRect: Geometry,
+  { fromRadius, toRadius, onSettle }: MorphOptions = {},
+) {
   const from = toRectLike(fromRect);
   const to = toRectLike(toRect);
   const prevTransition = el.style.transition;
@@ -94,12 +107,12 @@ export function morphGeometry(el, fromRect, toRect, { fromRadius, toRadius, onSe
 //
 // Call `unhideInnerBox` once the shell is hidden again (so the next open's
 // fade-in isn't itself skipped).
-export function hideInnerBoxInstantly(el) {
+export function hideInnerBoxInstantly(el: HTMLElement) {
   el.style.transition = "none";
   el.style.opacity = "0";
 }
 
-export function unhideInnerBox(el) {
+export function unhideInnerBox(el: HTMLElement) {
   el.style.transition = "";
   el.style.opacity = "";
 }

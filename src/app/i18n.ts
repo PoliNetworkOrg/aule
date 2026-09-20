@@ -1,32 +1,33 @@
 import { fetchJson } from "../lib/query";
-// i18n.js — lightweight localization module
+// i18n.ts — lightweight localization module
 
 const SUPPORTED = ["en", "it"];
 
 const STORAGE_KEY = "poliAule_locale";
 
-let translations = {};
+let translations: Record<string, string> = {};
 
 let currentLocale = "en";
 
-const switchCallbacks = [];
+const switchCallbacks: ((lang: string) => void)[] = [];
 
 let _isLangSwitch = false;
 
 export async function initI18n() {
   const saved = localStorage.getItem(STORAGE_KEY);
   const detected = navigator.language.slice(0, 2).toLowerCase();
-  currentLocale = SUPPORTED.includes(saved)
-    ? saved
-    : SUPPORTED.includes(detected)
-      ? detected
-      : "en";
+  currentLocale =
+    saved !== null && SUPPORTED.includes(saved)
+      ? saved
+      : SUPPORTED.includes(detected)
+        ? detected
+        : "en";
   await loadLocale(currentLocale);
 }
 
-async function loadLocale(lang) {
+async function loadLocale(lang: string) {
   try {
-    translations = await fetchJson(`/locales/${lang}.json`);
+    translations = await fetchJson<Record<string, string>>(`/locales/${lang}.json`);
     currentLocale = lang;
     document.documentElement.lang = lang;
   } catch (e) {
@@ -37,11 +38,11 @@ async function loadLocale(lang) {
 
 // Synchronous key lookup — call only after initI18n() resolves.
 // Falls back to the key name itself so missing strings are visible.
-export function t(key) {
+export function t(key: string) {
   return translations[key] ?? key;
 }
 
-export function animateI18nElement(el) {
+export function animateI18nElement(el: HTMLElement) {
   el.classList.remove("i18n-animate");
   void el.offsetWidth; // force reflow — restarts animation on repeated switches
   el.classList.add("i18n-animate");
@@ -53,13 +54,13 @@ export function getLocale() {
 
 // Walk [data-i18n] and [data-i18n-attr] nodes and apply current translations.
 export function applyTranslations(root = document) {
-  root.querySelectorAll("[data-i18n]").forEach((el) => {
-    el.innerHTML = t(el.dataset.i18n);
+  root.querySelectorAll<HTMLElement>("[data-i18n]").forEach((el) => {
+    el.innerHTML = t(el.dataset.i18n!);
 
     if (_isLangSwitch) animateI18nElement(el);
   });
-  root.querySelectorAll("[data-i18n-attr]").forEach((el) => {
-    el.dataset.i18nAttr.split(",").forEach((pair) => {
+  root.querySelectorAll<HTMLElement>("[data-i18n-attr]").forEach((el) => {
+    el.dataset.i18nAttr!.split(",").forEach((pair) => {
       const [attr, key] = pair.split(":");
       el.setAttribute(attr, t(key));
     });
@@ -68,11 +69,17 @@ export function applyTranslations(root = document) {
 
 // Register a callback to be invoked after every locale switch.
 // Components with JS-built DOM use this to retranslate in-place.
-export function onLanguageSwitch(cb) {
+export function onLanguageSwitch(cb: (lang: string) => void) {
   switchCallbacks.push(cb);
+
+  return () => {
+    const index = switchCallbacks.indexOf(cb);
+
+    if (index >= 0) switchCallbacks.splice(index, 1);
+  };
 }
 
-export async function setLocale(lang) {
+export async function setLocale(lang: string) {
   if (!SUPPORTED.includes(lang) || lang === currentLocale) return;
   await loadLocale(lang);
   localStorage.setItem(STORAGE_KEY, lang);

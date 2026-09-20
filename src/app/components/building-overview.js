@@ -1,7 +1,7 @@
-import { t } from "../i18n.js";
-import { escapeHtml } from "../utils/html.js";
-import { haptics, defaultPatterns } from "./haptics.js";
-import { getCampusBuildingsOverview } from "../available-rooms-script.js";
+import { t } from "../i18n.ts";
+import { escapeHtml } from "../utils/html.ts";
+import { haptics, defaultPatterns } from "./haptics.ts";
+import { getCampusBuildingsOverview } from "../available-rooms-script.ts";
 
 // The "zoom out" building overview.
 //

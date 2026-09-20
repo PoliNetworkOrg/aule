@@ -1,12 +1,12 @@
 // Search overlay — the bottom-nav search FAB opens this as a sheet over
 // whatever tab is currently showing, rather than switching to its own tab
 // page. It owns only the presentation/UX; the actual classroom text search
-// (data, index, card builders) lives in classroom-search-data.js.
+// (data, index, card builders) lives in classroom-search-data.ts.
 
-import { t, getLocale, onLanguageSwitch } from "../i18n.js";
-import { haptics, defaultPatterns } from "./haptics.js";
-import { escapeHtml, highlight } from "../utils/html.js";
-import { createTimeFormatter } from "../utils/time-format.js";
+import { t, getLocale, onLanguageSwitch } from "../i18n.ts";
+import { haptics, defaultPatterns } from "./haptics.ts";
+import { escapeHtml, highlight } from "../utils/html.ts";
+import { createTimeFormatter } from "../utils/time-format.ts";
 import {
   ensureSearchData,
   runClassroomSearch,
@@ -15,7 +15,7 @@ import {
   hasOccupationData,
   SEARCH_MAX_RESULTS,
   OCC_MAX_GROUPS,
-} from "../classroom-search-data.js";
+} from "../classroom-search-data.ts";
 
 const DEBOUNCE_MS = 200;
 

@@ -32,11 +32,11 @@ export function getFavouriteIds() {
   }
 }
 
-export function isFavourite(id) {
+export function isFavourite(id: string | number) {
   return getFavouriteIds().includes(Number(id));
 }
 
-function write(ids) {
+function write(ids: number[]) {
   try {
     localStorage.setItem(KEY, JSON.stringify(ids));
   } catch {
@@ -47,7 +47,7 @@ function write(ids) {
 }
 
 // Adds or removes the id. Returns the new favourited state (boolean).
-export function toggleFavourite(id) {
+export function toggleFavourite(id: string | number) {
   const num = Number(id);
   const ids = getFavouriteIds();
   const idx = ids.indexOf(num);
@@ -72,7 +72,7 @@ export function initFavouriteMarkers() {
   window.addEventListener("favourites-changed", () => {
     const favs = new Set(getFavouriteIds());
     document
-      .querySelectorAll(".classroom-card[data-fav-star][data-open-classroom]")
+      .querySelectorAll<HTMLElement>(".classroom-card[data-fav-star][data-open-classroom]")
       .forEach((card) => {
         const on = favs.has(Number(card.dataset.openClassroom));
         card.classList.toggle("classroom-card--fav", on);

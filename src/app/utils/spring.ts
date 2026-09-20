@@ -4,14 +4,15 @@
 
 const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-const springs = new Set();
+const springs = new Set<Spring>();
 
-const renderers = new Set();
+const renderers = new Set<() => void>();
 
-let rafId = null,
-  lastT = 0;
+let rafId: number | null = null;
 
-function loop(t) {
+let lastT = 0;
+
+function loop(t: number) {
   const dt = Math.min((t - lastT) / 1000, 0.064);
   lastT = t;
   let busy = false;
@@ -30,6 +31,13 @@ function wake() {
 }
 
 export class Spring {
+  value: number;
+  v: number;
+  target: number;
+  k: number;
+  c: number;
+  m: number;
+  resting: boolean;
   constructor(value = 0) {
     this.value = value;
     this.v = 0;
@@ -40,7 +48,7 @@ export class Spring {
     this.resting = true;
     springs.add(this);
   }
-  to(target, { stiffness = 300, damping = 30, mass = 1 } = {}) {
+  to(target: number, { stiffness = 300, damping = 30, mass = 1 } = {}) {
     if (reducedMotion) return this.set(target);
     this.target = target;
     this.k = stiffness;
@@ -49,7 +57,7 @@ export class Spring {
     this.resting = false;
     wake();
   }
-  set(value) {
+  set(value: number) {
     this.value = value;
     this.target = value;
     this.v = 0;
@@ -61,7 +69,7 @@ export class Spring {
     this.v = 0;
     this.resting = true;
   }
-  step(dt) {
+  step(dt: number) {
     if (this.resting) return false;
     const n = Math.max(1, Math.ceil(dt / 0.004));
     const h = dt / n;
@@ -85,7 +93,7 @@ export class Spring {
 // Registers a per-frame render callback, run alongside every spring's step()
 // while any spring in the whole module is active (there's one shared RAF
 // loop, not one per consumer).
-export function onSpringFrame(fn) {
+export function onSpringFrame(fn: () => void) {
   renderers.add(fn);
 
   return () => renderers.delete(fn);

@@ -1,11 +1,11 @@
-import { haptics, defaultPatterns } from "./haptics.js";
-import { t, getLocale, onLanguageSwitch } from "../i18n.js";
+import { haptics, defaultPatterns } from "./haptics.ts";
+import { t, getLocale, onLanguageSwitch } from "../i18n.ts";
 import {
   snapGeometry,
   morphGeometry,
   hideInnerBoxInstantly,
   unhideInnerBox,
-} from "../utils/flip-morph.js";
+} from "../utils/flip-morph.ts";
 
 // <date-chip-picker> is a thin wrapper around the sliding date picker
 // (components/date-picker.js), which stays completely untouched — its markup,

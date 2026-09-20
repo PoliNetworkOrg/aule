@@ -1,6 +1,6 @@
-import { getLocale } from "../i18n.js";
-import { haptics } from "./haptics.js";
-import { classroomsData } from "../available-rooms-script.js";
+import { getLocale } from "../i18n.ts";
+import { haptics } from "./haptics.ts";
+import { classroomsData } from "../available-rooms-script.ts";
 import { createPillSelector } from "./pill-selector.js";
 
 // Sets the allowed dates into the date picker,
