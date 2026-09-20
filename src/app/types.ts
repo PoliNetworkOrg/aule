@@ -35,6 +35,7 @@ export interface BuildingHours {
 }
 
 export interface Building<Room extends Classroom = Classroom> {
+  id?: string | number | null;
   name: string;
   altName?: string;
   lat?: number;

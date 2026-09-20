@@ -26,4 +26,6 @@ Each item depends on the preceding contracts and is complete only after its impl
 
 - The Campus sheet, building browser, floor groups, and map marker content now render in React. The sheet gestures, page transitions, Mapbox camera integration, and event contracts are checked TypeScript. Desktop/mobile comparisons and live map marker/recenter checks match the source.
 
-Steps 2 and 3 remain in progress. The React classroom card is used by search and favourites; availability still uses the legacy card builder. Other views and startup also remain on the legacy controllers. There are 5 frontend JavaScript modules left; `allowJs` remains enabled until they are converted. The complete frontend migration is not finished.
+- Availability sections, partial-free filtering, and the building overview now render in React. The overview keeps its original typed zoom and scroll geometry, and all classroom-card consumers now use the shared React component. Desktop/mobile comparisons match result ordering, query context, filters, overview counts, and Campus links.
+
+Step 3 remains in progress. Shared classroom cards now render in React across every view. Other views and startup also remain on the legacy controllers. There are 3 frontend JavaScript modules left; `allowJs` remains enabled until they are converted. The complete frontend migration is not finished.

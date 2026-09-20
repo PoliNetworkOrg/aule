@@ -39,25 +39,21 @@ import { initTimeControls } from "./components/time-controls-state.ts";
 import { setupCampusPicker } from "./components/campus-picker.tsx";
 import { initCampusMap } from "./components/campus-map.tsx";
 import { initCampusSheet } from "./components/campus-sheet.tsx";
-import { retranslateCampusBuildingsPage, goToBuilding } from "./components/campus-buildings.tsx";
-import { activateGroupTab } from "./components/bottom-nav.tsx";
+import { retranslateCampusBuildingsPage } from "./components/campus-buildings.tsx";
 import { setupDatePicker } from "./components/date-picker.tsx";
 import { initPickerDock } from "./components/picker-dock.ts";
 import { renderDataFetchStatus, setDataFetchReloading } from "./components/data-fetch-card";
 
 import { haptics, defaultPatterns } from "./components/haptics.ts";
-import { buildCardForClassroom } from "./components/classroom-list.js";
-import { buildingOverview } from "./components/building-overview.js";
+import { renderAvailableClassroomsResults } from "./components/available-results";
 import { initLiquidGlass } from "./components/liquid-glass.ts";
 import { initFavourites, renderFavourites } from "./components/favourites.tsx";
 
-import { initI18n, t, applyTranslations, onLanguageSwitch } from "./i18n.ts";
-import { escapeHtml } from "./utils/html.ts";
+import { initI18n, applyTranslations, onLanguageSwitch } from "./i18n.ts";
 import {
   initSettings,
   applyPreferredCampusIfEnabled,
   applyRememberLastCampusIfEnabled,
-  SHOW_PARTIAL_KEY,
   INTERVAL_HOURS_KEY,
   AUTO_SEARCH_KEY,
   LIVE_SEARCH_KEY,
@@ -269,110 +265,6 @@ document.querySelectorAll(".button-primary").forEach((btn) => {
 // ---------- TAB BAR ----------
 // Tab switching is owned by components/bottom-nav.js (the bottom pill nav).
 
-// ---------- BUILDING CARD ----------
-
-// Builds one building's section: a single <li class="building-section"> (its
-// own card grid) holding a sticky header followed by that building's room
-// cards, to append directly into the outer <ul>. Returns { node, cardIndex }
-// (the next cardIndex feeds the stagger-animation sequencing).
-function buildBuildingSection(
-  building,
-  rooms,
-  from,
-  to,
-  cardIndex = 0,
-  isToday = false,
-  date = null,
-  campusId = null,
-  allResults = [],
-) {
-  const buildingName = building.name;
-
-  const allPartial = rooms.every((r) => r.status === "partially-free");
-
-  // One <li> per building: its own card grid, so the sticky header stays
-  // confined to this section (see .building-section in classroom-list.css).
-  const section = document.createElement("li");
-  section.className = "building-section";
-  section.dataset.buildingName = buildingName;
-
-  if (building.id != null) section.dataset.buildingId = building.id;
-
-  if (allPartial) section.dataset.allPartial = "true";
-
-  const headerEl = document.createElement("div");
-  headerEl.className = "building-section-header";
-  headerEl.style.animationDelay = `${Math.min(cardIndex * 30, 300)}ms`;
-  headerEl.innerHTML = `
-    <button class="building-section-titles liquid-glass" type="button" aria-haspopup="dialog" aria-label="${escapeHtml(t("building.prefix"))} ${escapeHtml(buildingName)}">
-      <span class="building-name">${t("building.prefix")} ${escapeHtml(buildingName)}</span>
-      ${building.altName ? `<span class="building-alt-name">${escapeHtml(building.altName)}</span>` : ""}
-    </button>
-    <button class="header-button building-section-btn liquid-glass" type="button" aria-label="${escapeHtml(t("building.viewInCampus").replace("{name}", buildingName))}">
-      <i class="hgi-stroke hgi-arrow-right-01" aria-hidden="true"></i>
-    </button>
-  `;
-  cardIndex++;
-  section.appendChild(headerEl);
-
-  // Tapping the name pill "zooms out" into the building overview grid.
-  const titlesBtn = headerEl.querySelector(".building-section-titles");
-
-  const openOverview = () =>
-    buildingOverview.open({
-      campusId,
-      date,
-      from,
-      to,
-      results: allResults,
-      sourceSection: section,
-      buildingName,
-    });
-
-  let downAt = null;
-  titlesBtn.addEventListener("pointerdown", (e) => {
-    downAt = { x: e.clientX, y: e.clientY, t: performance.now() };
-    buildingOverview.prewarm(section);
-  });
-  // Open on pointerup, not click: iOS Safari swallows the click when the tap
-  // lands while the page is still rubber-banding from a scroll (very easy to
-  // hit when you've just scrolled to the bottom of the list), and the shared
-  // liquid-glass handler eats it after a few px of finger travel. A short,
-  // near-stationary press is a tap. open() is a no-op if one already ran.
-  titlesBtn.addEventListener("pointerup", (e) => {
-    if (!downAt) return;
-    const moved = Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y);
-    const held = performance.now() - downAt.t;
-    downAt = null;
-
-    if (moved <= 12 && held < 700) openOverview();
-  });
-  // Fallback for keyboard / assistive-tech activation, which fires click only.
-  titlesBtn.addEventListener("click", openOverview);
-
-  // Jumps straight to this building's detail page in the Campus tab — see
-  // components/campus-buildings.js's goToBuilding(), which brings the picker
-  // along to the right campus first if needed.
-  headerEl.querySelector(".building-section-btn").addEventListener("click", () => {
-    haptics.trigger(defaultPatterns.light);
-    activateGroupTab("search-classrooms-container");
-    goToBuilding(campusId, buildingName);
-  });
-
-  rooms.forEach((room) => {
-    const roomItem = document.createElement("div");
-    roomItem.className = "classroom-list-item-container";
-    roomItem.dataset.status = room.status;
-    const cardEl = buildCardForClassroom(room, building, from, to, isToday, date, "", true);
-    cardEl.style.animationDelay = `${Math.min(cardIndex * 30, 300)}ms`;
-    roomItem.appendChild(cardEl);
-    section.appendChild(roomItem);
-    cardIndex++;
-  });
-
-  return { node: section, cardIndex };
-}
-
 // ---------- DATA FETCHING ----------
 
 // Triggers the fetching of data as soon as the page loads
@@ -541,95 +433,6 @@ document.getElementById("available-classrooms-form").addEventListener("submit", 
   // Render results
   renderAvailableClassroomsResults(results, date, from, to, campus);
 });
-
-// Builds the UI to show the results of the 'Available Classrooms' form submission,
-function renderAvailableClassroomsResults(results, date, from, to, campusId = null) {
-  const container = document.getElementById("available-classrooms-results");
-  buildingOverview.reset(); // tear down the zoom-out view if it's open
-  container.dataset.searched = "true";
-  container.innerHTML = ""; // Clear previous results
-
-  // Find the day entry matching the selected date
-
-  if (results.length === 0) {
-    renderNoResultsClassroomsContainer(container);
-
-    return;
-  }
-
-  container.classList.remove("empty");
-
-  // Filter row (rendered only when partial-free filter is needed)
-  const filterRow = document.createElement("div");
-  filterRow.className = "results-filter-row";
-
-  // Partial-free filter toggle — initial state driven by Show Partially Free setting
-  const showPartialSaved = localStorage.getItem(SHOW_PARTIAL_KEY);
-  const showPartialDefault = showPartialSaved === null ? true : showPartialSaved === "true";
-  const hasPartial = results.some((b) => b.rooms.some((r) => r.status === "partially-free"));
-
-  if (hasPartial) {
-    const toggleBtn = document.createElement("button");
-    toggleBtn.className = showPartialDefault ? "results-filter-btn active" : "results-filter-btn";
-    toggleBtn.innerHTML = `<i class="hgi-stroke hgi-filter" aria-hidden="true"></i> ${t("results.filterPartial")}`;
-
-    if (!showPartialDefault) container.classList.add("hide-partial");
-    toggleBtn.addEventListener("click", () => {
-      haptics.trigger(defaultPatterns.light);
-      const isActive = toggleBtn.classList.toggle("active");
-      container.classList.toggle("hide-partial", !isActive);
-    });
-    filterRow.appendChild(toggleBtn);
-    container.appendChild(filterRow);
-  }
-
-  const list = document.createElement("ul");
-  list.className = "list-outer-container";
-
-  const today = new Date();
-  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-  const isToday = date === todayStr;
-
-  let cardIndex = 0;
-  results.forEach((buildingResult) => {
-    const { node, cardIndex: next } = buildBuildingSection(
-      buildingResult.building,
-      buildingResult.rooms,
-      from,
-      to,
-      cardIndex,
-      isToday,
-      date,
-      campusId,
-      results,
-    );
-
-    cardIndex = next;
-    list.appendChild(node);
-  });
-
-  container.appendChild(list);
-
-  // Mark the list as appeared after the staggered animation finishes.
-  // This avoids re-triggering the animation when returning from the details page
-  // or switching back and forth between tabs.
-  requestAnimationFrame(() => {
-    setTimeout(() => {
-      list.classList.add("appeared");
-    }, 800);
-  });
-}
-
-// Render the error state for the Available Classrooms results container
-function renderNoResultsClassroomsContainer(container) {
-  container.classList.add("empty");
-
-  container.innerHTML = `
-    <i class="hgi-stroke hgi-search-remove empty-container-icon" aria-hidden="true"></i>
-    <p class="empty-container-title">${t("results.noResultsTitle")}</p>
-    <p class="empty-container-subtitle">${t("results.noResultsSubtitle")}</p>
-  `;
-}
 
 const TIME_MIN_MINS = 7 * 60 + 15; // 07:15
 

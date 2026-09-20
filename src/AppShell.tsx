@@ -1,3 +1,4 @@
+import { AvailableResults } from "./app/components/available-results";
 import { CampusMap } from "./app/components/campus-map";
 import { CampusSheet } from "./app/components/campus-sheet";
 import { DataFetchCard } from "./app/components/data-fetch-card";
@@ -122,15 +123,7 @@ export function AppShell() {
             </div>
           </form>
 
-          <div id="available-classrooms-results" className="available-classrooms-container empty">
-            <i className="hgi-stroke hgi-search-01 empty-container-icon" aria-hidden="true"></i>
-            <p className="empty-container-title" data-i18n="results.emptyTitle">
-              Need a classroom?
-            </p>
-            <p className="empty-container-subtitle" data-i18n="results.emptySubtitle">
-              Tell me when you need it and I’ll show you what’s available
-            </p>
-          </div>
+          <AvailableResults />
         </div>
 
         <div id="search-classrooms-container" className="tab-content">

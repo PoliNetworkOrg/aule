@@ -89,7 +89,8 @@
           "classroom-card--plain",
           "data-status-description",
           "data-status-time",
-          "data-reload-label"
+          "data-reload-label",
+          "bo-count-label"
         ]
       }
     ],

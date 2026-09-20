@@ -1,5 +1,31 @@
 import { t } from "../i18n.ts";
-import { escapeHtml } from "../utils/html.ts";
+import { useRef } from "react";
+import { createRoot, type Root } from "react-dom/client";
+import { flushSync } from "react-dom";
+import type { findAvailableClassrooms } from "../available-rooms-script";
+
+type BuildingCount = ReturnType<typeof getCampusBuildingsOverview>[number];
+
+export interface OverviewContext {
+  campusId: string;
+  date: string;
+  from: string;
+  to: string;
+  results: ReturnType<typeof findAvailableClassrooms>;
+}
+
+interface OverviewRequest extends OverviewContext {
+  sourceSection: HTMLElement;
+  buildingName: string;
+}
+
+interface AnchorRect {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
 import { haptics, defaultPatterns } from "./haptics.ts";
 import { getCampusBuildingsOverview } from "../available-rooms-script.ts";
 
@@ -34,10 +60,10 @@ const SPRING_WT = 7.6;
 const spring = (() => {
   const end = 1 - (1 + SPRING_WT) * Math.exp(-SPRING_WT);
 
-  return (p) => (1 - (1 + SPRING_WT * p) * Math.exp(-SPRING_WT * p)) / end;
+  return (p: number) => (1 - (1 + SPRING_WT * p) * Math.exp(-SPRING_WT * p)) / end;
 })();
 
-const smooth = (x, a, b) => {
+const smooth = (x: number, a: number, b: number) => {
   const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
 
   return t * t * (3 - 2 * t);
@@ -52,7 +78,7 @@ const KEYFRAMES = 60;
 
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
-const STATUS_META = [
+const STATUS_META: { key: keyof BuildingCount["counts"]; i18n: string; cls: string }[] = [
   { key: "free", i18n: "status.free", cls: "free" },
   { key: "partially-free", i18n: "status.partiallyFree", cls: "partially-free" },
   { key: "occupied", i18n: "status.occupied", cls: "occupied" },
@@ -60,19 +86,19 @@ const STATUS_META = [
 
 const LAYER_PROPS = [
   "position",
-  "insetInline",
+  "inset-inline",
   "top",
-  "zIndex",
-  "transformOrigin",
-  "willChange",
+  "z-index",
+  "transform-origin",
+  "will-change",
   "opacity",
-  "pointerEvents",
+  "pointer-events",
 ];
 
-function clearLayer(el) {
+function clearLayer(el: HTMLElement | null) {
   if (!el) return;
 
-  for (const p of LAYER_PROPS) el.style[p] = "";
+  for (const p of LAYER_PROPS) el.style.removeProperty(p);
 }
 
 // Where a scrollable area's "top" is on screen, and how to scroll it, for the
@@ -80,7 +106,7 @@ function clearLayer(el) {
 // self-scrolling results panel (desktop ≥1100px). "visibleTop" is the client-y
 // a stuck building header parks at — i.e. where a section's top should sit to
 // read as "scrolled to this building".
-function scrollerFor(container, stickyTop) {
+function scrollerFor(container: HTMLElement, stickyTop: number) {
   const selfScrolls = /auto|scroll/.test(getComputedStyle(container).overflowY);
 
   if (selfScrolls) {
@@ -88,7 +114,7 @@ function scrollerFor(container, stickyTop) {
       visibleTop: () => container.getBoundingClientRect().top + container.clientTop + stickyTop,
       visibleBottom: () =>
         container.getBoundingClientRect().top + container.clientTop + container.clientHeight,
-      scrollBy: (dy) => container.scrollBy({ top: dy, behavior: "instant" }),
+      scrollBy: (dy: number) => container.scrollBy({ top: dy, behavior: "instant" }),
       contentHeight: () => container.scrollHeight,
     };
   }
@@ -98,35 +124,47 @@ function scrollerFor(container, stickyTop) {
     visibleBottom: () => window.innerHeight,
     // The page has `scroll-behavior: smooth` — every scroll here has to be
     // explicitly instant or it turns into a visible glide.
-    scrollBy: (dy) => window.scrollBy({ top: dy, behavior: "instant" }),
+    scrollBy: (dy: number) => window.scrollBy({ top: dy, behavior: "instant" }),
     contentHeight: () => document.documentElement.scrollHeight,
   };
 }
 
 class BuildingOverview {
   #phase = "idle"; // 'idle' | 'opening' | 'open' | 'closing'
-  #ctx = null;
-  #container = null; // #available-classrooms-results
-  #filterRow = null;
-  #list = null; // ul.list-outer-container (moved into #stage while open)
-  #stage = null; // .bo-stage — the clipped frame holding list + grid
-  #grid = null;
-  #scroller = null;
-  #sourceName = null;
-  #pendingNavName = null;
+  #ctx: OverviewContext | null = null;
+  #container: HTMLElement | null = null; // #available-classrooms-results
+  #filterRow: HTMLElement | null = null;
+  #list: HTMLElement | null = null; // ul.list-outer-container (moved into #stage while open)
+  #stage: HTMLElement | null = null; // .bo-stage — the clipped frame holding list + grid
+  #grid: HTMLElement | null = null;
+  #scroller: ReturnType<typeof scrollerFor> | null = null;
+  #sourceName: string | null = null;
+  #pendingNavName: string | null = null;
   #listTop0 = 0; // the list's client top when we opened (what × restores)
-  #anims = [];
-  #onKey = null;
+  #anims: Animation[] = [];
+  #onKey: ((event: KeyboardEvent) => void) | null = null;
+  #gridRoot: Root | null = null;
+  #timers = new Set<number>();
+  #later(callback: () => void, delay: number) {
+    const id = window.setTimeout(() => {
+      this.#timers.delete(id);
+      callback();
+    }, delay);
+
+    this.#timers.add(id);
+
+    return id;
+  }
 
   // ── Public ────────────────────────────────────────────────────────
 
   // Call on pointer-down on a name pill: promotes the list to its own
   // compositor layer so its first rasterisation happens during the press,
   // not on the zoom's first frame. Undone if no open() follows.
-  prewarm(sourceSection) {
+  prewarm(sourceSection: HTMLElement) {
     if (this.#phase !== "idle") return;
-    const container = sourceSection?.closest("#available-classrooms-results");
-    const list = container?.querySelector(".list-outer-container");
+    const container = sourceSection?.closest<HTMLElement>("#available-classrooms-results");
+    const list = container?.querySelector<HTMLElement>(".list-outer-container");
 
     if (!container || !list) return;
     // Scoping the sections here too (open() repeats it, idempotently) means
@@ -138,7 +176,7 @@ class BuildingOverview {
     this.#scopeSections(sourceSection);
     list.style.willChange = "transform";
     clearTimeout(this.#prewarmTimer);
-    this.#prewarmTimer = setTimeout(() => {
+    this.#prewarmTimer = this.#later(() => {
       if (this.#phase === "idle") {
         this.#unscopeSections();
         list.style.willChange = "";
@@ -155,7 +193,7 @@ class BuildingOverview {
   // rasterised.
   prewarmClose(targetName = this.#sourceName) {
     if (this.#phase !== "open") return;
-    const list = this.#list;
+    const list = this.#list!;
     list.style.display = "";
     list.style.opacity = "0.01";
     list.style.zIndex = "1";
@@ -169,7 +207,7 @@ class BuildingOverview {
       if (this.#phase === "open") this.#scopeSections(this.#sectionFor(targetName));
     });
     clearTimeout(this.#prewarmTimer);
-    this.#prewarmTimer = setTimeout(() => {
+    this.#prewarmTimer = this.#later(() => {
       if (this.#phase === "open") {
         list.style.display = "none";
         list.style.opacity = "";
@@ -179,10 +217,10 @@ class BuildingOverview {
   }
   #prewarmRaf = 0;
 
-  open({ campusId, date, from, to, results, sourceSection, buildingName }) {
+  open({ campusId, date, from, to, results, sourceSection, buildingName }: OverviewRequest) {
     if (this.#phase !== "idle") return;
-    const container = sourceSection?.closest("#available-classrooms-results");
-    const list = container?.querySelector(".list-outer-container");
+    const container = sourceSection?.closest<HTMLElement>("#available-classrooms-results");
+    const list = container?.querySelector<HTMLElement>(".list-outer-container");
 
     if (!container || !list) return;
 
@@ -200,7 +238,7 @@ class BuildingOverview {
       if (e.key === "Escape") this.close();
     };
 
-    document.addEventListener("keydown", this.#onKey);
+    document.addEventListener("keydown", this.#onKey!);
 
     // Decide which sections take part BEFORE measuring anything: forcing a
     // never-rendered section to render swaps its placeholder size for its
@@ -208,11 +246,11 @@ class BuildingOverview {
     this.#scopeSections(sourceSection);
 
     // Measure the anchor and the list's place on screen BEFORE touching the DOM.
-    const visibleTop = this.#scroller.visibleTop();
+    const visibleTop = this.#scroller!.visibleTop();
     const from_ = this.#anchorRect(sourceSection, visibleTop);
     this.#listTop0 = list.getBoundingClientRect().top;
     this.#openViewport = this.#viewportKey();
-    const docHeight0 = this.#scroller.contentHeight();
+    const docHeight0 = this.#scroller!.contentHeight();
 
     // A dedicated stage — a positioned, clipped frame we fully control — takes
     // the list's place. The results container's own (sticky, grid-placed,
@@ -234,7 +272,7 @@ class BuildingOverview {
 
     // Keep the frame at least a screen tall while the overview is up, so the
     // scroller always has enough room to park the frame at the top.
-    stage.style.minHeight = `${this.#scroller.visibleBottom() - visibleTop}px`;
+    stage.style.minHeight = `${this.#scroller!.visibleBottom() - visibleTop}px`;
 
     // Grid in flow (it sizes the stage), list re-parked on top of where it was.
     // Then scroll the grid so the building we're zooming out of lands where its
@@ -258,9 +296,9 @@ class BuildingOverview {
 
         if (!card) return;
         const want = card.getBoundingClientRect().top - anchorTop;
-        const viewportH = this.#scroller.visibleBottom() - this.#scroller.visibleTop();
-        const maxDown = Math.max(0, this.#grid.getBoundingClientRect().height - viewportH);
-        this.#scroller.scrollBy(want < 0 ? want : Math.min(want, maxDown));
+        const viewportH = this.#scroller!.visibleBottom() - this.#scroller!.visibleTop();
+        const maxDown = Math.max(0, this.#grid!.getBoundingClientRect().height - viewportH);
+        this.#scroller!.scrollBy(want < 0 ? want : Math.min(want, maxDown));
       },
       docHeight0,
     );
@@ -275,7 +313,7 @@ class BuildingOverview {
     }
 
     const fromRect = from_ ?? this.#stageVisibleRect(visibleTop);
-    this.#zoom({ outgoing: this.#list, incoming: this.#grid, from: fromRect, to: to_ }).then(
+    this.#zoom({ outgoing: this.#list!, incoming: this.#grid!, from: fromRect, to: to_ }).then(
       (done) => {
         if (done) this.#settleOpen();
       },
@@ -290,19 +328,19 @@ class BuildingOverview {
 
     clearTimeout(this.#prewarmTimer);
     cancelAnimationFrame(this.#prewarmRaf);
-    document.removeEventListener("keydown", this.#onKey);
+    document.removeEventListener("keydown", this.#onKey!);
     this.#onKey = null;
     haptics.trigger(defaultPatterns.light);
 
     const targetName = this.#pendingNavName || this.#sourceName;
-    const { list, grid } = { list: this.#list, grid: this.#grid };
-    const container = this.#container;
-    const docHeight0 = this.#scroller.contentHeight();
+    const { list, grid } = { list: this.#list!, grid: this.#grid! };
+    const container = this.#container!;
+    const docHeight0 = this.#scroller!.contentHeight();
 
     container.classList.add("bo-animating");
 
     if (this.#filterRow) this.#filterRow.hidden = false;
-    this.#stage.style.minHeight = "";
+    this.#stage!.style.minHeight = "";
 
     // The card we're zooming into, where it is on screen right now.
     const heroCard = this.#cardFor(targetName);
@@ -319,9 +357,9 @@ class BuildingOverview {
     // The list has to be rendered for the sticky `top` to resolve to px.
     this.#scroller = scrollerFor(
       container,
-      this.#stickyTop(section ?? list.querySelector(".building-section")),
+      this.#stickyTop(section ?? list.querySelector<HTMLElement>(".building-section")),
     );
-    const visibleTop = this.#scroller.visibleTop();
+    const visibleTop = this.#scroller!.visibleTop();
     this.#scopeSections(section); // before measuring — see open()
 
     // Navigating means the user picked a different building than the one they
@@ -337,9 +375,9 @@ class BuildingOverview {
 
     const settle = () => {
       if (navigating) {
-        this.#scroller.scrollBy(section.getBoundingClientRect().top - visibleTop);
+        this.#scroller!.scrollBy(section.getBoundingClientRect().top - visibleTop);
       } else {
-        this.#scroller.scrollBy(list.getBoundingClientRect().top - this.#listTop0);
+        this.#scroller!.scrollBy(list.getBoundingClientRect().top - this.#listTop0);
       }
     };
 
@@ -365,7 +403,7 @@ class BuildingOverview {
     if (this.#phase === "idle") return;
     this.#cancelAnims();
 
-    if (this.#onKey) document.removeEventListener("keydown", this.#onKey);
+    if (this.#onKey) document.removeEventListener("keydown", this.#onKey!);
     this.#onKey = null;
     this.#teardown();
   }
@@ -378,8 +416,14 @@ class BuildingOverview {
   // Everything happens before the next paint, so on screen the outgoing layer
   // hasn't moved and the scroll change is invisible — the incoming layer is
   // the only thing that "appears", and the zoom animates it in.
-  #swapIn(incoming, outgoing, outgoingTop0, settle = () => {}, heightBefore = 0) {
-    const stage = this.#stage;
+  #swapIn(
+    incoming: HTMLElement,
+    outgoing: HTMLElement,
+    outgoingTop0: number,
+    settle = () => {},
+    heightBefore = 0,
+  ) {
+    const stage = this.#stage!;
     clearLayer(incoming);
     incoming.style.position = "relative";
     incoming.style.zIndex = "2";
@@ -394,7 +438,7 @@ class BuildingOverview {
     // onto the stage so the scroll position is preserved; #settleOpen /
     // #teardown release it once nothing is animating.
     if (heightBefore) {
-      const deficit = heightBefore - this.#scroller.contentHeight();
+      const deficit = heightBefore - this.#scroller!.contentHeight();
 
       if (deficit > 0) {
         const cur = parseFloat(stage.style.minHeight) || 0;
@@ -403,7 +447,7 @@ class BuildingOverview {
     }
 
     // Default: bring the frame's top to the visible top.
-    this.#scroller.scrollBy(stage.getBoundingClientRect().top - this.#scroller.visibleTop());
+    this.#scroller!.scrollBy(stage.getBoundingClientRect().top - this.#scroller!.visibleTop());
     settle();
 
     outgoing.style.top = `${outgoingTop0 - stage.getBoundingClientRect().top}px`;
@@ -413,11 +457,21 @@ class BuildingOverview {
   // starts blown up by the inverse so that `to` sits on `from`, then settles.
   // One shared anchor, one shared easing — it reads as a single camera move.
   // Resolves true when it ran to completion, false if cancelled/reversed.
-  #zoom({ outgoing, incoming, from, to }) {
+  #zoom({
+    outgoing,
+    incoming,
+    from,
+    to,
+  }: {
+    outgoing: HTMLElement;
+    incoming: HTMLElement;
+    from: AnchorRect;
+    to: AnchorRect;
+  }) {
     const k = to.width / from.width;
     const outRect = outgoing.getBoundingClientRect();
     const inRect = incoming.getBoundingClientRect();
-    const stageRect = this.#stage.getBoundingClientRect();
+    const stageRect = this.#stage!.getBoundingClientRect();
 
     outgoing.style.transformOrigin = `${from.left - outRect.left}px ${from.top - outRect.top}px`;
     incoming.style.transformOrigin = `${to.left - inRect.left}px ${to.top - inRect.top}px`;
@@ -483,7 +537,7 @@ class BuildingOverview {
       });
     }
 
-    const opts = { duration: DUR, easing: "linear", fill: "both" };
+    const opts: KeyframeAnimationOptions = { duration: DUR, easing: "linear", fill: "both" };
     const anims = [outgoing.animate(outFrames, opts), incoming.animate(inFrames, opts)];
     this.#anims = anims;
 
@@ -492,10 +546,10 @@ class BuildingOverview {
     // phase has moved on and the caller must not settle.
     const phase = this.#phase;
 
-    return new Promise((resolve) => {
+    return new Promise<boolean>((resolve) => {
       let settled = false;
 
-      const finish = (ok) => {
+      const finish = (ok: boolean) => {
         if (!settled) {
           settled = true;
           resolve(ok);
@@ -509,7 +563,7 @@ class BuildingOverview {
       // Backstop: iOS Safari sometimes never resolves `.finished` for a
       // composited animation, which would strand the view mid-morph (class,
       // clip and phase never cleaned up). Settle on our own clock if so.
-      setTimeout(() => finish(this.#phase === phase), DUR + 150);
+      this.#later(() => finish(this.#phase === phase), DUR + 150);
     });
   }
 
@@ -520,7 +574,7 @@ class BuildingOverview {
     if (!this.#anims.length) return;
     this.#phase = "closing";
 
-    document.removeEventListener("keydown", this.#onKey);
+    document.removeEventListener("keydown", this.#onKey!);
     this.#onKey = null;
     haptics.trigger(defaultPatterns.light);
 
@@ -533,18 +587,24 @@ class BuildingOverview {
     // are leaving stays fully opaque almost the whole way and then snaps. Drive
     // the opacity ourselves with a plain linear cross-fade over the time that's
     // actually left (a reversed animation runs from `currentTime` back to 0).
-    const left = Math.max(120, anims[0].currentTime ?? DUR);
-    const fade = { duration: left, easing: "linear", fill: "both" };
+    const left = Math.max(120, Number(anims[0].currentTime ?? DUR));
+    const fade: KeyframeAnimationOptions = { duration: left, easing: "linear", fill: "both" };
     this.#anims.push(
-      this.#grid.animate([{ opacity: getComputedStyle(this.#grid).opacity }, { opacity: 0 }], fade),
-      this.#list.animate([{ opacity: getComputedStyle(this.#list).opacity }, { opacity: 1 }], fade),
+      this.#grid!.animate(
+        [{ opacity: getComputedStyle(this.#grid!).opacity }, { opacity: 0 }],
+        fade,
+      ),
+      this.#list!.animate(
+        [{ opacity: getComputedStyle(this.#list!).opacity }, { opacity: 1 }],
+        fade,
+      ),
     );
 
     Promise.all(anims.map((a) => a.finished)).then(
       () => {
         // Both layers are back at rest; put the list back into flow and cancel
         // the scroll shift that #swapIn made on open, all before the next paint.
-        const listTop = this.#list.getBoundingClientRect().top;
+        const listTop = this.#list!.getBoundingClientRect().top;
         this.#teardown({ restoreListTop: listTop });
       },
       () => {},
@@ -569,10 +629,10 @@ class BuildingOverview {
   // list-relative (no transforms are applied at this point), so it holds
   // whatever the scroll position. The smallest scale isn't known yet when
   // opening (the grid doesn't exist), so a conservative estimate is used.
-  #scopeSections(anchorSection) {
-    const list = this.#list;
+  #scopeSections(anchorSection: HTMLElement | null) {
+    const list = this.#list!;
     const listTop = list.getBoundingClientRect().top;
-    const reach = ((this.#scroller.visibleBottom() - this.#scroller.visibleTop()) / 0.4) * 1.1;
+    const reach = ((this.#scroller!.visibleBottom() - this.#scroller!.visibleTop()) / 0.4) * 1.1;
     let lo, hi;
 
     if (anchorSection) {
@@ -580,7 +640,7 @@ class BuildingOverview {
       lo = a.top - listTop - reach;
       hi = a.bottom - listTop + reach;
     } else {
-      const v = this.#scroller.visibleTop() - listTop;
+      const v = this.#scroller!.visibleTop() - listTop;
       lo = v - reach;
       hi = v + reach;
     }
@@ -600,23 +660,23 @@ class BuildingOverview {
   #settleOpen() {
     this.#cancelAnims();
     this.#unscopeSections();
-    this.#list.style.display = "none";
+    this.#list!.style.display = "none";
     clearLayer(this.#grid);
-    this.#grid.style.position = "relative";
-    this.#grid.style.zIndex = "2"; // above the parked list, always
+    this.#grid!.style.position = "relative";
+    this.#grid!.style.zIndex = "2"; // above the parked list, always
 
     // Drop the anti-clamp padding #swapIn may have added for the zoom, back to
     // the plain one-screen minimum — keeping the grid where it sits on screen
     // as the scroller shrinks (the browser clamps it up if the grid is short).
-    const gridTop = this.#grid.getBoundingClientRect().top;
-    this.#stage.style.minHeight = `${this.#scroller.visibleBottom() - this.#scroller.visibleTop()}px`;
-    this.#scroller.scrollBy(this.#grid.getBoundingClientRect().top - gridTop);
+    const gridTop = this.#grid!.getBoundingClientRect().top;
+    this.#stage!.style.minHeight = `${this.#scroller!.visibleBottom() - this.#scroller!.visibleTop()}px`;
+    this.#scroller!.scrollBy(this.#grid!.getBoundingClientRect().top - gridTop);
 
-    this.#container.classList.remove("bo-animating");
+    this.#container!.classList.remove("bo-animating");
     this.#phase = "open";
   }
 
-  #teardown({ restoreListTop = null } = {}) {
+  #teardown({ restoreListTop = null }: { restoreListTop?: number | null } = {}) {
     this.#cancelAnims();
     // Ease the cards' tight morph shadow back to the resting 40px one as
     // #unscopeSections drops .bo-onstage, rather than snapping it in. (The
@@ -625,13 +685,13 @@ class BuildingOverview {
     this.#unscopeSections();
 
     const { list, stage, container, grid } = {
-      list: this.#list,
-      stage: this.#stage,
-      container: this.#container,
-      grid: this.#grid,
+      list: this.#list!,
+      stage: this.#stage!,
+      container: this.#container!,
+      grid: this.#grid!,
     };
 
-    if (container) setTimeout(() => container.classList.remove("bo-restore"), 450);
+    if (container) this.#later(() => container.classList.remove("bo-restore"), 450);
 
     // Where the list sits on screen right now — used to hold it still across
     // the stage removal when the caller didn't ask for a specific target.
@@ -646,6 +706,9 @@ class BuildingOverview {
       if (stage?.parentNode === container) container.insertBefore(list, stage);
     }
 
+    const root = this.#gridRoot;
+    this.#gridRoot = null;
+    queueMicrotask(() => root?.unmount());
     grid?.remove();
     stage?.remove();
 
@@ -655,7 +718,7 @@ class BuildingOverview {
     const target = restoreListTop ?? listTopNow;
 
     if (target != null && list && this.#scroller) {
-      this.#scroller.scrollBy(list.getBoundingClientRect().top - target);
+      this.#scroller!.scrollBy(list.getBoundingClientRect().top - target);
     }
 
     this.#stage = null;
@@ -672,7 +735,7 @@ class BuildingOverview {
   // actually visible: when its header is stuck the section itself starts
   // above the fold, and what should shrink into the card is the part you're
   // looking at — with the stuck pill landing on the card's title.
-  #anchorRect(section, visibleTop) {
+  #anchorRect(section: HTMLElement | null, visibleTop: number) {
     if (!section) return null;
     const r = section.getBoundingClientRect();
 
@@ -689,8 +752,8 @@ class BuildingOverview {
 
   // The part of the stage that's on screen (its top starts at visibleTop once
   // #swapIn has parked it there) — the generic anchor when there's no section.
-  #stageVisibleRect(visibleTop) {
-    const r = this.#stage.getBoundingClientRect();
+  #stageVisibleRect(visibleTop: number) {
+    const r = this.#stage!.getBoundingClientRect();
     const top = Math.max(r.top, visibleTop);
 
     return { left: r.left, top, width: r.width, height: Math.max(1, r.bottom - top) };
@@ -699,27 +762,32 @@ class BuildingOverview {
   // Client-y a stuck building header parks at (the used `top` of the sticky
   // header — header height + picker bar + margins, or 1rem inside the panel
   // on desktop).
-  #stickyTop(section) {
+  #stickyTop(section: HTMLElement | null) {
     const header = section?.querySelector(".building-section-header");
     const px = header ? parseFloat(getComputedStyle(header).top) : NaN;
 
     return Number.isFinite(px) ? px : 80;
   }
 
-  #sectionFor(name) {
+  #sectionFor(name: string | null) {
     return (
-      this.#list?.querySelector(`.building-section[data-building-name="${CSS.escape(name)}"]`) ??
-      null
+      this.#list?.querySelector<HTMLElement>(
+        `.building-section[data-building-name="${CSS.escape(name ?? "")}"]`,
+      ) ?? null
     );
   }
 
-  #cardFor(name) {
-    return this.#grid?.querySelector(`.bo-card[data-building-name="${CSS.escape(name)}"]`) ?? null;
+  #cardFor(name: string | null) {
+    return (
+      this.#grid?.querySelector<HTMLElement>(
+        `.bo-card[data-building-name="${CSS.escape(name ?? "")}"]`,
+      ) ?? null
+    );
   }
 
   // ── Grid / cards ──────────────────────────────────────────────────
   #buildGrid() {
-    const { campusId, date, from, to, results } = this.#ctx;
+    const { campusId, date, from, to, results } = this.#ctx!;
 
     const active = new Set(
       (results ?? [])
@@ -730,94 +798,138 @@ class BuildingOverview {
     const grid = document.createElement("div");
     grid.className = "bo-grid";
 
-    const bar = document.createElement("div");
-    bar.className = "bo-topbar";
-    bar.innerHTML = `
-      <h3 class="bo-title">${escapeHtml(t("overview.title"))}</h3>
-      <button class="bo-close liquid-glass" type="button" aria-label="${escapeHtml(t("overview.close"))}">
-        <i class="hgi-stroke hgi-cancel-01" aria-hidden="true"></i>
-      </button>
-    `;
-    const closeBtn = bar.querySelector(".bo-close");
-    closeBtn.addEventListener("pointerdown", () => this.prewarmClose());
-    closeBtn.addEventListener("click", () => this.close());
-    grid.appendChild(bar);
-
-    for (const { building, counts } of getCampusBuildingsOverview(campusId, date, from, to)) {
-      grid.appendChild(this.#buildCard(building, counts, active.has(building.name)));
-    }
+    this.#gridRoot = createRoot(grid);
+    flushSync(() =>
+      this.#gridRoot?.render(
+        <>
+          <div className="bo-topbar">
+            <h3 className="bo-title">{t("overview.title")}</h3>
+            <button
+              className="bo-close liquid-glass"
+              type="button"
+              aria-label={t("overview.close")}
+              onPointerDown={() => this.prewarmClose()}
+              onClick={() => this.close()}
+            >
+              <i className="hgi-stroke hgi-cancel-01" aria-hidden="true" />
+            </button>
+          </div>
+          {getCampusBuildingsOverview(campusId, date, from, to).map(({ building, counts }) => (
+            <OverviewCard
+              key={building.name}
+              building={building}
+              counts={counts}
+              active={active.has(building.name)}
+              prewarm={() => this.prewarmClose(building.name)}
+              go={() => {
+                this.#pendingNavName = building.name;
+                this.close();
+              }}
+            />
+          ))}
+        </>,
+      ),
+    );
 
     return grid;
   }
-
-  #buildCard(building, counts, isActive) {
-    const total = STATUS_META.reduce((n, s) => n + (counts[s.key] || 0), 0);
-
-    const card = document.createElement("div");
-    card.className = "bo-card" + (isActive ? "" : " bo-card--inactive");
-    card.dataset.buildingName = building.name;
-
-    const countsHtml = STATUS_META.map((s) => {
-      const n = counts[s.key] || 0;
-
-      return `<span class="bo-count ${s.cls}${n === 0 ? " is-zero" : ""}">
-                <b>${n}</b><span class="bo-count-label">${escapeHtml(t(s.i18n))}</span>
-              </span>`;
-    }).join("");
-
-    card.innerHTML = `
-      <div class="bo-card-body">
-        <div class="bo-card-head">
-          <span class="bo-card-name">${escapeHtml(t("building.prefix"))} ${escapeHtml(building.name)}</span>
-          ${building.altName ? `<span class="bo-card-alt">${escapeHtml(building.altName)}</span>` : ""}
-          <span class="bo-card-total secondary">${escapeHtml(t("overview.subtitle").replace("{n}", total))}</span>
-        </div>
-        <div class="bo-card-counts">${countsHtml}</div>
-      </div>
-    `;
-
-    if (isActive) {
-      card.setAttribute("role", "button");
-      card.setAttribute("tabindex", "0");
-      card.setAttribute("aria-label", `${t("building.prefix")} ${building.name}`);
-
-      const go = () => {
-        this.#pendingNavName = building.name;
-        this.close();
-      };
-
-      // Navigate on pointerup, not click. prewarmClose reveals the parked list
-      // and forces layout on it during pointerdown; on iOS Safari that jitters
-      // the gesture enough that the synthetic click never arrives, so the first
-      // tap only played the :active scale. pointerup is a real event and always
-      // fires. click stays for keyboard / assistive-tech; close() is idempotent.
-      let downAt = null;
-      card.addEventListener("pointerdown", (e) => {
-        downAt = { x: e.clientX, y: e.clientY, t: performance.now() };
-        this.prewarmClose(building.name);
-      });
-      card.addEventListener("pointerup", (e) => {
-        if (!downAt) return;
-        const moved = Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y);
-        const held = performance.now() - downAt.t;
-        downAt = null;
-
-        if (moved <= 12 && held < 700) go();
-      });
-      card.addEventListener("pointercancel", () => {
-        downAt = null;
-      });
-      card.addEventListener("click", go);
-      card.addEventListener("keydown", (e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          go();
-        }
-      });
-    }
-
-    return card;
+  destroy() {
+    this.reset();
+    clearTimeout(this.#prewarmTimer);
+    cancelAnimationFrame(this.#prewarmRaf);
+    this.#timers.forEach(clearTimeout);
+    this.#timers.clear();
   }
+}
+
+function OverviewCard({
+  building,
+  counts,
+  active,
+  prewarm,
+  go,
+}: BuildingCount & { active: boolean; prewarm: () => void; go: () => void }) {
+  const downAt = useRef<{ x: number; y: number; t: number } | null>(null);
+  const total = STATUS_META.reduce((n, status) => n + (counts[status.key] || 0), 0);
+
+  return (
+    <div
+      className={`bo-card${active ? "" : " bo-card--inactive"}`}
+      data-building-name={building.name}
+      role={active ? "button" : undefined}
+      tabIndex={active ? 0 : undefined}
+      aria-label={active ? `${t("building.prefix")} ${building.name}` : undefined}
+      onPointerDown={
+        active
+          ? (e) => {
+              downAt.current = { x: e.clientX, y: e.clientY, t: performance.now() };
+              prewarm();
+            }
+          : undefined
+      }
+      onPointerUp={
+        active
+          ? (e) => {
+              const start = downAt.current;
+
+              if (!start) return;
+              downAt.current = null;
+
+              if (
+                Math.hypot(e.clientX - start.x, e.clientY - start.y) <= 12 &&
+                performance.now() - start.t < 700
+              )
+                go();
+            }
+          : undefined
+      }
+      onPointerCancel={
+        active
+          ? () => {
+              downAt.current = null;
+            }
+          : undefined
+      }
+      onClick={active ? go : undefined}
+      onKeyDown={
+        active
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                go();
+              }
+            }
+          : undefined
+      }
+    >
+      <div className="bo-card-body">
+        <div className="bo-card-head">
+          <span className="bo-card-name">
+            {t("building.prefix")} {building.name}
+          </span>
+          {building.altName && <span className="bo-card-alt">{building.altName}</span>}
+          <span className="bo-card-total secondary">
+            {t("overview.subtitle").replace("{n}", String(total))}
+          </span>
+        </div>
+        <div className="bo-card-counts">
+          {STATUS_META.map((status) => {
+            const n = counts[status.key] || 0;
+
+            return (
+              <span
+                key={status.key}
+                className={`bo-count ${status.cls}${n === 0 ? " is-zero" : ""}`}
+              >
+                <b>{n}</b>
+                <span className="bo-count-label">{t(status.i18n)}</span>
+              </span>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export const buildingOverview = new BuildingOverview();
