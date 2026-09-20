@@ -69,6 +69,10 @@ export class Spring {
     this.v = 0;
     this.resting = true;
   }
+  destroy() {
+    this.stop();
+    springs.delete(this);
+  }
   step(dt: number) {
     if (this.resting) return false;
     const n = Math.max(1, Math.ceil(dt / 0.004));

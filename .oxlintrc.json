@@ -45,7 +45,9 @@
           "splash-header-item",
           "changelog-container",
           "splash-loading-label",
-          "visible"
+          "visible",
+          "settings-toggle__thumb",
+          "pill-active-cell"
         ]
       }
     ],

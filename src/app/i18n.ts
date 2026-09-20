@@ -9,6 +9,8 @@ let translations: Record<string, string> = {};
 
 let currentLocale = "en";
 
+let translationVersion = 0;
+
 const switchCallbacks: ((lang: string) => void)[] = [];
 
 let _isLangSwitch = false;
@@ -48,6 +50,10 @@ export function animateI18nElement(el: HTMLElement) {
   el.classList.add("i18n-animate");
 }
 
+export function getTranslationVersion() {
+  return translationVersion;
+}
+
 export function getLocale() {
   return currentLocale;
 }
@@ -55,6 +61,7 @@ export function getLocale() {
 // Walk [data-i18n] and [data-i18n-attr] nodes and apply current translations.
 export function applyTranslations(root = document) {
   root.querySelectorAll<HTMLElement>("[data-i18n]").forEach((el) => {
+    if (el.closest("[data-react-owned]")) return;
     el.innerHTML = t(el.dataset.i18n!);
 
     if (_isLangSwitch) animateI18nElement(el);
@@ -86,5 +93,6 @@ export async function setLocale(lang: string) {
   _isLangSwitch = true;
   applyTranslations();
   _isLangSwitch = false;
+  translationVersion++;
   switchCallbacks.forEach((cb) => cb(lang));
 }

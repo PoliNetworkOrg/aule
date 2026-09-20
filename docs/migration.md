@@ -69,3 +69,15 @@ pnpm --dir workers/api run typecheck
 pnpm --dir workers/cron install --frozen-lockfile
 pnpm --dir workers/cron run typecheck
 ```
+
+### React settings checkpoint
+
+Settings and its switches, segmented controls, stepper, warnings, and campus preferences now render in React. The popup retains the original CSS, markup classes, storage keys, native preference events, and motion calculations. The shared pill drag engine is checked TypeScript. For React controls it positions React-rendered duplicate labels; the remaining date controllers still use its original label-cloning mode. Unmounting releases the React controls' ResizeObservers, pointer listeners, timers, frame callbacks, and springs.
+
+The existing startup controller mounts settings after translations load through a small portal host. This preserves the order in which legacy custom elements upgrade after the shell commits. Global translation updates skip React-owned text; a translation revision subscription also updates settings when a failed locale request clears the dictionary without changing the active locale. The shadcn allowlist retains two additional upstream markup markers, `settings-toggle__thumb` and `pill-active-cell`, which have no independent CSS rules.
+
+Temporary Chromium checks compared the pinned upstream application with this checkpoint at 1440×1000 and 390×844. With glass effects set identically, sampled settings geometry, fonts, colors, labels, preference storage, switch states, warnings, and campus selections matched before and after switching to Italian. Dragging the time-format pill, arrow-key selection, swipe dismissal, Escape, desktop keyboard opening, and reopening by button matched. Unmounting and remounting the React popup produced one popup and 11 working controls. A failed Italian dictionary request followed by a successful retry preserved the source's fallback labels and recovery. No new test suite or dependencies were added.
+
+`pnpm build`, `pnpm build:beta`, and `pnpm lint` pass for this checkpoint. The built preview also passed the locale failure/recovery check.
+
+This checkpoint covers settings and shared control mechanics. The remaining pickers, cards, navigation, views, and startup have not yet completed the React/TypeScript conversion described in the roadmap. No feature was dropped or intentionally changed in this checkpoint. Physical-device haptics and Safari-specific transitions remain unverified.

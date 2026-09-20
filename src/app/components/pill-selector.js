@@ -7,7 +7,7 @@
 // day-chip selector (classroom-detail.js), which share the same markup/CSS
 // but otherwise have independent selection logic (hidden <select> vs.
 // schedule row highlight).
-import { createPillDragCore } from "./pill-drag-core.js";
+import { createPillDragCore } from "./pill-drag-core.ts";
 import { haptics, defaultPatterns } from "./haptics.ts";
 
 // container: the `.date-picker-container` element (already position:relative,

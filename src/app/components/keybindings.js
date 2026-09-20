@@ -19,7 +19,7 @@
 import { t, applyTranslations, onLanguageSwitch } from "../i18n.ts";
 import { activateGroupTab } from "./bottom-nav.js";
 import { openSearchOverlay } from "./search-overlay.js";
-import { toggleSettings } from "./settings.js";
+import { toggleSettings } from "./settings.tsx";
 
 const desktopMQ = matchMedia("(min-width: 600px)");
 

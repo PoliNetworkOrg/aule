@@ -73,7 +73,7 @@ import {
   INTERVAL_HOURS_KEY,
   AUTO_SEARCH_KEY,
   LIVE_SEARCH_KEY,
-} from "./components/settings.js";
+} from "./components/settings.tsx";
 import { initKeybindings } from "./components/keybindings.js";
 import {
   resolveBlurCapability,

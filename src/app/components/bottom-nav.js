@@ -9,7 +9,7 @@
 
 import { haptics, defaultPatterns } from "./haptics.ts";
 import { t, onLanguageSwitch } from "../i18n.ts";
-import { DEFAULT_TAB_KEY, LAST_TAB_KEY, getStartupTabId } from "./settings.js";
+import { DEFAULT_TAB_KEY, LAST_TAB_KEY, getStartupTabId } from "./settings.tsx";
 import { Spring, onSpringFrame } from "../utils/spring.ts";
 import { openSearchOverlay } from "./search-overlay.js";
 

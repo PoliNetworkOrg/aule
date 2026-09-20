@@ -15,7 +15,7 @@ pnpm lint
 
 The frontend uses the existing hosted APIs. As upstream, `poliaule.com` uses the stable backend; other hosts default to beta and expose the backend setting. The Campus map gets its public Mapbox token from `/v1/config`. Google Fonts, Floating UI's CDN module, Mapbox resources, GitHub statistics, and classroom photos retain their upstream network requirements.
 
-The React shell and file routes live in `src/`. The original animated controls remain JavaScript modules and custom elements in `src/app/`, mounted once after React commits the shell. Their layout uses Tailwind v4 `@apply` with CSS-first theme tokens; custom animation and browser-specific CSS are preserved. See [migration details](docs/migration.md) for scope, compatibility, and validation.
+The React shell and file routes live in `src/`. Settings and its shared controls render in React with typed gesture functions. The remaining animated controls are JavaScript modules and custom elements in `src/app/`, mounted once after React commits the shell. The full conversion is tracked in [the roadmap](docs/roadmap.md). Their layout uses Tailwind v4 `@apply` with CSS-first theme tokens; custom animation and browser-specific CSS are preserved. See [migration details](docs/migration.md) for scope, compatibility, and validation.
 
 Lint runs Oxlint's built-in rules, the vendored [anti-slop](https://github.com/dmmulroy/anti-slop) generic rules, and [@shadcn/lint](https://github.com/shadcn-ui/lint) class/color validation, followed by Oxfmt's formatting check. Both plugins are registered and enabled in `.oxlintrc.json`; shadcn runs inside Oxlint, without ESLint or a separate CLI. Tailwind Preflight is omitted to preserve the original controls' reset and appearance.
 

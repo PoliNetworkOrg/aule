@@ -43,7 +43,7 @@ const ENGAGE_MOVE = 6; // ...or this much finger travel, whichever comes first
 const LIFT_THRESHOLD = 1.001;
 
 // Asymptotic rubber-band (approaches ±give, never past it).
-const rubber = (x, give) => (x * give) / (give + Math.abs(x));
+const rubber = (x: number, give: number) => (x * give) / (give + Math.abs(x));
 
 // onChange(index, { silent }) fires whenever a *different* cell becomes the
 // selected one. `silent` is true only for a programmatic select(..., { silent }).
@@ -58,6 +58,32 @@ const rubber = (x, give) => (x * give) / (give + Math.abs(x));
 //   onPillTap()        a grab of the pill itself that barely moved (a tap on
 //                      the pill; without this it just settles back).
 //   onRender({ pos })  after every frame's transforms are written.
+export interface PillSelection {
+  animate?: boolean;
+  silent?: boolean;
+}
+
+interface PillDragOptions {
+  root: HTMLElement;
+  items: HTMLElement;
+  pill: HTMLElement;
+  hit: HTMLElement;
+  activeRow: HTMLElement;
+  cellSelector: string;
+  activeCellClass?: string;
+  liftedClass?: string;
+  tapScale?: number;
+  trail?: { follow: number; give: number; giveCross: number };
+  canSelect?: (index: number) => boolean;
+  onReject?: (index: number) => void;
+  haptic?: (() => void) | null;
+  onRender?: (frame: { pos: number }) => void;
+  onPillTap?: () => void;
+  onChange?: (index: number, options: { silent: boolean }) => void;
+  // React controls render their own duplicate labels; the engine only positions them.
+  cloneCells?: boolean;
+}
+
 export function createPillDragCore({
   root,
   items,
@@ -75,16 +101,21 @@ export function createPillDragCore({
   onRender,
   onPillTap,
   onChange,
-}) {
-  let cells = [];
-  let anchors = []; // [{ pos, size }] — the pill's {x, w} sitting on each cell
+  cloneCells = true,
+}: PillDragOptions) {
+  const events = new AbortController();
+  const signal = events.signal;
+  let pointerId: number | null = null;
+  let cells: HTMLElement[] = [];
+  let anchors: { pos: number; size: number }[] = []; // [{ pos, size }] — the pill's {x, w} sitting on each cell
   let index = -1;
 
   let itemsW = 0,
     itemsH = 0;
 
   let didInit = false;
-  let timers = [];
+  let timers: number[] = [];
+  let clickTimer: number | undefined;
 
   const pillPos = new Spring(0);
   const pillMain = new Spring(0);
@@ -99,7 +130,7 @@ export function createPillDragCore({
     lastCrossVal = 0,
     smoothStretch = 0;
 
-  const later = (fn, ms) => timers.push(setTimeout(fn, ms));
+  const later = (fn: () => void, ms: number) => timers.push(window.setTimeout(fn, ms));
 
   const clearTimers = () => {
     timers.forEach(clearTimeout);
@@ -107,7 +138,7 @@ export function createPillDragCore({
   };
 
   /* --- Layout ------------------------------------------------------ */
-  function sizeForPos(pos) {
+  function sizeForPos(pos: number) {
     const n = anchors.length;
     const clamped = Math.max(anchors[0].pos, Math.min(anchors[n - 1].pos, pos));
 
@@ -130,7 +161,9 @@ export function createPillDragCore({
   // control was hidden or is about to be shown).
   function refresh({ snap = false } = {}) {
     // offsetWidth > 0 skips display:none cells and non-cell children.
-    cells = Array.from(items.querySelectorAll(cellSelector)).filter((el) => el.offsetWidth > 0);
+    cells = Array.from(items.querySelectorAll<HTMLElement>(cellSelector)).filter(
+      (el) => el.offsetWidth > 0,
+    );
     itemsW = items.offsetWidth;
     itemsH = items.offsetHeight;
 
@@ -157,18 +190,24 @@ export function createPillDragCore({
     // One duplicate per cell, centered on that cell's own anchor midpoint
     // rather than laid out by flex — see .bn-tab-active in bottom-nav.css
     // for why sub-pixel drift between two flow layouts is worth avoiding.
-    activeRow.innerHTML = "";
+    if (cloneCells) activeRow.replaceChildren();
     cells.forEach((el, i) => {
-      const dup = document.createElement("span");
-      dup.className = activeCellClass;
-      dup.innerHTML = el.innerHTML;
+      const dup = cloneCells ? document.createElement("span") : activeRow.children[i];
+
+      if (!(dup instanceof HTMLElement)) return;
+
+      if (cloneCells) {
+        dup.className = activeCellClass;
+        dup.innerHTML = el.innerHTML;
+        activeRow.appendChild(dup);
+      }
+
       dup.style.left = anchors[i].pos + anchors[i].size / 2 + "px";
       dup.style.transform = "translateX(-50%)";
       dup.style.height = "100%";
       // Auto width on an abs-positioned box shrinks to the room right of `left`,
       // squeezing the last cell's duplicate; max-content keeps it its natural size.
       dup.style.width = "max-content";
-      activeRow.appendChild(dup);
     });
 
     // A cell that disappeared (e.g. hidden) can leave `index` out of range.
@@ -192,13 +231,13 @@ export function createPillDragCore({
 
   // Offset of `items` within `ancestor`, summed up the offsetParent chain
   // (items usually sits inside an intermediate positioned track element).
-  function itemsOffsetIn(ancestor, prop = "offsetLeft") {
-    let sum = 0,
-      el = items;
+  function itemsOffsetIn(ancestor: HTMLElement, prop: "offsetLeft" | "offsetTop" = "offsetLeft") {
+    let sum = 0;
+    let el: HTMLElement | null = items;
 
     while (el && el !== ancestor) {
       sum += el[prop];
-      el = el.offsetParent;
+      el = el.offsetParent instanceof HTMLElement ? el.offsetParent : null;
     }
 
     return sum;
@@ -222,7 +261,7 @@ export function createPillDragCore({
 
     const clip = `path(evenodd, "${d}")`;
     items.style.clipPath = clip;
-    items.style.webkitClipPath = clip;
+    items.style.setProperty("-webkit-clip-path", clip);
   }
 
   function render() {
@@ -276,13 +315,13 @@ export function createPillDragCore({
     onRender?.({ pos: pillPos.value });
   }
 
-  onSpringFrame(render);
+  const stopRendering = onSpringFrame(render);
 
   /* --- Selection --------------------------------------------------- */
   // Tap / programmatic select: lift, slide, settle. With animate:false the
   // pill is just placed (initial state), and with silent:true onChange is
   // skipped for callers reacting to their own change.
-  function select(i, { animate = true, silent = false } = {}) {
+  function select(i: number, { animate = true, silent = false }: PillSelection = {}) {
     if (i < 0) return;
     const changed = i !== index;
     index = i;
@@ -316,20 +355,25 @@ export function createPillDragCore({
     later(() => scale.to(1, { stiffness: 350, damping: 30, mass: 0.8 }), 250);
   }
 
-  items.addEventListener("click", (e) => {
-    const i = cells.indexOf(e.target.closest(cellSelector));
+  items.addEventListener(
+    "click",
+    (e) => {
+      const cell = e.target instanceof Element ? e.target.closest<HTMLElement>(cellSelector) : null;
+      const i = cell ? cells.indexOf(cell) : -1;
 
-    if (i === -1 || i === index) return;
+      if (i === -1 || i === index) return;
 
-    if (canSelect && !canSelect(i)) {
-      onReject?.(i);
+      if (canSelect && !canSelect(i)) {
+        onReject?.(i);
 
-      return;
-    }
+        return;
+      }
 
-    haptic?.();
-    select(i);
-  });
+      haptic?.();
+      select(i);
+    },
+    { signal },
+  );
 
   /* --- Drag -------------------------------------------------------- */
   // Two ways in: grab the pill itself (relative — it moves by your drag
@@ -346,18 +390,17 @@ export function createPillDragCore({
     dragOriginPos = 0,
     itemsOrigin = 0;
 
-  let holdTimer = 0,
-    captureEl = null;
+  let holdTimer = 0;
+  let captureEl: HTMLElement | null = null;
+  let samples: { x: number; t: number }[] = [];
 
-  let samples = [];
-
-  const clampDragPos = (pos) =>
+  const clampDragPos = (pos: number) =>
     Math.max(
       anchors[0].pos - DRAG_OVERSHOOT,
       Math.min(anchors[anchors.length - 1].pos + DRAG_OVERSHOOT, pos),
     );
 
-  const railDragPos = (raw) => {
+  const railDragPos = (raw: number) => {
     const lo = anchors[0].pos,
       hi = anchors[anchors.length - 1].pos;
 
@@ -368,9 +411,9 @@ export function createPillDragCore({
     return raw;
   };
 
-  const pillEdgeAtPointer = (e) => e.clientX - itemsOrigin - pillMain.value / 2;
+  const pillEdgeAtPointer = (e: PointerEvent) => e.clientX - itemsOrigin - pillMain.value / 2;
 
-  function engage(e) {
+  function engage(e: PointerEvent) {
     if (grabbed) return;
     grabbed = true;
     clearTimeout(holdTimer);
@@ -389,12 +432,17 @@ export function createPillDragCore({
     }
   }
 
-  function onDragStart(e) {
+  function onDragStart(e: PointerEvent) {
     if (!anchors.length || index < 0) return;
     const onHit = e.currentTarget === hit;
-    captureEl = onHit ? hit : e.target.closest(cellSelector);
+    captureEl = onHit
+      ? hit
+      : e.target instanceof Element
+        ? e.target.closest<HTMLElement>(cellSelector)
+        : null;
 
     if (!captureEl) return;
+    pointerId = e.pointerId;
     captureEl.setPointerCapture(e.pointerId);
     dragging = true;
     grabbed = false;
@@ -405,11 +453,11 @@ export function createPillDragCore({
     samples = [{ x: e.clientX, t: grantTime }];
     itemsOrigin = items.getBoundingClientRect().left;
 
-    if (absoluteDrag) holdTimer = setTimeout(() => engage(e), HOLD_MS);
+    if (absoluteDrag) holdTimer = window.setTimeout(() => engage(e), HOLD_MS);
     else engage(e); // grabbing the pill itself: no wait
   }
 
-  function onDragMove(e) {
+  function onDragMove(e: PointerEvent) {
     if (!dragging) return;
     const now = performance.now();
     samples.push({ x: e.clientX, t: now });
@@ -442,7 +490,7 @@ export function createPillDragCore({
     });
   }
 
-  function release(e, terminated) {
+  function release(e: PointerEvent, terminated: boolean) {
     if (!dragging) return;
     dragging = false;
     clearTimeout(holdTimer);
@@ -464,9 +512,12 @@ export function createPillDragCore({
     // We drove the pill, so suppress the cell's click (whichever cell the
     // browser routes it to) — the selection is decided below.
     if (absoluteDrag) {
-      const swallow = (ev) => ev.stopImmediatePropagation();
-      items.addEventListener("click", swallow, { capture: true, once: true });
-      setTimeout(() => items.removeEventListener("click", swallow, { capture: true }), 0);
+      const swallow = (ev: MouseEvent) => ev.stopImmediatePropagation();
+      items.addEventListener("click", swallow, { capture: true, once: true, signal });
+      clickTimer = window.setTimeout(
+        () => items.removeEventListener("click", swallow, { capture: true }),
+        0,
+      );
     }
 
     captureEl = null;
@@ -538,32 +589,51 @@ export function createPillDragCore({
   }
 
   for (const el of [hit, items]) {
-    el.addEventListener("pointerdown", onDragStart);
-    el.addEventListener("pointermove", onDragMove);
-    el.addEventListener("pointerup", (e) => release(e, false));
-    el.addEventListener("pointercancel", (e) => release(e, true));
+    el.addEventListener("pointerdown", onDragStart, { signal });
+    el.addEventListener("pointermove", onDragMove, { signal });
+    el.addEventListener("pointerup", (e) => release(e, false), { signal });
+    el.addEventListener("pointercancel", (e) => release(e, true), { signal });
   }
 
   /* --- Keyboard (arrows cycle) ------------------------------------- */
-  root.addEventListener("keydown", (e) => {
-    const step =
-      e.key === "ArrowRight" || e.key === "ArrowDown"
-        ? 1
-        : e.key === "ArrowLeft" || e.key === "ArrowUp"
-          ? -1
-          : 0;
+  root.addEventListener(
+    "keydown",
+    (e) => {
+      const step =
+        e.key === "ArrowRight" || e.key === "ArrowDown"
+          ? 1
+          : e.key === "ArrowLeft" || e.key === "ArrowUp"
+            ? -1
+            : 0;
 
-    if (!step || index < 0) return;
-    const next = Math.max(0, Math.min(cells.length - 1, index + step));
+      if (!step || index < 0) return;
+      const next = Math.max(0, Math.min(cells.length - 1, index + step));
 
-    if (next === index) return;
-    e.preventDefault();
-    haptics.trigger(defaultPatterns.light);
-    select(next);
-    cells[next].focus();
-  });
+      if (next === index) return;
+      e.preventDefault();
+      haptics.trigger(defaultPatterns.light);
+      select(next);
+      cells[next].focus();
+    },
+    { signal },
+  );
 
   return {
+    destroy() {
+      events.abort();
+      clearTimers();
+      clearTimeout(holdTimer);
+      clearTimeout(clickTimer);
+      stopRendering();
+
+      if (pointerId !== null && captureEl?.hasPointerCapture(pointerId)) {
+        captureEl.releasePointerCapture(pointerId);
+      }
+
+      for (const spring of [pillPos, pillMain, crossOff, containerOff, containerCross, scale]) {
+        spring.destroy();
+      }
+    },
     refresh,
     select,
     get index() {
@@ -572,6 +642,6 @@ export function createPillDragCore({
     get cells() {
       return cells;
     },
-    indexOf: (el) => cells.indexOf(el),
+    indexOf: (el: HTMLElement) => cells.indexOf(el),
   };
 }

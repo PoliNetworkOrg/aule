@@ -1,3 +1,4 @@
+import { Settings } from "./app/components/settings-host";
 import { loadApplication } from "./lib/application";
 import { useEffect } from "react";
 
@@ -8,6 +9,7 @@ export function AppShell() {
 
   return (
     <>
+      <Settings />
       <div className="header-top-strip" aria-hidden="true"></div>
       <header className="header">
         <div className="header-top-line-container">
