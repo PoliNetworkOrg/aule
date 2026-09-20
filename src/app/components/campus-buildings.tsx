@@ -182,6 +182,11 @@ function replacePage(next: HTMLElement) {
 }
 
 export function destroyCampusBuildingsPage() {
+  transitioning = false;
+  selectedBuildingId = null;
+  view = "campus";
+  savedCampusScroll = 0;
+  pendingCleanup = 0;
   events.abort();
   timers.forEach(clearTimeout);
   timers.clear();

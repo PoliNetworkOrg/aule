@@ -94,7 +94,11 @@
           "info-intro",
           "info-section-text",
           "timeline-time-indicator",
-          "timeline-popover-body"
+          "timeline-popover-body",
+          "splash-error-icon",
+          "splash-error-title",
+          "splash-error-subtitle",
+          "splash-error-reload"
         ]
       }
     ],

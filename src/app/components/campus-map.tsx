@@ -108,7 +108,7 @@ const darkScheme = window.matchMedia("(prefers-color-scheme: dark)");
 
 let started = false;
 
-let map: MapboxMap;
+let map: MapboxMap | null = null;
 
 let mapboxglLib: MapboxLibrary | null = null; // set once loaded — reused by the picker's change listener below
 
@@ -181,7 +181,7 @@ const ANGLE_SLACK_DEG = 0.5;
 function updateShifted() {
   const focus = selectedFocus();
 
-  if (!focus) {
+  if (!focus || !map) {
     setShifted(false);
 
     return;
@@ -415,6 +415,10 @@ function attachCampusMap() {
     queueMicrotask(() => oldControls.forEach((root) => root.unmount()));
 
     if (map) map.remove();
+    map = null;
+    enabled = false;
+    hostReady = false;
+    mapError = false;
     started = false;
     mapboxglLib = null;
     autoFlying = false;
@@ -440,7 +444,8 @@ async function boot(_container: HTMLElement) {
   const startCampus = selectedCampus();
 
   mapboxgl.accessToken = token;
-  map = new mapboxgl.Map({
+
+  const instance = new mapboxgl.Map({
     container: el,
     style: "mapbox://styles/mapbox/standard",
     center: startCampus ? [startCampus.long, startCampus.lat] : INITIAL_CENTER,
@@ -454,13 +459,15 @@ async function boot(_container: HTMLElement) {
     logoPosition: "bottom-left",
   });
 
+  map = instance;
+
   // The constructor's own `center`/`zoom`/`pitch` above ignore `padding` —
   // only jumpTo/easeTo/flyTo actually offset `center` by it. Re-apply the
   // same camera through jumpTo (no animation, runs before the first paint)
   // so the initial view is padding-aware too, not just later flyTo's (see
   // flyToCampus()).
   if (startCampus) {
-    map.jumpTo({
+    instance.jumpTo({
       center: [startCampus.long, startCampus.lat],
       zoom: CAMPUS_FLY_ZOOM,
       pitch: 55,
@@ -471,7 +478,7 @@ async function boot(_container: HTMLElement) {
   // Desktop trackpad: a two-finger swipe should pan the map, not zoom it.
   // Wheel zoom is kept only for the pinch gesture, which the browser reports
   // as a ctrl-wheel event.
-  map.scrollZoom.disable();
+  instance.scrollZoom.disable();
   el.addEventListener("wheel", (e) => onWheel(e, el), { passive: false, signal: events.signal });
 
   // Safari trackpad pinch doesn't come through as a ctrl+wheel event like
@@ -502,7 +509,7 @@ async function boot(_container: HTMLElement) {
       "gesturestart",
       (e) => {
         e.preventDefault();
-        gestureStartZoom = map.getZoom();
+        gestureStartZoom = instance.getZoom();
       },
       { signal: events.signal },
     );
@@ -511,8 +518,8 @@ async function boot(_container: HTMLElement) {
       (e) => {
         e.preventDefault();
         const rect = el.getBoundingClientRect();
-        const around = map.unproject([e.clientX - rect.left, e.clientY - rect.top]);
-        map.easeTo({ zoom: gestureStartZoom + Math.log2(e.scale), around, duration: 0 });
+        const around = instance.unproject([e.clientX - rect.left, e.clientY - rect.top]);
+        instance.easeTo({ zoom: gestureStartZoom + Math.log2(e.scale), around, duration: 0 });
       },
       { signal: events.signal },
     );
@@ -520,7 +527,7 @@ async function boot(_container: HTMLElement) {
   }
 
   const navControl = new mapboxgl.NavigationControl({ showZoom: false, showCompass: true });
-  map.addControl(navControl, "top-right");
+  instance.addControl(navControl, "top-right");
 
   const geolocateControl = new mapboxgl.GeolocateControl({
     positionOptions: { enableHighAccuracy: true },
@@ -528,7 +535,7 @@ async function boot(_container: HTMLElement) {
     showUserHeading: true,
   });
 
-  map.addControl(geolocateControl, "top-right");
+  instance.addControl(geolocateControl, "top-right");
 
   // `liquid-glass` (components/liquid-glass.js) must go on the actual
   // <button>, not the wrapping .mapboxgl-ctrl-group div: its delegated
@@ -575,7 +582,7 @@ async function boot(_container: HTMLElement) {
   // GeolocateControl above), so watch the whole map container for its
   // button to show up instead.
   const attributionObserver = new MutationObserver((_records, observer) => {
-    const button = map.getContainer().querySelector(".mapboxgl-ctrl-attrib-button");
+    const button = instance.getContainer().querySelector(".mapboxgl-ctrl-attrib-button");
 
     if (!button) return;
     button.classList.add("liquid-glass");
@@ -588,22 +595,22 @@ async function boot(_container: HTMLElement) {
   });
 
   observers.push(attributionObserver);
-  attributionObserver.observe(map.getContainer(), { childList: true, subtree: true });
+  attributionObserver.observe(instance.getContainer(), { childList: true, subtree: true });
 
   // Match the map's daylight to the app theme (Standard style only).
-  map.on("style.load", applyLightPreset);
+  instance.on("style.load", applyLightPreset);
   darkScheme.addEventListener("change", applyLightPreset, { signal: events.signal });
 
-  map.on("load", () => {
-    map.resize();
+  instance.on("load", () => {
+    instance.resize();
 
     if (startCampus) showBuildingMarkers(mapboxgl, startCampus);
     else showCampusMarkers(mapboxgl);
   });
 
   // Zoom back out past a campus → return to the campus overview.
-  map.on("zoomend", () => {
-    if (mode === "buildings" && map.getZoom() < CAMPUS_ZOOM) {
+  instance.on("zoomend", () => {
+    if (mode === "buildings" && instance.getZoom() < CAMPUS_ZOOM) {
       // A zoom-out this big leaves any single-building focus behind too —
       // fall the sheet back to its campus page in sync (see
       // clearSelectedBuildingSilently()'s own note on why this doesn't just
@@ -611,24 +618,25 @@ async function boot(_container: HTMLElement) {
       clearSelectedBuildingSilently();
       showCampusMarkers(mapboxgl);
 
-      if (map.getPitch() > 0) map.easeTo({ pitch: 0, duration: reduceMotion.matches ? 0 : 600 });
+      if (instance.getPitch() > 0)
+        instance.easeTo({ pitch: 0, duration: reduceMotion.matches ? 0 : 600 });
     }
   });
 
   // Soft geographic leash: after any move, if the centre has drifted outside
   // Lombardy, ease it back. Doesn't touch pitch, unlike constructor maxBounds.
-  map.on("moveend", panBackInBounds);
+  instance.on("moveend", panBackInBounds);
 
   // Re-check "shifted" (see updateShifted() above) after every settle —
   // covers every way the camera can end up off the auto-centered view (pan,
   // zoom, rotate, pitch), from any source (drag, wheel/trackpad, a control
   // button), including Mapbox-native interactions like the NavigationControl
   // compass's own drag-to-rotate/click-to-reset-north.
-  map.on("moveend", updateShifted);
+  instance.on("moveend", updateShifted);
 
   // Keep the GL canvas glued to the panel through rotations / dynamic toolbars.
   const resizeObserver = new ResizeObserver(() => {
-    if (map) map.resize();
+    if (map) instance.resize();
   });
 
   observers.push(resizeObserver);
@@ -800,6 +808,7 @@ function mapPadding(mobileHeightOverride?: number) {
 // swapped in as the new target of — see followSheetResize()) a flyTo towards
 // `destination`, tracking it in `flyDestination` for the duration.
 function startFly(destination: CameraOptions, mobileHeightOverride?: number) {
+  if (!map) return;
   flyDestination = destination;
   autoFlying = true;
   lastFlyRetargetAt = performance.now();
@@ -882,6 +891,7 @@ function buildingLabel(b: Building) {
 }
 
 function showCampusMarkers(mapboxgl: MapboxLibrary) {
+  if (!map) return;
   clearMarkers();
   mode = "campus";
 
@@ -919,6 +929,7 @@ function showCampusMarkers(mapboxgl: MapboxLibrary) {
 }
 
 function showBuildingMarkers(mapboxgl: MapboxLibrary, campus: Campus) {
+  if (!map) return;
   clearMarkers();
   mode = "buildings";
 

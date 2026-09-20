@@ -77,12 +77,14 @@ export function morphGeometry(
   // rest of the animation short if a caller is listening with `{ once: true }`.
   el.style.transition = prevTransition || "";
 
-  requestAnimationFrame(() => {
+  const frame = requestAnimationFrame(() => {
     el.style.transform = "";
 
     if (toRadius != null) el.style.borderRadius = toRadius;
     onSettle?.();
   });
+
+  return () => cancelAnimationFrame(frame);
 }
 
 // Hides `el` instantly (no transition) — call before `morphGeometry` snaps a

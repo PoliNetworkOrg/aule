@@ -1,17 +1,17 @@
 import { createRootRoute, Outlet } from "@tanstack/react-router";
 import { AppShell } from "../AppShell";
-import { PageController } from "../PageController";
+import { Application, ApplicationRoute } from "../Application";
 
 function Root() {
   return (
-    <>
+    <Application>
       <AppShell />
       <Outlet />
-    </>
+    </Application>
   );
 }
 
 export const Route = createRootRoute({
   component: Root,
-  notFoundComponent: () => <PageController page="home" />,
+  notFoundComponent: () => <ApplicationRoute page="home" />,
 });

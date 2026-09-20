@@ -2,7 +2,7 @@ import { useSyncExternalStore } from "react";
 import { flushSync } from "react-dom";
 import { ClassroomCard, subscribeFavourites } from "./classroom-card";
 import { getClassroomStatusNow } from "../available-rooms-script";
-import { getFavouriteIds, initFavouriteMarkers } from "../utils/favourites";
+import { getFavouriteIds } from "../utils/favourites";
 import { onTranslationChange, getTranslationVersion, t } from "../i18n";
 import type { Building, Campus, Classroom } from "../types";
 
@@ -32,7 +32,6 @@ export function initFavourites(campuses: Campus[]) {
     for (const building of campus.buildings)
       for (const classroom of building.classrooms)
         index.set(Number(classroom.id), { classroom, building });
-  initFavouriteMarkers();
   renderFavourites();
 }
 

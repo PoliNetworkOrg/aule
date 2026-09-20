@@ -1,6 +1,6 @@
 import { observeInputProperty } from "./time-input";
 import { useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
-import { createPortal } from "react-dom";
+import { createPortal, flushSync } from "react-dom";
 import { getTranslationVersion, onTranslationChange } from "../i18n";
 
 export interface TimeCard extends HTMLButtonElement {
@@ -93,32 +93,64 @@ function measureTextWidth(text: string, referenceEl: HTMLElement) {
 
 let overlay: HTMLDivElement | null = null;
 
-function getOverlay() {
-  if (!overlay) {
-    overlay = document.createElement("div");
-    overlay.className = "tp-overlay";
-    overlay.addEventListener("click", () => {
-      haptics.trigger(defaultPatterns.light);
-      closePicker();
-    });
-    overlay.addEventListener("touchmove", (e) => e.preventDefault(), { passive: false });
-    overlay.addEventListener("wheel", (e) => e.preventDefault(), { passive: false });
-    document.body.appendChild(overlay);
-  }
+let overlayVisible = false;
 
-  return overlay;
+const overlayListeners = new Set<() => void>();
+
+function subscribeOverlay(listener: () => void) {
+  overlayListeners.add(listener);
+
+  return () => {
+    overlayListeners.delete(listener);
+  };
+}
+
+function renderOverlay(visible: boolean) {
+  overlayVisible = visible;
+  flushSync(() => overlayListeners.forEach((listener) => listener()));
+}
+
+export function TimePickerBackdrop() {
+  const visible = useSyncExternalStore(subscribeOverlay, () => overlayVisible);
+  const ref = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (!visible || !ref.current) return;
+    const element = ref.current;
+    overlay = element;
+    const events = new AbortController();
+    element.addEventListener("touchmove", preventScroll, { passive: false, signal: events.signal });
+    element.addEventListener("wheel", preventScroll, { passive: false, signal: events.signal });
+
+    return () => {
+      events.abort();
+
+      if (overlay === element) overlay = null;
+    };
+  }, [visible]);
+
+  return visible
+    ? createPortal(
+        <div
+          ref={ref}
+          className="tp-overlay"
+          onClick={() => {
+            haptics.trigger(defaultPatterns.light);
+            closePicker();
+          }}
+        />,
+        document.body,
+      )
+    : null;
+}
+
+function getOverlay() {
+  if (!overlay) renderOverlay(true);
+
+  return overlay!;
 }
 
 function removeOverlay() {
-  if (!overlay) return;
-  overlay.addEventListener(
-    "transitionend",
-    () => {
-      overlay?.remove();
-      overlay = null;
-    },
-    { once: true },
-  );
+  overlay?.addEventListener("transitionend", () => renderOverlay(false), { once: true });
 }
 
 // ── Scroll lock ───────────────────────────────────────────────────────────────
@@ -139,20 +171,53 @@ function unlockScroll() {
 
 // ── transitionend with fallback ───────────────────────────────────────────────
 
+const motionCleanups = new Map<HTMLElement, Set<() => void>>();
+
+function ownMotion(el: HTMLElement, cleanup: () => void) {
+  let owned = motionCleanups.get(el);
+
+  if (!owned) {
+    owned = new Set();
+    motionCleanups.set(el, owned);
+  }
+
+  owned.add(cleanup);
+}
+
 function onTransitionEnd(el: HTMLElement, cb: () => void) {
+  let settled = false;
+
   const settle = () => {
+    if (settled) return;
+    settled = true;
+    clearTimeout(fallback);
+    el.removeEventListener("transitionend", settle);
+    motionCleanups.get(el)?.delete(cancel);
+
     if (el.isConnected) cb();
   };
 
-  const fallback = setTimeout(settle, TRANSITION_DURATION + 50);
-  el.addEventListener(
-    "transitionend",
-    () => {
-      clearTimeout(fallback);
-      settle();
-    },
-    { once: true },
-  );
+  const fallback = window.setTimeout(settle, TRANSITION_DURATION + 50);
+
+  const cancel = () => {
+    settled = true;
+    clearTimeout(fallback);
+    el.removeEventListener("transitionend", settle);
+  };
+
+  ownMotion(el, cancel);
+  el.addEventListener("transitionend", settle, { once: true });
+}
+
+function animatePopup(el: HTMLElement, animate: () => () => void) {
+  const frame = requestAnimationFrame(() => {
+    motionCleanups.get(el)?.delete(cancelFrame);
+
+    if (el.isConnected) ownMotion(el, animate());
+  });
+
+  const cancelFrame = () => cancelAnimationFrame(frame);
+  ownMotion(el, cancelFrame);
 }
 
 // ── Open / close / switch ─────────────────────────────────────────────────────
@@ -183,8 +248,8 @@ function switchPicker(nextCard: TimeCard) {
   // mid-fade would get doubly scaled as the shell fakes its "still large"
   // look, visibly stretching it.
   hideInnerBoxInstantly(prevInner);
-  requestAnimationFrame(() => {
-    morphGeometry(prevPopup, prevVisualRect, prevRect, {
+  animatePopup(prevPopup, () => {
+    return morphGeometry(prevPopup, prevVisualRect, prevRect, {
       toRadius: "18px",
       onSettle: () => {
         prevPopup.style.boxShadow = "var(--shadow)";
@@ -207,8 +272,8 @@ function switchPicker(nextCard: TimeCard) {
   nextPopup.style.display = "flex";
   nextCard.classList.add("tp-card--morphing");
 
-  requestAnimationFrame(() => {
-    morphGeometry(nextPopup, nextRect, getPopupTarget(), {
+  animatePopup(nextPopup, () => {
+    return morphGeometry(nextPopup, nextRect, getPopupTarget(), {
       fromRadius: "18px",
       toRadius: "22px",
       onSettle: () => {
@@ -244,8 +309,8 @@ export function openPicker(cardEl: TimeCard, sourceRect: DOMRect | null = null) 
 
   cardEl.classList.add("tp-card--morphing");
 
-  requestAnimationFrame(() => {
-    morphGeometry(popup, rect, getPopupTarget(), {
+  animatePopup(popup, () => {
+    return morphGeometry(popup, rect, getPopupTarget(), {
       fromRadius: initialRadius,
       toRadius: "22px",
       onSettle: () => {
@@ -280,8 +345,8 @@ function closePicker() {
   const visualRect = popup.getBoundingClientRect();
   const closingInner = popup.querySelector<HTMLElement>(".tp-popup__inner")!;
   hideInnerBoxInstantly(closingInner);
-  requestAnimationFrame(() => {
-    morphGeometry(popup, visualRect, rect, {
+  animatePopup(popup, () => {
+    return morphGeometry(popup, visualRect, rect, {
       toRadius: "18px",
       onSettle: () => {
         if (!popup.isConnected) return;
@@ -605,6 +670,8 @@ export function TimePicker({ input }: { input: HTMLInputElement }) {
 
     return () => {
       events.abort();
+      motionCleanups.get(popup)?.forEach((cleanup) => cleanup());
+      motionCleanups.delete(popup);
       unsubscribe();
       observer.disconnect();
       restoreMax();
@@ -616,8 +683,10 @@ export function TimePicker({ input }: { input: HTMLInputElement }) {
         activeCard = null;
         isAnimating = false;
         unlockScroll();
-        overlay?.remove();
-        overlay = null;
+        overlayVisible = false;
+        queueMicrotask(() => {
+          if (!activeCard) renderOverlay(false);
+        });
       }
 
       popup.remove();

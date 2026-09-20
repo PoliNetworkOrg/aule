@@ -90,9 +90,15 @@ function supportsBackdropFilter() {
 // surfaces (a full-viewport --glass-blur-lg panel) and measures rAF frame
 // gaps while it's composited, so the sample reflects real compositing cost
 // rather than a trivial element.
-function runBenchmark() {
+function runBenchmark(signal?: AbortSignal) {
   return new Promise<boolean>((resolve) => {
     if (!supportsBackdropFilter()) {
+      resolve(false);
+
+      return;
+    }
+
+    if (signal?.aborted) {
       resolve(false);
 
       return;
@@ -116,6 +122,16 @@ function runBenchmark() {
     let totalFrames = 0;
     let jankFrames = 0;
 
+    let frame = 0;
+
+    const abort = () => {
+      cancelAnimationFrame(frame);
+      probe.remove();
+      resolve(false);
+    };
+
+    signal?.addEventListener("abort", abort, { once: true });
+
     function tick(now: number) {
       totalFrames++;
 
@@ -123,11 +139,12 @@ function runBenchmark() {
       lastTime = now;
 
       if (now - start < SAMPLE_MS) {
-        requestAnimationFrame(tick);
+        frame = requestAnimationFrame(tick);
 
         return;
       }
 
+      signal?.removeEventListener("abort", abort);
       probe.remove();
       const sampledFrames = totalFrames - WARMUP_FRAMES;
       // Too few post-warmup frames to trust (e.g. the tab was backgrounded
@@ -136,7 +153,7 @@ function runBenchmark() {
       resolve(ratio <= MAX_JANK_RATIO);
     }
 
-    requestAnimationFrame(tick);
+    frame = requestAnimationFrame(tick);
   });
 }
 
@@ -166,21 +183,34 @@ export function scheduleIdleBenchmark() {
 
   if (readCachedResult() !== null) return;
 
+  const events = new AbortController();
+
   const run = () => {
     // Mode or cache may have changed while waiting (manual override, or a
     // duplicate call from another tab/instance) — bail rather than clobber it.
     if (getBlurMode() !== "auto" || readCachedResult() !== null) return;
-    runBenchmark().then((capable) => {
+    runBenchmark(events.signal).then((capable) => {
+      if (events.signal.aborted) return;
       writeCachedResult(capable);
       applyBlurState(capable);
     });
   };
 
   if ("requestIdleCallback" in window) {
-    requestIdleCallback(run, { timeout: IDLE_RECHECK_DELAY_MS + 1500 });
+    const id = requestIdleCallback(run, { timeout: IDLE_RECHECK_DELAY_MS + 1500 });
+
+    return () => {
+      events.abort();
+      cancelIdleCallback(id);
+    };
   } else {
     // Safari has never implemented requestIdleCallback.
-    setTimeout(run, IDLE_RECHECK_DELAY_MS);
+    const id = setTimeout(run, IDLE_RECHECK_DELAY_MS);
+
+    return () => {
+      events.abort();
+      clearTimeout(id);
+    };
   }
 }
 

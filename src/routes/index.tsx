@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { PageController } from "../PageController";
+import { ApplicationRoute } from "../Application";
 
 export const Route = createFileRoute("/")({
-  component: () => <PageController page="home" />,
+  component: () => <ApplicationRoute page="home" />,
 });

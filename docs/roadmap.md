@@ -32,4 +32,6 @@ Each item depends on the preceding contracts and is complete only after its impl
 
 - Classroom detail, photos, weekly timelines, day selectors, favourite icons, and occupation popovers now render in React. Numeric/named bookmarks, mobile selection, metadata, refresh, and Info return checks preserve the source. Shared pill controls no longer clone HTML.
 
-Steps 1–3 are complete. Step 4 remains: startup is the one remaining frontend JavaScript module, and `allowJs` remains enabled until it is converted. The complete migration is not finished.
+- React now owns application startup, route activation, shell translations, splash errors, and teardown. The legacy bootstrap bridge, HTML renderers, label-cloning path, and last frontend JavaScript module are removed. `allowJs` is disabled.
+
+All four steps are complete. Production and beta builds, strict application TypeScript, Oxlint/Oxfmt, and both worker typechecks pass. Final desktop/mobile browser comparisons cover availability, classroom details, Info, search, favourites, time controls, locale failure/recovery, partial occupancy reloads, live maps, native hash navigation, and browser back/forward. Startup error/reload and timeout recovery match the source. Temporary production harnesses verify full-app unmount/remount and interruption of Info/classroom transitions. No dependencies or committed tests were added. Physical-device haptics and Safari-specific behavior remain unverified.

@@ -46,7 +46,7 @@ function parseDateKey(key: string) {
   return new Date(year, month - 1, day);
 }
 
-// Keep the startup controller's synchronous contract until it moves to React.
+// Publish synchronously so startup and reload handlers can read the form fields.
 // The preferred date is read after fonts settle, since time setup can set it later.
 export function setupDatePicker(getPreferInitialDate: () => string | null = () => null) {
   const availableDates = classroomsData.map((day) => day.date);

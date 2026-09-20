@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { animateI18nElement, getTranslationVersion, onTranslationChange, t } from "../i18n";
 import { createTimeFormatter } from "../utils/time-format";
 import { PickerMotion } from "./picker-motion";
-import { TimePicker } from "./time-picker";
+import { TimePicker, TimePickerBackdrop } from "./time-picker";
 import { TimeRangeSlider } from "./time-range-slider";
 import { subscribeTimeControls, timeControlsReady } from "./time-controls-state";
 
@@ -131,6 +131,7 @@ export function TimeRangeChipPicker() {
         </span>
         <i className="hgi-stroke hgi-arrow-down-01 trc-trigger__chevron" aria-hidden="true" />
       </button>
+      <TimePickerBackdrop />
       <div className="time-pickers-container">
         <div className="time-picker">
           <input

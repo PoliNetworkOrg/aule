@@ -83,6 +83,7 @@ class InfoPage {
   _stopLanguage: (() => void) | null = null;
   _timers = new Set<number>();
   _disposed = false;
+  _generation = 0;
   _later(callback: () => void, delay: number) {
     const id = window.setTimeout(() => {
       this._timers.delete(id);
@@ -95,6 +96,7 @@ class InfoPage {
   }
 
   init() {
+    this._generation++;
     this._disposed = false;
     this._events = new AbortController();
     this._overlay = document.getElementById("info-page-overlay");
@@ -202,6 +204,8 @@ class InfoPage {
   }
 
   _doOpen() {
+    const generation = this._generation;
+
     if (!this._overlay) return;
     this._isOpen = true;
 
@@ -228,7 +232,7 @@ class InfoPage {
       }
 
       const vt = document.startViewTransition(() => {
-        if (this._disposed) return;
+        if (this._disposed || generation !== this._generation) return;
 
         if (logoEl) logoEl.style.viewTransitionName = "";
 
@@ -265,7 +269,12 @@ class InfoPage {
       // InvalidStateError; .finished is handled below, but .ready isn't awaited
       // anywhere, so it was surfacing as an unhandled rejection on every abort.
       vt.ready.catch(() => {});
-      vt.finished.then(() => this._clearVtNames()).catch(() => this._clearVtNames());
+
+      const cleanup = () => {
+        if (generation === this._generation) this._clearVtNames();
+      };
+
+      vt.finished.then(cleanup).catch(cleanup);
     } else {
       this._tabbar?.classList.add("detail-open");
       document.body.classList.add("info-open");
@@ -281,6 +290,8 @@ class InfoPage {
   }
 
   _doClose() {
+    const generation = this._generation;
+
     if (!this._overlay || this._overlay!.hidden) return;
     this._isOpen = false;
 
@@ -292,6 +303,7 @@ class InfoPage {
     const heroBadge = this._overlay!.querySelector<HTMLElement>(".info-hero-badge");
 
     const cleanup = () => {
+      if (generation !== this._generation) return;
       this._clearContent();
       this._clearVtNames();
 
@@ -313,7 +325,7 @@ class InfoPage {
       if (heroBadge) heroBadge.style.viewTransitionName = "info-badge";
 
       const vt = document.startViewTransition(() => {
-        if (this._disposed) return;
+        if (this._disposed || generation !== this._generation) return;
 
         if (heroIcon) heroIcon.style.viewTransitionName = "";
 
@@ -660,6 +672,9 @@ class InfoPage {
     flushSync(() => this._root?.render(null));
   }
   destroy() {
+    this._generation++;
+    this._isOpen = false;
+    this._openedFromDetail = false;
     this._disposed = true;
     this._events.abort();
     this._contentEvents.abort();

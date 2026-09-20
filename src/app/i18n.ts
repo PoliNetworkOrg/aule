@@ -28,8 +28,6 @@ function notifyTranslations() {
   translationListeners.forEach((listener) => listener());
 }
 
-let _isLangSwitch = false;
-
 export async function initI18n() {
   const saved = localStorage.getItem(STORAGE_KEY);
   const detected = navigator.language.slice(0, 2).toLowerCase();
@@ -74,24 +72,8 @@ export function getLocale() {
   return currentLocale;
 }
 
-// Walk [data-i18n] and [data-i18n-attr] nodes and apply current translations.
-export function applyTranslations(root = document) {
-  root.querySelectorAll<HTMLElement>("[data-i18n]").forEach((el) => {
-    if (el.closest("[data-react-owned]")) return;
-    el.innerHTML = t(el.dataset.i18n!);
-
-    if (_isLangSwitch) animateI18nElement(el);
-  });
-  root.querySelectorAll<HTMLElement>("[data-i18n-attr]").forEach((el) => {
-    el.dataset.i18nAttr!.split(",").forEach((pair) => {
-      const [attr, key] = pair.split(":");
-      el.setAttribute(attr, t(key));
-    });
-  });
-}
-
 // Register a callback to be invoked after every locale switch.
-// Components with JS-built DOM use this to retranslate in-place.
+// Measured view controllers rebuild their React content after a locale change.
 export function onLanguageSwitch(cb: (lang: string) => void) {
   switchCallbacks.push(cb);
 
@@ -106,9 +88,6 @@ export async function setLocale(lang: string) {
   if (!SUPPORTED.includes(lang) || lang === currentLocale) return;
   await loadLocale(lang);
   localStorage.setItem(STORAGE_KEY, lang);
-  _isLangSwitch = true;
-  applyTranslations();
-  _isLangSwitch = false;
   notifyTranslations();
   switchCallbacks.forEach((cb) => cb(lang));
 }

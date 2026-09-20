@@ -220,6 +220,7 @@ class ClassroomDetail {
   _timers = new Set<number>();
   _frames = new Set<number>();
   _disposed = false;
+  _generation = 0;
   _frame(callback: () => void) {
     const id = requestAnimationFrame(() => {
       this._frames.delete(id);
@@ -254,6 +255,11 @@ class ClassroomDetail {
     flushSync(() => this._root?.render(null));
   }
   destroy() {
+    this._generation++;
+    this._pendingTrigger = null;
+    this._openTrigger = null;
+    this._queryContext = null;
+    this._openedViaPushState = false;
     this._disposed = true;
     this._events.abort();
     this._contentEvents.abort();
@@ -277,8 +283,9 @@ class ClassroomDetail {
     });
   }
 
-  // Called from script.js after all data is loaded.
+  // Called by the React application lifecycle after the directory loads.
   init(staticData: Campus[]) {
+    this._generation++;
     this._disposed = false;
     this._events = new AbortController();
     this._staticData = staticData;
@@ -519,6 +526,8 @@ class ClassroomDetail {
   // ---------- OPEN ----------
 
   async _doOpen(id: number, pending: OpenTrigger | null) {
+    const generation = this._generation;
+
     if (!this._overlay) return;
     this._buildFlatIndex();
 
@@ -551,7 +560,7 @@ class ClassroomDetail {
         .then(() => true)
         .catch(() => false);
 
-      if (this._currentId !== id) return; // navigated away during decode
+      if (this._currentId !== id || generation !== this._generation) return; // navigated away during decode
 
       // Decode failed (e.g. a 404 from a stale idfoto) — don't stamp a broken image as
       // "loaded" below. Leaving validPhotoUrl unset lets _loadPhoto()'s own error path
@@ -586,7 +595,7 @@ class ClassroomDetail {
       document.documentElement.classList.add("header-ctl-vt");
 
       const vt = document.startViewTransition(() => {
-        if (this._disposed) return;
+        if (this._disposed || generation !== this._generation) return;
 
         if (fromInfo) {
           infoPage._applyReturnVT();
@@ -639,6 +648,7 @@ class ClassroomDetail {
       });
 
       const cleanup = () => {
+        if (generation !== this._generation) return;
         this._overlay!.style.viewTransitionName = "";
 
         if (cardEl) cardEl.style.viewTransitionName = "";
@@ -691,6 +701,8 @@ class ClassroomDetail {
   // ---------- CLOSE ----------
 
   _doClose() {
+    const generation = this._generation;
+
     if (!this._overlay || this._overlay!.hidden) return;
 
     this._currentId = null;
@@ -700,6 +712,7 @@ class ClassroomDetail {
     const headerEl = document.querySelector<HTMLElement>(".header");
 
     const cleanup = () => {
+      if (generation !== this._generation) return;
       this._clearContent();
       this._openTrigger = null;
       this._queryContext = null;
@@ -733,7 +746,7 @@ class ClassroomDetail {
       document.documentElement.classList.add("header-ctl-vt");
 
       const vt = document.startViewTransition(() => {
-        if (this._disposed) return;
+        if (this._disposed || generation !== this._generation) return;
         // -- DOM changes (defines NEW state) --
 
         // Fully hide the overlay and back button

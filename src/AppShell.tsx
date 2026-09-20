@@ -11,13 +11,28 @@ import { CampusPicker } from "./app/components/campus-picker";
 import { TimeRangeChipPicker } from "./app/components/time-range-chip-picker";
 import { DateChipPicker } from "./app/components/date-chip-picker";
 import { Settings } from "./app/components/settings-host";
-import { loadApplication } from "./lib/application";
-import { useEffect } from "react";
+import { useLayoutEffect, useRef, useSyncExternalStore } from "react";
+import { getTranslationVersion, onTranslationChange, t, animateI18nElement } from "./app/i18n";
+import { RichText } from "./app/components/rich-text";
 
 export function AppShell() {
-  useEffect(() => {
-    void loadApplication();
-  }, []);
+  const translationVersion = useSyncExternalStore(onTranslationChange, getTranslationVersion);
+  const previousTranslation = useRef(translationVersion);
+  useLayoutEffect(() => {
+    if (previousTranslation.current > 0 && previousTranslation.current !== translationVersion)
+      document.querySelectorAll<HTMLElement>("[data-shell-i18n]").forEach(animateI18nElement);
+    previousTranslation.current = translationVersion;
+  }, [translationVersion]);
+  const hostname = location.hostname;
+
+  const envLabel =
+    hostname === "beta.poliaule.com"
+      ? "Beta"
+      : hostname === "dev.poliaule.com"
+        ? "Dev"
+        : hostname === "poliaule.com"
+          ? null
+          : "Local";
 
   return (
     <>
@@ -46,8 +61,8 @@ export function AppShell() {
 
               <div className="header-title-beta-container splash-header-item">
                 <h2 className="header-title">PoliAule</h2>
-                <h4 className="secondary" id="env-badge" hidden>
-                  Beta
+                <h4 className="secondary" id="env-badge" hidden={!envLabel}>
+                  {envLabel ?? "Beta"}
                 </h4>
               </div>
             </button>
@@ -59,9 +74,7 @@ export function AppShell() {
               className="header-button liquid-glass"
               hidden
               aria-label="Add to favourites"
-            >
-              <i className="hgi-stroke hgi-star" aria-hidden="true"></i>
-            </button>
+            />
 
             <button
               id="data-fetch-btn"
@@ -95,7 +108,9 @@ export function AppShell() {
             <div className="section-header">
               <h3 className="section-header-title">
                 <i className="hgi-stroke hgi-star section-header-title-icon" aria-hidden="true"></i>
-                <span data-i18n="favourites.title">Favourites</span>
+                <span data-shell-i18n="" data-i18n="favourites.title">
+                  <RichText text={t("favourites.title")} />
+                </span>
               </h3>
             </div>
             <Favourites />
@@ -107,7 +122,9 @@ export function AppShell() {
                 className="hgi-stroke hgi-calendar-03 section-header-title-icon"
                 aria-hidden="true"
               ></i>
-              <span data-i18n="available.title">Available Classrooms</span>
+              <span data-shell-i18n="" data-i18n="available.title">
+                <RichText text={t("available.title")} />
+              </span>
             </h3>
           </div>
 
@@ -141,22 +158,32 @@ export function AppShell() {
           className="transparent-button version-info-button"
           data-popover="version-info-popover"
         >
-          <label className="secondary" data-i18n="footer.versionInfo"></label>
+          <label className="secondary" data-shell-i18n="" data-i18n="footer.versionInfo">
+            <RichText text={t("footer.versionInfo")} />
+          </label>
         </button>
         <div id="version-info-popover" className="popover liquid-glass">
           <div className="arrow" data-arrow=""></div>
 
           <img src="/favicons/main/logo.webp" className="changelog-logo" width="434" height="500" />
-          <h1 className="popover-title" data-i18n="footer.versionInfo"></h1>
+          <h1 className="popover-title" data-shell-i18n="" data-i18n="footer.versionInfo">
+            <RichText text={t("footer.versionInfo")} />
+          </h1>
           <div className="changelog-container">
-            <h2 className="popover-subtitle" data-i18n="footer.whatsNew">
-              What's new?
+            <h2 className="popover-subtitle" data-shell-i18n="" data-i18n="footer.whatsNew">
+              <RichText text={t("footer.whatsNew")} />
             </h2>
 
             <ul>
-              <li data-i18n="changelog.item1"></li>
-              <li data-i18n="changelog.item2"></li>
-              <li data-i18n="changelog.item3"></li>
+              <li data-shell-i18n="" data-i18n="changelog.item1">
+                <RichText text={t("changelog.item1")} />
+              </li>
+              <li data-shell-i18n="" data-i18n="changelog.item2">
+                <RichText text={t("changelog.item2")} />
+              </li>
+              <li data-shell-i18n="" data-i18n="changelog.item3">
+                <RichText text={t("changelog.item3")} />
+              </li>
             </ul>
 
             <a
@@ -182,8 +209,8 @@ export function AppShell() {
                 24 5.67 18.627 0.297 12 0.297z"
                 />
               </svg>
-              <span className="hero-text" data-i18n="footer.checkOnGitHub">
-                Check on GitHub
+              <span className="hero-text" data-shell-i18n="" data-i18n="footer.checkOnGitHub">
+                <RichText text={t("footer.checkOnGitHub")} />
               </span>
             </a>
           </div>
@@ -191,7 +218,9 @@ export function AppShell() {
 
         <label className="secondary info-label">
           <strong>
-            <span data-i18n="footer.disclaimer5">Not affiliated with Politecnico di Milano.</span>
+            <span data-shell-i18n="" data-i18n="footer.disclaimer5">
+              <RichText text={t("footer.disclaimer5")} />
+            </span>
           </strong>
         </label>
       </footer>

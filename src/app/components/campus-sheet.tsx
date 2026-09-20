@@ -776,6 +776,7 @@ function attachSheet() {
     clearTimeout(wheelIdleTimer);
     cancelAnimationFrame(guardFrame);
     destroyCampusBuildingsPage();
+    ready = false;
   };
 }
 

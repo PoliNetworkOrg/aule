@@ -5,9 +5,8 @@ let content: ReactNode = null;
 
 const listeners = new Set<() => void>();
 
-// The remaining startup controller calls this after locale loading. Keep its
-// dependencies out of the shell's imports so custom elements still upgrade
-// after React has committed their light-DOM children.
+// Application initialization publishes the popup after the locale and directory
+// load. React owns its portal and releases the popup effects on unmount.
 export function mountSettings(popup: ReactNode) {
   content = popup;
   flushSync(() => listeners.forEach((listener) => listener()));
