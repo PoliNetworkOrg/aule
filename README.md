@@ -4,7 +4,7 @@ PoliAule's `dev` application migrated to Vite+, React, TypeScript, Tailwind CSS 
 
 Requires Node.js 22.18+ and pnpm 11.15.1.
 
-The production site is deployed to [aule.polinetwork.org](https://aule.polinetwork.org) by GitHub Pages whenever `main` changes. The custom-domain DNS record can be reapplied from the **Configure GitHub Pages domain** workflow.
+The production site is deployed to [aule.polinetwork.org](https://aule.polinetwork.org) by GitHub Pages whenever `main` changes.
 
 ```sh
 pnpm install --frozen-lockfile
