@@ -1,3 +1,13 @@
+interface GlassElement extends HTMLElement {
+  disabled?: boolean;
+  _lgActive?: boolean;
+  _lgSettleTimer?: ReturnType<typeof setTimeout>;
+  _liquidGlassBound?: boolean;
+  _lgCancel?: () => void;
+}
+
+const activeGlass = new Set<GlassElement>();
+
 // Liquid-glass press / swipe-deform + "lit" hover, shared by every glass
 // surface that opts in with the `liquid-glass` class.
 //
@@ -30,17 +40,18 @@ const PRESS_SCALE = 0.94;
 // ordinary taps on big surfaces (the building name pills) were being eaten.
 const DRAG_THRESHOLD = 8;
 
-function beginPress(el, e) {
+function beginPress(el: GlassElement, e: PointerEvent) {
   // Ignore secondary mouse buttons; let real clicks/taps through untouched.
   if (e.pointerType === "mouse" && e.button !== 0) return;
 
   if (el.disabled || el._lgActive) return;
   el._lgActive = true;
+  activeGlass.add(el);
 
   // Cancel a still-pending "settle" from a previous release on this element.
   if (el._lgSettleTimer) {
     clearTimeout(el._lgSettleTimer);
-    el._lgSettleTimer = 0;
+    el._lgSettleTimer = undefined;
   }
 
   const startX = e.clientX;
@@ -58,7 +69,7 @@ function beginPress(el, e) {
     /* not fatal */
   }
 
-  const onMove = (ev) => {
+  const onMove = (ev: PointerEvent) => {
     if (ev.pointerId !== e.pointerId) return;
     const dx = ev.clientX - startX;
     const dy = ev.clientY - startY;
@@ -91,7 +102,7 @@ function beginPress(el, e) {
     el.style.scale = `${sx.toFixed(4)} ${sy.toFixed(4)}`;
   };
 
-  const onEnd = (ev) => {
+  const onEnd = (ev: PointerEvent) => {
     if (ev.pointerId !== e.pointerId) return;
     el.removeEventListener("pointermove", onMove);
     el.removeEventListener("pointerup", onEnd);
@@ -109,7 +120,7 @@ function beginPress(el, e) {
     // release-over-the-element would otherwise fire. A plain tap never sets
     // `dragging`, so it's untouched.
     if (dragging) {
-      const swallow = (clickEv) => {
+      const swallow = (clickEv: MouseEvent) => {
         clickEv.stopImmediatePropagation();
         clickEv.preventDefault();
       };
@@ -132,11 +143,26 @@ function beginPress(el, e) {
 
     el._lgSettleTimer = setTimeout(
       () => {
-        el._lgSettleTimer = 0;
+        el._lgSettleTimer = undefined;
         el.classList.remove("lg-settling");
+        activeGlass.delete(el);
       },
       settleS * 1000 + 60,
     );
+  };
+
+  el._lgCancel = () => {
+    clearTimeout(el._lgSettleTimer);
+    el.removeEventListener("pointermove", onMove);
+    el.removeEventListener("pointerup", onEnd);
+    el.removeEventListener("pointercancel", onEnd);
+
+    if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId);
+    el._lgActive = false;
+    el.classList.remove("lg-pressing", "lg-dragging", "lg-settling");
+    el.style.translate = "";
+    el.style.scale = "";
+    activeGlass.delete(el);
   };
 
   el.addEventListener("pointermove", onMove);
@@ -154,17 +180,33 @@ function beginPress(el, e) {
 //   ignored.
 // The light-DOM delegated path reads the same two as `data-lg-from` /
 // `data-lg-exclude` attributes.
-export function attachLiquidGlass(el, opts = {}) {
+export function attachLiquidGlass(
+  el: GlassElement | null,
+  opts: { from?: string; exclude?: string } = {},
+) {
   if (!el || el._liquidGlassBound) return;
   el._liquidGlassBound = true;
   el.classList.add("liquid-glass");
   const { from, exclude } = opts;
-  el.addEventListener("pointerdown", (e) => {
-    if (from && !e.target.closest(from)) return;
+  const events = new AbortController();
+  el.addEventListener(
+    "pointerdown",
+    (e) => {
+      if (!(e.target instanceof Element)) return;
 
-    if (exclude && e.target.closest(exclude)) return;
-    beginPress(el, e);
-  });
+      if (from && !e.target.closest(from)) return;
+
+      if (exclude && e.target.closest(exclude)) return;
+      beginPress(el, e);
+    },
+    { signal: events.signal },
+  );
+
+  return () => {
+    events.abort();
+    el._lgCancel?.();
+    el._liquidGlassBound = false;
+  };
 }
 
 // Interactive elements that can sit *inside* a glass surface (a link in a
@@ -179,20 +221,33 @@ let delegated = false;
 export function initLiquidGlass() {
   if (delegated) return;
   delegated = true;
-  document.addEventListener("pointerdown", (e) => {
-    const el = e.target.closest?.(".liquid-glass");
+  const events = new AbortController();
+  document.addEventListener(
+    "pointerdown",
+    (e) => {
+      if (!(e.target instanceof Element)) return;
+      const el = e.target.closest<GlassElement>(".liquid-glass");
 
-    if (!el) return;
-    const inner = e.target.closest(INNER_CONTROL);
+      if (!el) return;
+      const inner = e.target.closest(INNER_CONTROL);
 
-    if (inner && inner !== el && el.contains(inner)) return;
-    // Same `from` / `exclude` gating as attachLiquidGlass(), via attributes.
-    const from = el.dataset?.lgFrom;
+      if (inner && inner !== el && el.contains(inner)) return;
+      // Same `from` / `exclude` gating as attachLiquidGlass(), via attributes.
+      const from = el.dataset?.lgFrom;
 
-    if (from && !e.target.closest(from)) return;
-    const exclude = el.dataset?.lgExclude;
+      if (from && !e.target.closest(from)) return;
+      const exclude = el.dataset?.lgExclude;
 
-    if (exclude && e.target.closest(exclude)) return;
-    beginPress(el, e);
-  });
+      if (exclude && e.target.closest(exclude)) return;
+      beginPress(el, e);
+    },
+    { signal: events.signal },
+  );
+
+  return () => {
+    events.abort();
+    delegated = false;
+
+    for (const element of activeGlass) element._lgCancel?.();
+  };
 }

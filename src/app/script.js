@@ -36,22 +36,20 @@ import { initSearchOverlay } from "./components/search-overlay.js";
 import { classroomDetail } from "./components/classroom-detail.js";
 import { infoPage } from "./components/info-page.js";
 
-import { initTimePickers } from "./components/time-picker.js";
-import { initTimeRangeSlider } from "./components/time-range-slider.js";
+import { initTimeControls } from "./components/time-controls-state.ts";
 import { setupCampusPicker } from "./components/campus-picker.js";
 import { initCampusMap } from "./components/campus-map.js";
 import { initCampusSheet } from "./components/campus-sheet.js";
 import { retranslateCampusBuildingsPage, goToBuilding } from "./components/campus-buildings.js";
 import { activateGroupTab } from "./components/bottom-nav.js";
 import { setupDatePicker } from "./components/date-picker.tsx";
-import "./components/time-range-chip-picker.js";
 import { initPickerDock } from "./components/picker-dock.ts";
 import "./components/data-fetch-card.js";
 
 import { haptics, defaultPatterns } from "./components/haptics.ts";
 import { buildCardForClassroom } from "./components/classroom-list.js";
 import { buildingOverview } from "./components/building-overview.js";
-import { initLiquidGlass } from "./components/liquid-glass.js";
+import { initLiquidGlass } from "./components/liquid-glass.ts";
 import { initFavourites, renderFavourites } from "./components/favourites.js";
 
 import {
@@ -452,8 +450,7 @@ export async function startApplication() {
     // Setup the time pickers to ensure valid time ranges
     // (these don't depend on occupancy data)
     setupTimePickers();
-    initTimePickers();
-    initTimeRangeSlider();
+    initTimeControls();
 
     // Decide pill vs. inline-expanded pickers based on the form column's width
     // (desktop two-column layout only).

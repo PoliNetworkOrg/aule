@@ -48,7 +48,20 @@
           "visible",
           "settings-toggle__thumb",
           "pill-active-cell",
-          "dcp-popup__title-text"
+          "dcp-popup__title-text",
+          "trc-trigger__value-from",
+          "trc-trigger__value-to",
+          "tp-switch__label",
+          "tp-step-minus",
+          "tp-step-plus",
+          "tp-popup__quick",
+          "tp-quick-now",
+          "tp-text-node",
+          "tp-quick-preset",
+          "tp-quick-label",
+          "trs-title-text",
+          "trs-badge--from",
+          "trs-badge--to"
         ]
       }
     ],

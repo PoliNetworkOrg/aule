@@ -1,3 +1,4 @@
+import { TimeRangeChipPicker } from "./app/components/time-range-chip-picker";
 import { DateChipPicker } from "./app/components/date-chip-picker";
 import { Settings } from "./app/components/settings-host";
 import { loadApplication } from "./lib/application";
@@ -114,23 +115,7 @@ export function AppShell() {
               <div className="picker-substack">
                 <DateChipPicker />
 
-                <time-range-chip-picker data-loading="">
-                  <div className="time-pickers-container">
-                    <div className="time-picker">
-                      <input
-                        type="time"
-                        id="from-time-picker"
-                        name="from"
-                        min="07:15"
-                        max="20:15"
-                      />
-                    </div>
-
-                    <div className="time-picker">
-                      <input type="time" id="to-time-picker" name="to" min="07:15" max="20:15" />
-                    </div>
-                  </div>
-                </time-range-chip-picker>
+                <TimeRangeChipPicker />
               </div>
             </div>
           </form>

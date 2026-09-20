@@ -12,7 +12,10 @@ const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
 // React owns the popup's children. This controller moves its portal container
 // between the document body and desktop dock and retains the original motion.
-export class DatePickerMotion {
+export class PickerMotion {
+  #prefix: string;
+  #width: number;
+  #onLayout: () => void;
   #host: HTMLElement;
   #trigger: HTMLButtonElement;
   #overlay: HTMLDivElement;
@@ -34,7 +37,13 @@ export class DatePickerMotion {
     overlay: HTMLDivElement,
     popup: HTMLDivElement,
     inner: HTMLDivElement,
+    prefix = "dcp",
+    width = 24,
+    onLayout: () => void = () => {},
   ) {
+    this.#onLayout = onLayout;
+    this.#prefix = prefix;
+    this.#width = width;
     this.#host = host;
     this.#trigger = trigger;
     this.#overlay = overlay;
@@ -53,6 +62,8 @@ export class DatePickerMotion {
     window.addEventListener(
       "resize",
       () => {
+        this.#onLayout();
+
         if (!this.#docked && this.#isOpen && !this.#isAnimating) {
           const target = this.#panelTarget();
           snapGeometry(this.#popup, target, target.borderRadius);
@@ -81,8 +92,8 @@ export class DatePickerMotion {
       if (this.#isOpen) this.#forceClose();
       this.#trigger.hidden = true;
       this.#overlay.hidden = true;
-      this.#popup.classList.remove("dcp-popup--closing");
-      this.#popup.classList.add("dcp-popup--docked", "dcp-popup--open");
+      this.#popup.classList.remove(`${this.#prefix}-popup--closing`);
+      this.#popup.classList.add(`${this.#prefix}-popup--docked`, `${this.#prefix}-popup--open`);
       (
         ["left", "top", "width", "height", "borderRadius", "transform", "transition"] as const
       ).forEach((p) => {
@@ -90,11 +101,12 @@ export class DatePickerMotion {
       });
       this.#popup.style.display = "flex";
       this.#host.appendChild(this.#popup);
+      this.#onLayout();
       // The sliding picker had no layout while display:none — date-picker.js's
       // own ResizeObserver on .date-picker fires on this reveal; nudge it too.
       window.dispatchEvent(new Event("resize"));
     } else {
-      this.#popup.classList.remove("dcp-popup--docked", "dcp-popup--open");
+      this.#popup.classList.remove(`${this.#prefix}-popup--docked`, `${this.#prefix}-popup--open`);
       this.#popup.style.display = "none";
       (
         ["left", "top", "width", "height", "borderRadius", "transform", "transition"] as const
@@ -112,7 +124,7 @@ export class DatePickerMotion {
     this.#isOpen = false;
     this.#isAnimating = false;
     this.#trigger.setAttribute("aria-expanded", "false");
-    this.#popup.classList.remove("dcp-popup--open", "dcp-popup--closing");
+    this.#popup.classList.remove(`${this.#prefix}-popup--open`, `${this.#prefix}-popup--closing`);
     this.#overlay.classList.remove("is-active");
     this.#popup.style.display = "none";
     this.#popup.style.transition = "";
@@ -121,7 +133,7 @@ export class DatePickerMotion {
     });
     unhideInnerBox(this.#inner);
     this.#overlay.hidden = true;
-    this.#host.classList.remove("dcp-anim", "dcp-content-hidden");
+    this.#host.classList.remove(`${this.#prefix}-anim`, `${this.#prefix}-content-hidden`);
     this.#unlockScroll();
   }
 
@@ -142,7 +154,7 @@ export class DatePickerMotion {
     const vh = window.innerHeight;
     const PAD = 8;
     const r = this.#trigger.getBoundingClientRect();
-    const width = Math.min(24 * 16, vw - PAD * 2);
+    const width = Math.min(this.#width * 16, vw - PAD * 2);
 
     const s = this.#popup.style;
     const prev = s.transition;
@@ -195,13 +207,13 @@ export class DatePickerMotion {
 
     // A close may have got as far as tagging the shell/pill for its handoff,
     // or hiding the picker's content (see #close) — undo both before reopening.
-    this.#popup.classList.remove("dcp-popup--closing");
-    this.#host.classList.remove("dcp-content-hidden");
+    this.#popup.classList.remove(`${this.#prefix}-popup--closing`);
+    this.#host.classList.remove(`${this.#prefix}-content-hidden`);
     unhideInnerBox(this.#inner);
 
     this.#overlay.hidden = false;
     this.#popup.style.display = "flex";
-    this.#host.classList.add("dcp-anim");
+    this.#host.classList.add(`${this.#prefix}-anim`);
 
     const target = this.#panelTarget();
 
@@ -209,7 +221,7 @@ export class DatePickerMotion {
       snapGeometry(this.#popup, target, target.borderRadius);
       this.#popup.style.transition = "none";
       this.#overlay.classList.add("is-active");
-      this.#popup.classList.add("dcp-popup--open");
+      this.#popup.classList.add(`${this.#prefix}-popup--open`);
       this.#isAnimating = false;
       this.#afterOpen();
 
@@ -230,7 +242,7 @@ export class DatePickerMotion {
         onSettle: () => {
           if (seq !== this.#seq) return;
           this.#overlay.classList.add("is-active");
-          this.#popup.classList.add("dcp-popup--open");
+          this.#popup.classList.add(`${this.#prefix}-popup--open`);
           this.#onMorphEnd(() => {
             if (seq !== this.#seq) return;
             this.#isAnimating = false;
@@ -243,6 +255,7 @@ export class DatePickerMotion {
 
   #afterOpen() {
     if (!this.#isOpen) return;
+    this.#onLayout();
     // The sliding picker was display:none until now; its own ResizeObserver
     // (date-picker.js) fires on the reveal and repositions the indicator.
     this.#popup.focus?.({ preventScroll: true });
@@ -255,12 +268,12 @@ export class DatePickerMotion {
     this.#isAnimating = true;
     this.#trigger.setAttribute("aria-expanded", "false");
 
-    this.#popup.classList.remove("dcp-popup--open");
+    this.#popup.classList.remove(`${this.#prefix}-popup--open`);
     this.#overlay.classList.remove("is-active");
 
     const clear = () => {
       if (seq !== this.#seq) return;
-      this.#popup.classList.remove("dcp-popup--closing");
+      this.#popup.classList.remove(`${this.#prefix}-popup--closing`);
       this.#popup.style.display = "none";
       this.#popup.style.transition = "";
       (["left", "top", "width", "height", "borderRadius", "transform"] as const).forEach((p) => {
@@ -268,7 +281,7 @@ export class DatePickerMotion {
       });
       unhideInnerBox(this.#inner);
       this.#overlay.hidden = true;
-      this.#host.classList.remove("dcp-anim", "dcp-content-hidden");
+      this.#host.classList.remove(`${this.#prefix}-anim`, `${this.#prefix}-content-hidden`);
       this.#unlockScroll();
     };
 
@@ -301,15 +314,15 @@ export class DatePickerMotion {
             this.#isAnimating = false;
             // Hand the frame back to the pill: swap the identical glass box
             // instantly, fade the pill's contents in as the shell fades out.
-            this.#host.classList.remove("dcp-anim");
-            this.#host.classList.add("dcp-content-hidden");
-            this.#popup.classList.add("dcp-popup--closing");
+            this.#host.classList.remove(`${this.#prefix}-anim`);
+            this.#host.classList.add(`${this.#prefix}-content-hidden`);
+            this.#popup.classList.add(`${this.#prefix}-popup--closing`);
             this.#overlay.hidden = true;
             this.#unlockScroll();
             requestAnimationFrame(() =>
               requestAnimationFrame(() => {
                 if (seq !== this.#seq) return;
-                this.#host.classList.remove("dcp-content-hidden");
+                this.#host.classList.remove(`${this.#prefix}-content-hidden`);
               }),
             );
             this.#cleanupTimer = window.setTimeout(clear, 240);

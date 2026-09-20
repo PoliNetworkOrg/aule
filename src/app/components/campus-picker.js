@@ -5,7 +5,7 @@ import {
   offset,
 } from "https://cdn.jsdelivr.net/npm/@floating-ui/dom@1/+esm";
 import { haptics, defaultPatterns } from "./haptics.ts";
-import { attachLiquidGlass } from "./liquid-glass.js";
+import { attachLiquidGlass } from "./liquid-glass.ts";
 import { t } from "../i18n.ts";
 import { BLUR_STATE_EVENT } from "../utils/blur-capability.ts";
 import {

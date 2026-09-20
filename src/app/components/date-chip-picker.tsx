@@ -2,7 +2,7 @@ import { useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { getLocale, getTranslationVersion, onLanguageSwitch, t, animateI18nElement } from "../i18n";
 import { DatePicker } from "./date-picker";
-import { DatePickerMotion } from "./date-picker-motion";
+import { PickerMotion } from "./picker-motion";
 import { getDatePickerData, subscribeDates } from "./date-picker-state";
 
 function createPopupContainer() {
@@ -38,7 +38,7 @@ export function DateChipPicker() {
 
     if (!element || !button || !backdrop || !content || !dateSelect) return;
     document.body.appendChild(popup);
-    const motion = new DatePickerMotion(element, button, backdrop, popup, content);
+    const motion = new PickerMotion(element, button, backdrop, popup, content);
 
     // The remaining docking/startup controllers call these methods on the
     // original tag. There is no custom element renderer competing with React.
