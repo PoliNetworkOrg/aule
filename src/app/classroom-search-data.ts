@@ -1,4 +1,4 @@
-import type { Campus, Classroom, Building } from "./types";
+import type { Campus, Classroom } from "./types";
 
 export interface SearchRoom extends Classroom {
   buildingName: string;
@@ -38,11 +38,7 @@ interface OccupationRow extends OccupationSession {
 }
 
 import { fetchJson } from "../lib/query";
-import {
-  getClassroomStatusNow,
-  classroomsData as occupancyDays,
-} from "./available-rooms-script.ts";
-import { buildCardForClassroom } from "./components/classroom-list.js";
+import { classroomsData as occupancyDays } from "./available-rooms-script.ts";
 import { getApiBase } from "./config.ts";
 
 // Static classroom directory (campus → buildings → classrooms) plus the text /
@@ -102,19 +98,6 @@ export function runClassroomSearch(query: string) {
   };
 }
 
-// Results span multiple campuses, so fold the campus name into the building
-// line (the card only has room for one line of building/location context).
-export function buildSearchResultCard(room: SearchRoom, query = "") {
-  return buildClassroomCard(
-    room,
-    {
-      name: room.buildingName,
-      altName: [room.buildingAltName, room.campusName].filter(Boolean).join(" · "),
-    },
-    query.trim(),
-  );
-}
-
 function buildSearchIndex() {
   const index: SearchRoom[] = [];
 
@@ -132,18 +115,6 @@ function buildSearchIndex() {
   }
 
   return index;
-}
-
-// Classroom cards reuse the exact card built for the Available tab
-// (components/classroom-list.js).
-function buildClassroomCard(
-  room: Classroom,
-  building: Pick<Building, "name" | "altName">,
-  query = "",
-) {
-  const status = getClassroomStatusNow(room.id);
-
-  return buildCardForClassroom({ ...room, status }, building, null, null, false, null, query, true);
 }
 
 // ---------- OCCUPATION (lesson / exam) SEARCH ----------

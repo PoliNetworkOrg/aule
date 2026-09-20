@@ -12,7 +12,7 @@ import { t, onTranslationChange, getTranslationVersion } from "../i18n.ts";
 import { useLayoutEffect, useSyncExternalStore } from "react";
 import { DEFAULT_TAB_KEY, LAST_TAB_KEY, getStartupTabId } from "./settings.tsx";
 import { Spring, onSpringFrame } from "../utils/spring.ts";
-import { openSearchOverlay } from "./search-overlay.js";
+import { openSearchOverlay } from "./search-overlay.tsx";
 
 const GROUP_TABS = [
   { target: "available-classrooms-container", icon: "hgi-calendar-03", labelKey: "tabs.available" },

@@ -22,4 +22,6 @@ Each item depends on the preceding contracts and is complete only after its impl
 
 - Bottom navigation, keyboard shortcut help, and tooltips now render in React. Navigation retains its springs, pointer dragging, keyboard controls, saved tab, and responsive layout. Initial dictionary loading now notifies React subscribers separately from language-switch callbacks. Desktop/mobile comparisons match the source.
 
-Step 2 remains in progress. Shared cards and the data-status popup still need React conversion. Other views and startup also remain on the legacy controllers. There are 11 frontend JavaScript modules left; `allowJs` remains enabled until they are converted. The complete frontend migration is not finished.
+- Search results, lesson/exam cards, favourites, and the data-status popup now render in React. Typed controllers retain search transitions, viewport tracking, retry timing, popup geometry, and reload behavior. Desktop/mobile comparisons cover result ordering, highlights, detail navigation, favourite state, reloads, and locale changes.
+
+Step 2 remains in progress. The React classroom card is used by search and favourites; availability and Campus still use the legacy card builder. Other views and startup also remain on the legacy controllers. There are 8 frontend JavaScript modules left; `allowJs` remains enabled until they are converted. The complete frontend migration is not finished.

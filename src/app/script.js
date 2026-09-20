@@ -32,7 +32,6 @@ import {
   ensureClassroomDirectory,
   classroomsData as staticClassroomsData,
 } from "./classroom-search-data.ts";
-import { initSearchOverlay } from "./components/search-overlay.js";
 import { classroomDetail } from "./components/classroom-detail.js";
 import { infoPage } from "./components/info-page.js";
 
@@ -44,22 +43,15 @@ import { retranslateCampusBuildingsPage, goToBuilding } from "./components/campu
 import { activateGroupTab } from "./components/bottom-nav.tsx";
 import { setupDatePicker } from "./components/date-picker.tsx";
 import { initPickerDock } from "./components/picker-dock.ts";
-import "./components/data-fetch-card.js";
+import { renderDataFetchStatus, setDataFetchReloading } from "./components/data-fetch-card";
 
 import { haptics, defaultPatterns } from "./components/haptics.ts";
 import { buildCardForClassroom } from "./components/classroom-list.js";
 import { buildingOverview } from "./components/building-overview.js";
 import { initLiquidGlass } from "./components/liquid-glass.ts";
-import { initFavourites, renderFavourites } from "./components/favourites.js";
+import { initFavourites, renderFavourites } from "./components/favourites.tsx";
 
-import {
-  initI18n,
-  t,
-  getLocale,
-  applyTranslations,
-  onLanguageSwitch,
-  animateI18nElement,
-} from "./i18n.ts";
+import { initI18n, t, applyTranslations, onLanguageSwitch } from "./i18n.ts";
 import { escapeHtml } from "./utils/html.ts";
 import {
   initSettings,
@@ -420,7 +412,6 @@ export async function startApplication() {
     infoPage.init();
 
     // Search overlay (bottom-nav FAB) — lazy-loads its data on first open
-    initSearchOverlay();
 
     // Init classroom detail overlay (hash routing + VT morph)
     classroomDetail.init(staticClassroomsData);
@@ -779,57 +770,10 @@ function setupDataFetchIndicator() {
 
 // Setups the text inside the popover shown in the Data Fetch Indicator
 function setupDataFetchIndicatorText(animate = false) {
-  const container = document.getElementById("data-fetch-indicator-popover-container");
-
-  const states = {
-    green: {
-      title: t("data.greenTitle"),
-      description: t("data.greenDesc"),
-    },
-    yellow: {
-      title: t("data.yellowTitle"),
-      description: t("data.yellowDesc"),
-    },
-    red: {
-      title: t("data.redTitle"),
-      description: t("data.redDesc"),
-    },
-  };
-
-  // Derive current status from the indicator's classes
   const indicator = document.getElementById("data-fetch-indicator");
   const status = ["green", "yellow", "red"].find((s) => indicator.classList.contains(s)) ?? "red";
-  const { title, description } = states[status];
-
-  // Last fetch time
   const generationDate = classroomsData[0] ? new Date(classroomsData[0].generated_at + "Z") : null;
-
-  const dateLocale = getLocale() === "it" ? "it-IT" : "en-GB";
-
-  const formattedTime = generationDate
-    ? generationDate.toLocaleString(dateLocale, {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
-        timeZone: "Europe/Rome",
-      })
-    : "—";
-
-  container.innerHTML = `
-    <h1 class="popover-title ${status}">${title}</h1>
-    <p class="data-status-description secondary">${description}</p>
-    <label class="data-status-time secondary">${t("data.lastFetched")}: ${formattedTime}</label>
-    <button id="reload-data-btn" class="button-primary button-secondary data-reload-btn">
-      <i class="hgi-stroke hgi-refresh data-reload-icon" aria-hidden="true"></i>
-      <span class="data-reload-label">${t("data.reload")}</span>
-    </button>
-  `;
-  document.getElementById("reload-data-btn").addEventListener("click", reloadOccupancyData);
-
-  if (animate) animateI18nElement(container);
+  renderDataFetchStatus(status, generationDate, reloadOccupancyData, animate);
 }
 
 async function reloadOccupancyData() {
@@ -837,9 +781,7 @@ async function reloadOccupancyData() {
 
   if (!btn || btn.disabled) return;
 
-  btn.disabled = true;
-  btn.querySelector(".data-reload-icon").classList.add("spinning");
-  btn.querySelector(".data-reload-label").textContent = t("data.reloading");
+  setDataFetchReloading(true);
 
   await fetchClassroomsData();
 

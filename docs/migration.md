@@ -113,3 +113,11 @@ Production/beta builds and lint pass. Temporary Chromium comparisons at 1440×10
 React now renders bottom navigation, its animated duplicate labels, keyboard shortcut help, and tooltips. Navigation retains the source gesture and spring calculations with cleanup for observers, listeners, frames, timers, and springs. Dictionary subscriptions notify React after initial locale loading as well as subsequent switches, without triggering legacy language-switch actions during startup.
 
 Production/beta builds and lint pass. Temporary Chromium comparisons at desktop and mobile widths matched navigation geometry, tab clicks, arrow-key changes, pill dragging, search opening, help text, and Italian labels with no browser errors. Eleven frontend JavaScript modules remain.
+
+### React search, favourites, and data-status checkpoint
+
+Search and favourites use a shared React classroom card with lazy photos, query highlighting, status text, and favourite subscriptions. Search also renders lesson/exam groups and session links in React. Its typed controller preserves debounce, delayed occupancy rechecks, keyboard viewport tracking, and the original transitions. Effects release observers, listeners, frames, and timers. Availability and Campus will adopt the shared card in their subsequent view conversions.
+
+The data-status popup, labels, reload button, and loading state now render in React. Its typed motion controller retains the source geometry and dismissals. Static markers from the original markup are explicitly allowed by the class lint rule.
+
+Production/beta builds and lint pass. Temporary desktop/mobile Chromium comparisons matched search results, highlights, sampled card layout, detail links, favourites, empty/cleared results, data-status text, reload behavior, and Italian labels. The migrated app reported no browser errors. The source emitted a skipped-view-transition error during search-to-detail navigation; this did not change the compared results. Eight frontend JavaScript modules remain.

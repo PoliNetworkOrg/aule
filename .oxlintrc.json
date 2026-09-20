@@ -84,7 +84,12 @@
           "cp-popup__title-icon",
           "cp-popup__title-text",
           "cp-section",
-          "cp-section-label"
+          "cp-section-label",
+          "star-icon--filled",
+          "classroom-card--plain",
+          "data-status-description",
+          "data-status-time",
+          "data-reload-label"
         ]
       }
     ],

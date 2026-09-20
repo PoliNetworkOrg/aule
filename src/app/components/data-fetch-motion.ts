@@ -27,71 +27,59 @@ const MORPH_MS = 420;
 
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
-class DataFetchCard {
-  #trigger = null;
-  #overlay = null;
-  #popup = null;
-  #inner = null;
+export class DataFetchMotion {
+  #trigger: HTMLElement;
+  #overlay: HTMLElement;
+  #popup: HTMLElement;
+  #inner: HTMLElement;
   #isOpen = false;
   #isAnimating = false;
-  #preventScroll = null;
+  #preventScroll: ((event: WheelEvent | TouchEvent) => void) | null = null;
   #scrollLocked = false;
   // Bumped on every open/close so deferred steps from a superseded transition
   // can detect they're stale and bail — otherwise a fast close→open tears the
   // freshly-opened card back down.
   #seq = 0;
   #cleanupTimer = 0;
-  #morphCleanup = null;
+  #morphCleanup: (() => void) | null = null;
 
-  init() {
-    if (this.#trigger) return; // already initialized
-
-    this.#trigger = document.getElementById("data-fetch-btn");
-    const container = document.getElementById("data-fetch-indicator-popover-container");
-
-    if (!this.#trigger || !container) return;
-
+  #events = new AbortController();
+  constructor() {
+    this.#trigger = document.getElementById("data-fetch-btn")!;
+    this.#overlay = document.querySelector<HTMLElement>(".dfc-overlay")!;
+    this.#popup = document.querySelector<HTMLElement>(".dfc-popup")!;
+    this.#inner = this.#popup.querySelector<HTMLElement>(".dfc-popup__inner")!;
     this.#trigger.setAttribute("aria-haspopup", "dialog");
     this.#trigger.setAttribute("aria-expanded", "false");
-
-    // ── Overlay + morphing card shell ───────────────────────────────
-    this.#overlay = document.createElement("div");
-    this.#overlay.className = "dfc-overlay";
-    this.#overlay.hidden = true;
-
-    this.#popup = document.createElement("div");
-    this.#popup.className = "dfc-popup liquid-glass";
-    this.#popup.setAttribute("role", "dialog");
-    this.#popup.setAttribute("aria-modal", "true");
-    this.#popup.tabIndex = -1;
-    this.#popup.innerHTML = `<div class="dfc-popup__inner"></div>`;
-    this.#inner = this.#popup.querySelector(".dfc-popup__inner");
-
-    // Move script.js's status container into the card. Appended to <body>, not
-    // kept in the header: a position:fixed + backdrop-filter panel trapped in
-    // the header's stacking context makes iOS Safari mispaint the safe-area
-    // bars (same reason the pickers portal to the root).
-    this.#inner.appendChild(container);
-    document.body.appendChild(this.#overlay);
-    document.body.appendChild(this.#popup);
-
     // ── Wiring ─────────────────────────────────────────────────────
-    this.#trigger.addEventListener("click", () => this.#toggle());
-    this.#overlay.addEventListener("click", () => this.#close());
-    document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") this.#close();
-    });
+    this.#trigger.addEventListener("click", () => this.#toggle(), { signal: this.#events.signal });
+    this.#overlay.addEventListener("click", () => this.#close(), { signal: this.#events.signal });
+    document.addEventListener(
+      "keydown",
+      (e) => {
+        if (e.key === "Escape") this.#close();
+      },
+      { signal: this.#events.signal },
+    );
     // The reload button is rebuilt by setupDataFetchIndicatorText each render;
     // close the card whenever a click inside it lands on that button.
-    this.#inner.addEventListener("click", (e) => {
-      if (e.target.closest("#reload-data-btn")) this.#close();
-    });
-    window.addEventListener("resize", () => {
-      if (this.#isOpen && !this.#isAnimating) {
-        const target = this.#panelTarget();
-        snapGeometry(this.#popup, target, target.borderRadius);
-      }
-    });
+    this.#inner.addEventListener(
+      "click",
+      (e) => {
+        if (e.target instanceof Element && e.target.closest("#reload-data-btn")) this.#close();
+      },
+      { signal: this.#events.signal },
+    );
+    window.addEventListener(
+      "resize",
+      () => {
+        if (this.#isOpen && !this.#isAnimating) {
+          const target = this.#panelTarget();
+          snapGeometry(this.#popup, target, target.borderRadius);
+        }
+      },
+      { signal: this.#events.signal },
+    );
   }
 
   // ── Geometry ──────────────────────────────────────────────────────
@@ -225,8 +213,8 @@ class DataFetchCard {
       this.#popup.classList.remove("dfc-popup--closing");
       this.#popup.style.display = "none";
       this.#popup.style.transition = "";
-      ["left", "top", "width", "height", "borderRadius", "transform"].forEach((p) => {
-        this.#popup.style[p] = "";
+      ["left", "top", "width", "height", "border-radius", "transform"].forEach((p) => {
+        this.#popup.style.removeProperty(p);
       });
       unhideInnerBox(this.#inner);
       this.#overlay.hidden = true;
@@ -274,28 +262,28 @@ class DataFetchCard {
                 this.#trigger.classList.remove("dfc-content-hidden");
               }),
             );
-            this.#cleanupTimer = setTimeout(clear, 240);
+            this.#cleanupTimer = window.setTimeout(clear, 240);
           });
         },
       });
     });
   }
 
-  #onMorphEnd(cb) {
+  #onMorphEnd(cb: () => void) {
     this.#clearMorphEnd();
 
-    const fallback = setTimeout(() => {
+    const fallback = window.setTimeout(() => {
       this.#clearMorphEnd();
       cb();
     }, MORPH_MS + 60);
 
-    const handler = (e) => {
+    const handler = (e: TransitionEvent) => {
       if (e.target !== this.#popup || e.propertyName !== "transform") return;
       this.#clearMorphEnd();
       cb();
     };
 
-    this.#popup.addEventListener("transitionend", handler);
+    this.#popup.addEventListener("transitionend", handler, { signal: this.#events.signal });
     this.#morphCleanup = () => {
       clearTimeout(fallback);
       this.#popup.removeEventListener("transitionend", handler);
@@ -312,28 +300,37 @@ class DataFetchCard {
     if (this.#scrollLocked) return;
     this.#scrollLocked = true;
     this.#preventScroll = (e) => {
-      if (this.#inner.contains(e.target) && this.#inner.scrollHeight > this.#inner.clientHeight)
+      if (
+        e.target instanceof Node &&
+        this.#inner.contains(e.target) &&
+        this.#inner.scrollHeight > this.#inner.clientHeight
+      )
         return;
       e.preventDefault();
     };
 
-    window.addEventListener("wheel", this.#preventScroll, { passive: false });
-    window.addEventListener("touchmove", this.#preventScroll, { passive: false });
+    window.addEventListener("wheel", this.#preventScroll, {
+      passive: false,
+      signal: this.#events.signal,
+    });
+    window.addEventListener("touchmove", this.#preventScroll, {
+      passive: false,
+      signal: this.#events.signal,
+    });
   }
 
   #unlockScroll() {
     if (!this.#scrollLocked) return;
     this.#scrollLocked = false;
-    window.removeEventListener("wheel", this.#preventScroll);
-    window.removeEventListener("touchmove", this.#preventScroll);
+    window.removeEventListener("wheel", this.#preventScroll!);
+    window.removeEventListener("touchmove", this.#preventScroll!);
     this.#preventScroll = null;
   }
-}
-
-const card = new DataFetchCard();
-
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", () => card.init());
-} else {
-  card.init();
+  destroy() {
+    this.#beginOp();
+    this.#events.abort();
+    this.#unlockScroll();
+    this.#trigger.classList.remove("dfc-anim", "dfc-content-hidden");
+    this.#trigger.setAttribute("aria-expanded", "false");
+  }
 }

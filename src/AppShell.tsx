@@ -1,3 +1,6 @@
+import { DataFetchCard } from "./app/components/data-fetch-card";
+import { SearchOverlay } from "./app/components/search-overlay";
+import { Favourites } from "./app/components/favourites";
 import { BottomNavigation } from "./app/components/bottom-nav";
 import { KeyboardShortcuts } from "./app/components/keybindings";
 import { Tooltip } from "./app/components/tooltip";
@@ -92,14 +95,7 @@ export function AppShell() {
                 <span data-i18n="favourites.title">Favourites</span>
               </h3>
             </div>
-            <div id="favourites-carousel" className="favourites-carousel" hidden></div>
-            <p
-              id="favourites-empty"
-              className="favourites-empty secondary"
-              data-i18n="favourites.empty"
-            >
-              Star a classroom to pin it here.
-            </p>
+            <Favourites />
           </div>
 
           <div className="section-header">
@@ -202,52 +198,9 @@ export function AppShell() {
         </label>
       </footer>
 
-      <div
-        id="data-fetch-indicator-popover-container"
-        className="data-fetch-popover-container"
-      ></div>
+      <DataFetchCard />
 
-      <div id="search-overlay" className="search-overlay-backdrop" hidden>
-        <div
-          className="search-overlay-panel"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Search classrooms"
-        >
-          <div className="search-overlay-header">
-            <div className="search-bar-wrapper liquid-glass">
-              <i className="hgi-stroke hgi-search-01" aria-hidden="true"></i>
-              <input
-                type="text"
-                id="classroom-search-input"
-                className="search-input"
-                data-i18n-attr="placeholder:search.inputPlaceholder"
-                placeholder="e.g. 2.0.1, Trifoglio..."
-                autoComplete="off"
-                spellCheck="false"
-              />
-              <button
-                id="classroom-search-clear"
-                className="search-clear-btn"
-                type="button"
-                tabIndex={-1}
-                aria-label="Clear search"
-              >
-                <i className="hgi-stroke hgi-cancel-01" aria-hidden="true"></i>
-              </button>
-            </div>
-            <button
-              id="search-overlay-close"
-              className="search-overlay-close liquid-glass"
-              type="button"
-              aria-label="Close search"
-            >
-              <i className="hgi-stroke hgi-cancel-01" aria-hidden="true"></i>
-            </button>
-          </div>
-          <div id="search-overlay-results" className="search-overlay-results"></div>
-        </div>
-      </div>
+      <SearchOverlay />
 
       <BottomNavigation />
     </>

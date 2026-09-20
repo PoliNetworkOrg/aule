@@ -2,7 +2,7 @@ import { Fragment, useLayoutEffect, useRef, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { t, onTranslationChange, getTranslationVersion } from "../i18n";
 import { activateGroupTab } from "./bottom-nav.tsx";
-import { openSearchOverlay } from "./search-overlay.js";
+import { openSearchOverlay } from "./search-overlay.tsx";
 import { toggleSettings } from "./settings";
 
 const desktopMQ = matchMedia("(min-width: 600px)");
