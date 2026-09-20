@@ -43,10 +43,9 @@ import { initCampusMap } from "./components/campus-map.js";
 import { initCampusSheet } from "./components/campus-sheet.js";
 import { retranslateCampusBuildingsPage, goToBuilding } from "./components/campus-buildings.js";
 import { activateGroupTab } from "./components/bottom-nav.js";
-import { setupDatePicker } from "./components/date-picker.js";
-import "./components/date-chip-picker.js";
+import { setupDatePicker } from "./components/date-picker.tsx";
 import "./components/time-range-chip-picker.js";
-import { initPickerDock } from "./components/picker-dock.js";
+import { initPickerDock } from "./components/picker-dock.ts";
 import "./components/data-fetch-card.js";
 
 import { haptics, defaultPatterns } from "./components/haptics.ts";

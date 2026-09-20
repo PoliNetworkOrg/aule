@@ -52,7 +52,7 @@ export function initPickerDock() {
 
   let lastPrint = "";
 
-  const apply = (n) => {
+  const apply = (n: number) => {
     compacted = Math.max(0, Math.min(priority.length, n));
     priority.forEach((el, i) => el.setDocked(i >= compacted));
   };
@@ -94,10 +94,20 @@ export function initPickerDock() {
     running = false;
   };
 
-  new ResizeObserver(settle).observe(row);
+  const observer = new ResizeObserver(settle);
+  observer.observe(row);
   window.addEventListener("resize", settle);
   twoCol.addEventListener("change", settle);
   document.getElementById("available-classrooms-container")?.addEventListener("tabvisible", settle);
 
   settle();
+
+  return () => {
+    observer.disconnect();
+    window.removeEventListener("resize", settle);
+    twoCol.removeEventListener("change", settle);
+    document
+      .getElementById("available-classrooms-container")
+      ?.removeEventListener("tabvisible", settle);
+  };
 }

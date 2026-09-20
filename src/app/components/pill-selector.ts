@@ -7,7 +7,7 @@
 // day-chip selector (classroom-detail.js), which share the same markup/CSS
 // but otherwise have independent selection logic (hidden <select> vs.
 // schedule row highlight).
-import { createPillDragCore } from "./pill-drag-core.ts";
+import { createPillDragCore, type PillSelection } from "./pill-drag-core.ts";
 import { haptics, defaultPatterns } from "./haptics.ts";
 
 // container: the `.date-picker-container` element (already position:relative,
@@ -22,9 +22,24 @@ import { haptics, defaultPatterns } from "./haptics.ts";
 // `silent` is true only for a caller-initiated selectElement(el, { silent: true })
 // (e.g. an initial auto-select) — callers use it to skip haptics/side effects
 // that shouldn't fire on page load.
+interface DateSelectorOptions {
+  isSkipped?: (element: HTMLElement) => boolean;
+  onSelect?: (element: HTMLElement, options: { silent: boolean }) => void;
+  rendered?: {
+    items: HTMLElement;
+    indicator: HTMLElement;
+    activeRow: HTMLElement;
+    hit: HTMLElement;
+  };
+}
+
 export function createPillSelector(
-  container,
-  { isSkipped = (el) => el.classList.contains("date-skipped"), onSelect } = {},
+  container: HTMLElement,
+  {
+    isSkipped = (el) => el.classList.contains("date-skipped"),
+    onSelect,
+    rendered,
+  }: DateSelectorOptions = {},
 ) {
   // container's own parent — .date-picker / .detail-schedule-day-selector,
   // both already position:relative. The indicator (+ hit overlay) live here
@@ -34,10 +49,13 @@ export function createPillSelector(
   // runtime): Safari doesn't reliably recompute an element's backdrop-filter
   // root after it's moved out from under a backdrop-filter'd ancestor via
   // JS, which silently killed the indicator's lift-blur there.
-  const wrapper = container.parentElement;
+  const wrapper = container.parentElement!;
+  const events = new AbortController();
 
-  const indicator = wrapper.querySelector(":scope > .date-indicator");
-  wrapper.appendChild(indicator); // move after `container` in case of re-init (refresh() re-runs this)
+  const indicator =
+    rendered?.indicator ?? wrapper.querySelector<HTMLElement>(":scope > .date-indicator")!;
+
+  if (!rendered) wrapper.appendChild(indicator); // move after `container` in case of re-init (refresh() re-runs this)
 
   // Wrap the real cells in their own layer so a pill-shaped hole can be
   // clipped out of them while the indicator is lifted — same reason
@@ -45,7 +63,8 @@ export function createPillSelector(
   // createPillSelector() calls on the same container (setupDatePicker can
   // re-run): reuse an existing wrapper and just re-adopt whatever cells
   // currently sit as direct children.
-  let items = container.querySelector(":scope > .date-picker-items");
+  let items =
+    rendered?.items ?? container.querySelector<HTMLElement>(":scope > .date-picker-items");
 
   if (!items) {
     items = document.createElement("div");
@@ -55,25 +74,27 @@ export function createPillSelector(
 
   const adoptCells = () =>
     Array.from(container.querySelectorAll(":scope > .date-element-container")).forEach((el) =>
-      items.appendChild(el),
+      items!.appendChild(el),
     );
 
-  adoptCells();
+  if (!rendered) adoptCells();
 
   // Accent-colored cell duplicates (.bn-active-row's equivalent) live in an
   // overflow:hidden inner layer that blurs while lifted (.bn-pill-inner's).
-  indicator.querySelector(":scope > .date-indicator-inner")?.remove();
-  const inner = document.createElement("div");
-  inner.className = "date-indicator-inner";
-  const activeRow = document.createElement("div");
-  activeRow.className = "date-indicator-active-row";
-  inner.appendChild(activeRow);
-  indicator.appendChild(inner);
+  const activeRow = rendered?.activeRow ?? document.createElement("div");
+  const hit = rendered?.hit ?? document.createElement("div");
 
-  wrapper.querySelector(":scope > .date-indicator-hit")?.remove();
-  const hit = document.createElement("div");
-  hit.className = "date-indicator-hit";
-  wrapper.appendChild(hit); // after indicator too
+  if (!rendered) {
+    indicator.querySelector(":scope > .date-indicator-inner")?.remove();
+    const inner = document.createElement("div");
+    inner.className = "date-indicator-inner";
+    activeRow.className = "date-indicator-active-row";
+    inner.appendChild(activeRow);
+    indicator.appendChild(inner);
+    wrapper.querySelector(":scope > .date-indicator-hit")?.remove();
+    hit.className = "date-indicator-hit";
+    wrapper.appendChild(hit);
+  }
 
   function shake() {
     indicator.classList.remove("shake");
@@ -81,6 +102,7 @@ export function createPillSelector(
     indicator.classList.add("shake");
     indicator.addEventListener("animationend", () => indicator.classList.remove("shake"), {
       once: true,
+      signal: events.signal,
     });
     haptics.trigger(defaultPatterns.error);
   }
@@ -92,6 +114,7 @@ export function createPillSelector(
     hit,
     activeRow,
     cellSelector: ".date-element-container",
+    cloneCells: !rendered,
     activeCellClass: "date-indicator-cell",
     liftedClass: "date-indicator--lifted",
     tapScale: 1.6,
@@ -112,11 +135,11 @@ export function createPillSelector(
   function refresh() {
     // Cells regenerated elsewhere (date-picker.js clears + re-appends) land
     // as direct children of `container` again — keep them inside `items`.
-    adoptCells();
+    if (!rendered) adoptCells();
     core.refresh({ snap: true });
   }
 
-  function selectElement(el, { silent = false, animate = true } = {}) {
+  function selectElement(el: HTMLElement, { silent = false, animate = true }: PillSelection = {}) {
     const index = core.indexOf(el);
 
     if (index === -1) {
@@ -139,6 +162,10 @@ export function createPillSelector(
   }
 
   return {
+    destroy() {
+      events.abort();
+      core.destroy();
+    },
     refresh,
     selectElement,
     get activeElement() {

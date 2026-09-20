@@ -1,3 +1,4 @@
+import { DateChipPicker } from "./app/components/date-chip-picker";
 import { Settings } from "./app/components/settings-host";
 import { loadApplication } from "./lib/application";
 import { useEffect } from "react";
@@ -111,22 +112,7 @@ export function AppShell() {
               </campus-chip-picker>
 
               <div className="picker-substack">
-                <date-chip-picker data-loading="">
-                  <div className="date-picker">
-                    <select id="date-picker" name="date" hidden></select>
-
-                    <div
-                      id="today-indicator"
-                      className="hidden"
-                      aria-hidden="true"
-                      data-i18n="datepicker.today"
-                    >
-                      Today
-                    </div>
-                    <div className="date-picker-container"></div>
-                    <div className="date-indicator"></div>
-                  </div>
-                </date-chip-picker>
+                <DateChipPicker />
 
                 <time-range-chip-picker data-loading="">
                   <div className="time-pickers-container">
