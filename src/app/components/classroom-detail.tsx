@@ -1120,6 +1120,7 @@ class ClassroomDetail {
       // Query context: from/to range carried over from the Available Tab
       const queryDateKey = this._queryContext?.date?.replace(/-/g, "") ?? null;
       const highlightDateKey = this._highlight?.date?.replace(/-/g, "") ?? null;
+
       const highlightProfessors = new Set(
         (this._highlight?.professors ?? []).map((p) => p.trim().toLowerCase()),
       );
@@ -1812,13 +1813,17 @@ class ClassroomDetail {
       // the page back or re-pop it after the user has moved on.
       if (this._highlight && !this._highlightConsumed) {
         this._highlightConsumed = true;
+
         const primaryBlock = container.querySelector<HTMLElement>(
           ".detail-schedule-block--highlight",
         );
 
         if (primaryBlock) {
           const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-          primaryBlock.scrollIntoView({ block: "center", behavior: reduceMotion ? "auto" : "smooth" });
+          primaryBlock.scrollIntoView({
+            block: "center",
+            behavior: reduceMotion ? "auto" : "smooth",
+          });
           showOccupationPopover(primaryBlock);
         }
       }
