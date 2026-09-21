@@ -95,6 +95,8 @@ import {
   classroomsData as occupancyData,
   SKIP_DAYS,
   getClassroomStatusNow,
+  getRomeNow,
+  romeMinutesOfDay,
 } from "../available-rooms-script.ts";
 import { t, getLocale, onLanguageSwitch } from "../i18n.ts";
 import { createTimeFormatter } from "../utils/time-format.ts";
@@ -1058,7 +1060,9 @@ class ClassroomDetail {
     }
 
     try {
-      const today = new Date();
+      // Rome's calendar date, not the browser's: the day keys these are
+      // matched against (dayData.date) come from the API in Rome time.
+      const today = getRomeNow();
 
       const todayKey = [
         today.getFullYear(),
@@ -1103,7 +1107,7 @@ class ClassroomDetail {
         prevDate = curr;
       }
 
-      const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+      const nowMin = romeMinutesOfDay();
 
       const nowPct =
         nowMin >= DAY_START && nowMin <= DAY_END
@@ -1461,7 +1465,7 @@ class ClassroomDetail {
       }
 
       this._nowTimer = window.setInterval(() => {
-        const n = new Date().getHours() * 60 + new Date().getMinutes();
+        const n = romeMinutesOfDay();
 
         const pctVal =
           n >= DAY_START && n <= DAY_END
@@ -1520,7 +1524,7 @@ class ClassroomDetail {
       // Auto-select: prefer the queried day when coming from the Available Tab,
       // otherwise today, or next available day if after 20:15, or first available
       const todayDayIndex = days.findIndex((d) => d.dayData?.date === todayKey);
-      const nowMins = new Date().getHours() * 60 + new Date().getMinutes();
+      const nowMins = romeMinutesOfDay();
       let initialDayIndex;
 
       if (queryDateKey) {

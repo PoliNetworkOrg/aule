@@ -32,7 +32,10 @@ function formatRomeHHMM(date: Date) {
   return romeHHMMFormatter.format(date);
 }
 
-function formatRomeYYYYMMDD(date: Date) {
+// Exported because anything comparing against the API's day keys (which are
+// Rome calendar days) has to derive its own "which day is it" the same way —
+// see the data-freshness indicator in application.tsx.
+export function formatRomeYYYYMMDD(date: Date) {
   // en-CA formats as YYYY-MM-DD; strip the dashes to match the API's key shape.
   return romeDatePartsFormatter.format(date).replace(/-/g, "");
 }
@@ -60,6 +63,17 @@ export function getRomeNow() {
     Number(parts.find((p) => p.type === type)?.value ?? 0);
 
   return new Date(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"));
+}
+
+// Minutes since midnight in Europe/Rome. Timeline axes (07:15–20:15), "now"
+// markers and after-hours day roll-over all plot against Rome wall-clock
+// data, so they must not read the browser's local clock — otherwise a
+// visitor abroad sees the marker at the wrong position (or off the axis
+// entirely) and lands on the wrong day.
+export function romeMinutesOfDay() {
+  const now = getRomeNow();
+
+  return now.getHours() * 60 + now.getMinutes();
 }
 
 // ---------- DATA ----------

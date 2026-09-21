@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { t } from "../i18n";
 import { createPillSelector } from "./pill-selector";
 import { formatLocalDate, type DatePickerData, type PickerDay } from "./date-picker-state";
+import { getRomeNow } from "../available-rooms-script";
 
 export { setupDatePicker } from "./date-picker-state";
 
@@ -85,7 +86,7 @@ export function DatePicker({ data, select }: DatePickerProps) {
     }
 
     function positionTodayIndicator() {
-      const today = formatLocalDate(new Date());
+      const today = formatLocalDate(getRomeNow());
       const cell = cells().find((element) => element.dataset.date === today);
 
       if (!cell) {
@@ -125,12 +126,11 @@ export function DatePicker({ data, select }: DatePickerProps) {
     todayIndicator.addEventListener(
       "click",
       () => {
-        // Use the local calendar date (matching data-date's own
-        // formatLocalDate), not toISOString() — which is UTC and picks the
-        // wrong day between local midnight and 01:00/02:00 CET/CEST. (The
-        // original vanilla-JS version had this same bug; it wasn't a
-        // deliberate behavior to preserve.)
-        const today = formatLocalDate(new Date());
+        // Rome's calendar date, formatted the same way the cells' data-date
+        // is. The original used toISOString() (UTC), which picks the wrong
+        // day between local midnight and 01:00/02:00 CET/CEST; the browser's
+        // own local date would be wrong for viewers outside Italy.
+        const today = formatLocalDate(getRomeNow());
         const cell = cells().find((element) => element.dataset.date === today);
 
         if (cell) selector.selectElement(cell);

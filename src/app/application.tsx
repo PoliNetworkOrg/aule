@@ -4,6 +4,7 @@ import {
   classroomsData,
   findAvailableClassrooms,
   fetchClassroomsData,
+  formatRomeYYYYMMDD,
   getRomeNow,
   SKIP_DAYS,
 } from "./available-rooms-script.ts";
@@ -659,21 +660,12 @@ export function mountApplication() {
       return;
     }
 
-    const today = new Date();
-
-    const todayKey = [
-      today.getFullYear(),
-      String(today.getMonth() + 1).padStart(2, "0"),
-      String(today.getDate()).padStart(2, "0"),
-    ].join("");
-
-    const generationDate = new Date(classroomsData[0].generated_at + "Z");
-
-    const generationKey = [
-      generationDate.getFullYear(),
-      String(generationDate.getMonth() + 1).padStart(2, "0"),
-      String(generationDate.getDate()).padStart(2, "0"),
-    ].join("");
+    // Both keys are compared against each other and, via hasFutureData
+    // below, against entry.date — which the API emits as Rome calendar days.
+    // Deriving them from the browser's local clock instead would misjudge
+    // freshness by a day for anyone not in Italy's timezone.
+    const todayKey = formatRomeYYYYMMDD(new Date());
+    const generationKey = formatRomeYYYYMMDD(new Date(classroomsData[0].generated_at + "Z"));
 
     const hasFutureData = classroomsData.some((entry) => entry.date > todayKey);
 
