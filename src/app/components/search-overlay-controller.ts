@@ -4,7 +4,6 @@
 // (data, index, card builders) lives in classroom-search-data.ts.
 
 import { onLanguageSwitch } from "../i18n.ts";
-import { haptics, defaultPatterns } from "./haptics.ts";
 import { ensureSearchData, hasOccupationData } from "../classroom-search-data";
 
 const DEBOUNCE_MS = 200;
@@ -54,7 +53,9 @@ export function initSearchOverlay(renderQuery: (query: string) => void) {
   };
 
   let disposed = false;
-  const fabEl = () => document.getElementById("bn-search-btn");
+  // Vitrium rebuilds this circle when the layout changes, so it is looked up by
+  // class each time rather than held or given an id.
+  const fabEl = () => document.querySelector<HTMLElement>(".lg-tabbar__prominent");
 
   const barEl = () => overlay.querySelector<HTMLElement>(".search-bar-wrapper");
 
@@ -178,7 +179,6 @@ export function initSearchOverlay(renderQuery: (query: string) => void) {
   async function open() {
     if (isOpen || !overlay) return;
     isOpen = true;
-    haptics.trigger(defaultPatterns.light);
     savedScrollPos = window.scrollY;
 
     // Unhide + focus synchronously (still inside the FAB-tap callstack, so iOS
@@ -283,7 +283,6 @@ export function initSearchOverlay(renderQuery: (query: string) => void) {
   closeBtn.addEventListener(
     "click",
     () => {
-      haptics.trigger(defaultPatterns.light);
       close();
     },
     { signal: events.signal },
@@ -341,7 +340,6 @@ export function initSearchOverlay(renderQuery: (query: string) => void) {
   clearBtn.addEventListener(
     "click",
     () => {
-      haptics.trigger(defaultPatterns.light);
       input.value = "";
       input.dispatchEvent(new Event("input"));
       input.focus();

@@ -20,13 +20,7 @@ import {
 import { classroomsData } from "../available-rooms-script";
 import { STORAGE_KEY as TIME_FORMAT_KEY } from "../utils/time-format";
 import { IS_STABLE_BUILD, USE_BETA_BACKEND_KEY } from "../config";
-import {
-  getBlurMode,
-  setBlurMode,
-  reevaluateBlurCapability,
-  applyBlurState,
-} from "../utils/blur-capability";
-import { haptics, defaultPatterns } from "./haptics";
+import { getBlurMode, setBlurMode, reevaluateBlurCapability, applyBlurState } from "vitrium";
 import { Toggle, type PillControl } from "./toggle";
 import { SegmentedControl } from "./segmented-control";
 import { bindSettingsMotion } from "./settings-motion";
@@ -92,7 +86,6 @@ function Warning({ visible, message }: { visible: boolean; message: string }) {
 
 function Stepper({ value, onChange }: { value: number; onChange: (value: number) => void }) {
   function change(next: number) {
-    haptics.trigger(defaultPatterns.light);
     onChange(next);
   }
 
@@ -358,7 +351,6 @@ function SettingsPopup() {
     setLanguage(value);
 
     if (value === getLocale()) return;
-    haptics.trigger(defaultPatterns.light);
     void setLocale(value);
   }
 

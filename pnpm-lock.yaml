@@ -24,6 +24,9 @@ importers:
       react-dom:
         specifier: ^19.2.0
         version: 19.3.0(react@19.3.0)
+      vitrium:
+        specifier: ^0.2.0
+        version: 0.2.0
       web-haptics:
         specifier: 0.0.6
         version: 0.0.6(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
@@ -186,6 +189,15 @@ packages:
   '@eslint/plugin-kit@0.7.3':
     resolution: {integrity: sha512-IkO+/KEUvwbVpiURZg+P7zF74z5Jxe0UgJxVni+RtoHQ6IZieXaO02kmadomap/q+l6bc/jdPGGqTjhuZnuz1Q==}
     engines: {node: ^20.19.0 || ^22.13.0 || >=24}
+
+  '@floating-ui/core@1.8.0':
+    resolution: {integrity: sha512-0CIZ5itps/8x7BG8dEIhs53BvCUH2PCoogtakwRTut+Arm58sJooJ0AuZhLw2HJYIR5cMLNPBSS728sPho2khQ==}
+
+  '@floating-ui/dom@1.8.0':
+    resolution: {integrity: sha512-yXSrzeHZBTZadLOlfyhCkJHNeLJnHRnRInwdZ40L7ZiaAtrBwoYlsDrX3v5zB1Utk7CLfzcOVnVVWoXEky7Ceg==}
+
+  '@floating-ui/utils@0.2.12':
+    resolution: {integrity: sha512-HpCo8tmWzLVad5s2d19EhAz5zqrrQ6s69qd6moPMQvkOuSwDT1YgRfWSVuc4ennqrgv3OHppiOGMQ7oC13yIww==}
 
   '@humanfs/core@0.19.2':
     resolution: {integrity: sha512-UhXNm+CFMWcbChXywFwkmhqjs3PRCmcSa/hfBgLIb7oQ5HNb1wS0icWsGtSAUNgefHeI+eBrA8I1fxmbHsGdvA==}
@@ -2085,6 +2097,9 @@ packages:
       jsdom:
         optional: true
 
+  vitrium@0.2.0:
+    resolution: {integrity: sha512-dQTa13LvqLo/zOsnpKv6ldjiNLFx5OuOZnq0qlpsErli6mWoIKvpQ6vVS0yroTQDzNNVHN+nkc8Pcz1pOIJTkg==}
+
   web-haptics@0.0.6:
     resolution: {integrity: sha512-eCzcf1LDi20+Fr0x9V3OkX92k0gxEQXaHajmhXHitsnk6SxPeshv8TBtBRqxyst8HI1uf2FyFVE7QS3jo1gkrw==}
     peerDependencies:
@@ -2301,6 +2316,17 @@ snapshots:
     dependencies:
       '@eslint/core': 1.2.1
       levn: 0.4.1
+
+  '@floating-ui/core@1.8.0':
+    dependencies:
+      '@floating-ui/utils': 0.2.12
+
+  '@floating-ui/dom@1.8.0':
+    dependencies:
+      '@floating-ui/core': 1.8.0
+      '@floating-ui/utils': 0.2.12
+
+  '@floating-ui/utils@0.2.12': {}
 
   '@humanfs/core@0.19.2':
     dependencies:
@@ -3776,6 +3802,10 @@ snapshots:
       '@vitest/browser-preview': 4.1.11(@voidzero-dev/vite-plus-core@0.3.3(@types/node@26.6.2)(jiti@2.7.0)(typescript@6.0.3))(vitest@4.1.11)
     transitivePeerDependencies:
       - msw
+
+  vitrium@0.2.0:
+    dependencies:
+      '@floating-ui/dom': 1.8.0
 
   web-haptics@0.0.6(react-dom@19.3.0(react@19.3.0))(react@19.3.0):
     optionalDependencies:

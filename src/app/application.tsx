@@ -1,6 +1,5 @@
 import { createRoot, type Root } from "react-dom/client";
 import { flushSync } from "react-dom";
-import { initPopovers } from "./components/popover.ts";
 import {
   classroomsData,
   findAvailableClassrooms,
@@ -21,9 +20,7 @@ import { retranslateCampusBuildingsPage } from "./components/campus-buildings.ts
 import { setupDatePicker } from "./components/date-picker.tsx";
 import { initPickerDock } from "./components/picker-dock.ts";
 import { renderDataFetchStatus, setDataFetchReloading } from "./components/data-fetch-card";
-import { haptics, defaultPatterns } from "./components/haptics.ts";
 import { renderAvailableClassroomsResults } from "./components/available-results";
-import { initLiquidGlass } from "./components/liquid-glass.ts";
 import { initFavourites, renderFavourites } from "./components/favourites.tsx";
 import { initI18n, onLanguageSwitch } from "./i18n.ts";
 import {
@@ -35,10 +32,12 @@ import {
   LIVE_SEARCH_KEY,
 } from "./components/settings.tsx";
 import {
+  initLiquidGlass,
+  createPopover,
   resolveBlurCapability,
   applyBlurState,
   scheduleIdleBenchmark,
-} from "./utils/blur-capability.ts";
+} from "vitrium";
 
 function isTextField(value: FormDataEntryValue | null): value is string {
   return typeof value === "string";
@@ -298,7 +297,24 @@ export function mountApplication() {
   // Triggers the fetching of data as soon as the page loads
   async function startApplication() {
     initializeLayout();
-    cleanups.push(initPopovers());
+
+    // One-time move of the blur preference to the key Vitrium reads. The cached
+    // benchmark verdict isn't carried over; it re-runs once at idle.
+    try {
+      const oldMode = localStorage.getItem("poliAule_blurMode");
+
+      if (oldMode !== null) {
+        if (localStorage.getItem("lg:blur-mode") === null)
+          localStorage.setItem("lg:blur-mode", oldMode);
+
+        localStorage.removeItem("poliAule_blurMode");
+      }
+
+      localStorage.removeItem("poliAule_blurBenchmark");
+    } catch {
+      /* storage unavailable */
+    }
+
     // Safety net: if init hangs for any reason (e.g. fonts.ready stalls on bad
     // connectivity), surface the error screen instead of staying stuck forever.
     const _initTimeoutId = later(showSplashError, 15000);
@@ -336,6 +352,28 @@ export function mountApplication() {
       const stopGlass = initLiquidGlass();
 
       if (stopGlass) cleanups.push(stopGlass);
+
+      // Footer "version info" popover; its content is authored in the shell.
+      const versionTrigger = document.querySelector<HTMLElement>(".version-info-button");
+      const versionContent = document.getElementById("version-info-content");
+
+      if (versionTrigger && versionContent) {
+        const versionHome = versionContent.parentElement;
+
+        versionContent.hidden = false;
+
+        const versionPopover = createPopover({
+          trigger: versionTrigger,
+          content: versionContent,
+          placement: "top-end",
+        });
+
+        cleanups.push(() => {
+          versionPopover.destroy();
+          versionContent.hidden = true;
+          versionHome?.append(versionContent);
+        });
+      }
 
       // Favourites carousel on the Available page
       initFavourites(staticClassroomsData!);
@@ -382,7 +420,7 @@ export function mountApplication() {
 
       // Apply the cached blur verdict (or the safe "off" default if none yet)
       // instantly — the actual benchmark never runs during load, see
-      // utils/blur-capability.ts for why.
+      // Vitrium's core/blur-capability.js for why.
       applyBlurState(resolveBlurCapability());
 
       await document.fonts.ready;
@@ -447,9 +485,6 @@ export function mountApplication() {
     (e) => {
       // Skip default submit behavior since we will handle it with JavaScript
       e.preventDefault();
-
-      // Haptic feedback
-      haptics.trigger(defaultPatterns.light);
 
       // Check if data was already fetched
       if (!classroomsData.length) {

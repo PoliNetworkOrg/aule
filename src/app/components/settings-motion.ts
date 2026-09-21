@@ -1,10 +1,4 @@
-import { haptics, defaultPatterns } from "./haptics";
-import {
-  snapGeometry,
-  morphGeometry,
-  hideInnerBoxInstantly,
-  unhideInnerBox,
-} from "../utils/flip-morph";
+import { snapGeometry, morphGeometry, hideInnerBoxInstantly, unhideInnerBox } from "vitrium";
 
 const TRANSITION_DURATION = 420;
 
@@ -276,7 +270,6 @@ export function bindSettingsMotion(
   triggerEl.addEventListener(
     "click",
     () => {
-      haptics.trigger(defaultPatterns.light);
       openSettings();
     },
     { signal: events.signal },

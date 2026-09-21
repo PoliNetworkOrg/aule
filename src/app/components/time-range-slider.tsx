@@ -4,14 +4,6 @@ import { observeInputProperty } from "./time-input";
 // Horizontal drag-based time range selector. Replaces the two-card picker UI
 // as the primary input; tapping a badge opens the morph popup for typed entry.
 
-import { haptics, defaultPatterns } from "./haptics.ts";
-
-// Defer haptic out of the pointer event to avoid mobile browser suppression
-// of navigator.vibrate() during active touch handling.
-function triggerHaptic() {
-  setTimeout(() => haptics.trigger(defaultPatterns.light), 0);
-}
-
 import { openPicker, getPickerCards } from "./time-picker";
 import { createTimeFormatter } from "../utils/time-format.ts";
 import { t } from "../i18n.ts";
@@ -219,7 +211,6 @@ export function TimeRangeSlider({
         bar.classList.add("trs-bar--snapping");
         render();
         schedule(() => bar.classList.remove("trs-bar--snapping"), 300);
-        triggerHaptic();
       },
       { signal },
     );
@@ -301,7 +292,6 @@ export function TimeRangeSlider({
         return;
       }
 
-      triggerHaptic();
       bar.setPointerCapture(e.pointerId);
     }
 
@@ -322,7 +312,6 @@ export function TimeRangeSlider({
 
         if (snapped !== fromMin) {
           fromMin = snapped;
-          triggerHaptic();
           syncInputs();
         }
       } else if (dragMode === "to") {
@@ -331,7 +320,6 @@ export function TimeRangeSlider({
 
         if (snapped !== toMin) {
           toMin = snapped;
-          triggerHaptic();
           syncInputs();
         }
       } else {
@@ -356,7 +344,6 @@ export function TimeRangeSlider({
         if (snappedF !== fromMin && snappedT <= MAX && snappedF >= MIN) {
           fromMin = snappedF;
           toMin = snappedT;
-          triggerHaptic();
           syncInputs();
         }
       }
@@ -384,7 +371,6 @@ export function TimeRangeSlider({
       }, 300);
 
       if (wasDrag) {
-        triggerHaptic();
         // Reflect any corrections applied by setupTimePickers' input listeners
         const cFrom = timeToMinutes(fromInput.value);
         const cTo = timeToMinutes(toInput.value);
@@ -396,7 +382,6 @@ export function TimeRangeSlider({
         }
       } else {
         // Tap (no significant movement) — open popup for the tapped handle
-        triggerHaptic();
 
         if (endedDragMode === "from") openFrom();
         else if (endedDragMode === "to") openTo();
@@ -429,7 +414,6 @@ export function TimeRangeSlider({
     fromBadge.addEventListener(
       "click",
       () => {
-        triggerHaptic();
         openFrom();
       },
       { signal },
@@ -437,7 +421,6 @@ export function TimeRangeSlider({
     toBadge.addEventListener(
       "click",
       () => {
-        triggerHaptic();
         openTo();
       },
       { signal },
@@ -454,13 +437,11 @@ export function TimeRangeSlider({
           fromMin = Math.max(MIN, fromMin - step);
           render();
           syncInputs();
-          triggerHaptic();
           e.preventDefault();
         } else if (e.key === "ArrowRight") {
           fromMin = Math.min(toMin - SNAP, fromMin + step);
           render();
           syncInputs();
-          triggerHaptic();
           e.preventDefault();
         } else if (e.key === "Enter" || e.key === " ") {
           openFrom();
@@ -479,13 +460,11 @@ export function TimeRangeSlider({
           toMin = Math.max(fromMin + SNAP, toMin - step);
           render();
           syncInputs();
-          triggerHaptic();
           e.preventDefault();
         } else if (e.key === "ArrowRight") {
           toMin = Math.min(MAX, toMin + step);
           render();
           syncInputs();
-          triggerHaptic();
           e.preventDefault();
         } else if (e.key === "Enter" || e.key === " ") {
           openTo();

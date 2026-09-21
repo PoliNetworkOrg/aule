@@ -21,7 +21,6 @@ function hasCoordinates<T extends { lat?: number; long?: number }>(
   return isNumber(value.lat) && isNumber(value.long);
 }
 
-import { haptics, defaultPatterns } from "./haptics.ts";
 import {
   getSelectedCampusId,
   getSelectedBuildingId,
@@ -916,7 +915,6 @@ function showCampusMarkers(mapboxgl: MapboxLibrary) {
     el.addEventListener(
       "click",
       () => {
-        haptics.trigger(defaultPatterns.light);
         flyToCampus(mapboxgl, campus);
       },
       { signal: markerEvents.signal },
@@ -959,7 +957,6 @@ function showBuildingMarkers(mapboxgl: MapboxLibrary, campus: Campus) {
     el.addEventListener(
       "click",
       () => {
-        haptics.trigger(defaultPatterns.light);
         document.dispatchEvent(
           new CustomEvent("buildingchange", {
             detail: { campusId: campus.id, buildingId: b.name },

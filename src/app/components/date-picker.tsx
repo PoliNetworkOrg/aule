@@ -1,6 +1,5 @@
 import { useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { t } from "../i18n";
-import { haptics } from "./haptics";
 import { createPillSelector } from "./pill-selector";
 import { formatLocalDate, type DatePickerData, type PickerDay } from "./date-picker-state";
 
@@ -73,14 +72,11 @@ export function DatePicker({ data, select }: DatePickerProps) {
         activeRow: activeRow.current,
         hit: hit.current,
       },
-      onSelect(element, { silent }) {
+      onSelect(element) {
         const changed = dateSelect.value !== element.dataset.date;
         dateSelect.value = element.dataset.date!;
 
         if (changed) dateSelect.dispatchEvent(new Event("change", { bubbles: true }));
-
-        if (silent || !changed) return;
-        haptics.trigger([{ duration: 30 }, { delay: 60, duration: 40, intensity: 1 }]);
       },
     });
 
@@ -182,7 +178,6 @@ export function DatePicker({ data, select }: DatePickerProps) {
   }, [hideSundays]);
 
   const days = data?.days ?? [];
-  const visibleDays = hideSundays ? days.filter((day) => !day.sunday) : days;
 
   return (
     <div
@@ -215,13 +210,8 @@ export function DatePicker({ data, select }: DatePickerProps) {
       </div>
       <div ref={indicator} className="date-indicator">
         <div className="date-indicator-inner">
-          <div ref={activeRow} className="date-indicator-active-row">
-            {visibleDays.map((day) => (
-              <span key={day.date} className="date-indicator-cell">
-                <DayLabel day={day} />
-              </span>
-            ))}
-          </div>
+          {/* Vitrium's pill core owns this row's children (one copy per cell). */}
+          <div ref={activeRow} className="date-indicator-active-row" />
         </div>
       </div>
       <div ref={hit} className="date-indicator-hit" />

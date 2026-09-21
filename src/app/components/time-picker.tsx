@@ -19,15 +19,9 @@ export interface TimeCard extends HTMLButtonElement {
 // Morph-card time picker component.
 // Replaces each .time-picker wrapper with a card that morphs into a popup.
 
-import { haptics, defaultPatterns } from "./haptics.ts";
 import { t, onLanguageSwitch, animateI18nElement } from "../i18n.ts";
 import { createTimeFormatter } from "../utils/time-format.ts";
-import {
-  snapGeometry,
-  morphGeometry,
-  hideInnerBoxInstantly,
-  unhideInnerBox,
-} from "../utils/flip-morph.ts";
+import { snapGeometry, morphGeometry, hideInnerBoxInstantly, unhideInnerBox } from "vitrium";
 
 const TRANSITION_DURATION = 420; // ms — must match CSS
 
@@ -134,7 +128,6 @@ export function TimePickerBackdrop() {
           ref={ref}
           className="tp-overlay"
           onClick={() => {
-            haptics.trigger(defaultPatterns.light);
             closePicker();
           }}
         />,
@@ -231,7 +224,6 @@ function switchPicker(nextCard: TimeCard) {
   const nextPopup = nextCard._popup;
   activeCard = nextCard;
 
-  haptics.trigger(defaultPatterns.light);
   nextCard._updateQuickLabel?.();
 
   // ── Close outgoing: morph back to its card ───────────────────────────────
@@ -486,7 +478,6 @@ export function TimePicker({ input }: { input: HTMLInputElement }) {
       const val = `${String(ch).padStart(2, "0")}:${String(cm).padStart(2, "0")}`;
       popupInput.value = val;
       syncValue(val);
-      haptics.trigger(defaultPatterns.light);
     }
 
     popup.querySelector<HTMLElement>(".tp-quick-now")?.addEventListener(
@@ -541,7 +532,6 @@ export function TimePicker({ input }: { input: HTMLInputElement }) {
       const val = `${String(ch).padStart(2, "0")}:${String(cm).padStart(2, "0")}`;
       popupInput.value = val;
       syncValue(val);
-      haptics.trigger(defaultPatterns.light);
     }
 
     popup
@@ -607,7 +597,6 @@ export function TimePicker({ input }: { input: HTMLInputElement }) {
     popup.querySelector<HTMLElement>(".tp-popup__done")!.addEventListener(
       "click",
       () => {
-        haptics.trigger(defaultPatterns.light);
         closePicker();
       },
       { signal },
@@ -661,7 +650,6 @@ export function TimePicker({ input }: { input: HTMLInputElement }) {
       "click",
       () => {
         if (DESKTOP_MQ.matches) return; // inline on desktop — card is not a trigger
-        haptics.trigger(defaultPatterns.light);
         updateQuickLabel();
         openPicker(card);
       },

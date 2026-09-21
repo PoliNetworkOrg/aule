@@ -1,6 +1,6 @@
-import { useLayoutEffect, useSyncExternalStore } from "react";
+import { useLayoutEffect, useState, useSyncExternalStore } from "react";
 import { createPortal, flushSync } from "react-dom";
-import { DataFetchMotion } from "./data-fetch-motion";
+import { createMorphPopup, attachLiquidGlass } from "vitrium";
 import {
   t,
   getLocale,
@@ -54,14 +54,62 @@ export function setDataFetchReloading(reloading: boolean) {
   }
 }
 
+// The header's data-fetch indicator button morphs into a glass card holding the
+// freshness status + reload button, and back: Vitrium's morph popup, with the
+// button as its trigger. Unlike the pickers there is no title bar, so the whole
+// card takes the press / drag deform.
+//
+// React keeps ownership of the container's contents; the container element is
+// only relocated into the card.
 export function DataFetchCard() {
   const status = useSyncExternalStore(subscribe, () => state);
   useSyncExternalStore(onTranslationChange, getTranslationVersion);
-  useLayoutEffect(() => {
-    const motion = new DataFetchMotion();
 
-    return () => motion.destroy();
-  }, []);
+  const [container] = useState(() => {
+    const element = document.createElement("div");
+
+    element.id = "data-fetch-indicator-popover-container";
+    element.className = "data-fetch-popover-container";
+
+    return element;
+  });
+
+  useLayoutEffect(() => {
+    const trigger = document.getElementById("data-fetch-btn");
+
+    if (!trigger) return;
+
+    const popup = createMorphPopup({
+      trigger,
+      role: "dialog",
+      label: trigger.getAttribute("aria-label") ?? "",
+      width: 20 * 16,
+    });
+
+    popup.inner.appendChild(container);
+
+    const stopGlass = attachLiquidGlass(popup.panel);
+    const events = new AbortController();
+
+    trigger.addEventListener("click", () => popup.toggle(), { signal: events.signal });
+
+    // The reload button is re-rendered with the status; close the card
+    // whenever a click inside it lands on that button.
+    popup.inner.addEventListener(
+      "click",
+      (e: Event) => {
+        if (e.target instanceof Element && e.target.closest("#reload-data-btn")) popup.close();
+      },
+      { signal: events.signal },
+    );
+
+    return () => {
+      events.abort();
+      container.remove();
+      stopGlass();
+      popup.destroy();
+    };
+  }, [container]);
 
   const formattedTime = status?.generated
     ? status.generated.toLocaleString(getLocale() === "it" ? "it-IT" : "en-GB", {
@@ -76,42 +124,29 @@ export function DataFetchCard() {
     : "—";
 
   return createPortal(
-    <>
-      <div className="dfc-overlay" hidden />
-      <div className="dfc-popup liquid-glass" role="dialog" aria-modal="true" tabIndex={-1}>
-        <div className="dfc-popup__inner">
-          <div id="data-fetch-indicator-popover-container" className="data-fetch-popover-container">
-            {status && (
-              <>
-                <h1 className={`popover-title ${status.status}`}>
-                  {t(`data.${status.status}Title`)}
-                </h1>
-                <p className="data-status-description secondary">
-                  {t(`data.${status.status}Desc`)}
-                </p>
-                <label className="data-status-time secondary">
-                  {t("data.lastFetched")}: {formattedTime}
-                </label>
-                <button
-                  id="reload-data-btn"
-                  className="button-primary button-secondary data-reload-btn"
-                  disabled={status.reloading}
-                  onClick={() => void status.reload()}
-                >
-                  <i
-                    className={`hgi-stroke hgi-refresh data-reload-icon${status.reloading ? " spinning" : ""}`}
-                    aria-hidden="true"
-                  />
-                  <span className="data-reload-label">
-                    {t(status.reloading ? "data.reloading" : "data.reload")}
-                  </span>
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-    </>,
-    document.body,
+    status && (
+      <>
+        <h1 className={`popover-title ${status.status}`}>{t(`data.${status.status}Title`)}</h1>
+        <p className="data-status-description secondary">{t(`data.${status.status}Desc`)}</p>
+        <label className="data-status-time secondary">
+          {t("data.lastFetched")}: {formattedTime}
+        </label>
+        <button
+          id="reload-data-btn"
+          className="button-primary button-secondary data-reload-btn"
+          disabled={status.reloading}
+          onClick={() => void status.reload()}
+        >
+          <i
+            className={`hgi-stroke hgi-refresh data-reload-icon${status.reloading ? " spinning" : ""}`}
+            aria-hidden="true"
+          />
+          <span className="data-reload-label">
+            {t(status.reloading ? "data.reloading" : "data.reload")}
+          </span>
+        </button>
+      </>
+    ),
+    container,
   );
 }

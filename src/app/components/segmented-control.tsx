@@ -1,5 +1,4 @@
 import {
-  Fragment,
   useImperativeHandle,
   useLayoutEffect,
   useRef,
@@ -7,7 +6,8 @@ import {
   type ReactNode,
   type Ref,
 } from "react";
-import { createPillDragCore } from "./pill-drag-core";
+import { renderToStaticMarkup } from "react-dom/server";
+import { createSegmentedControl } from "vitrium";
 import type { PillControl } from "./toggle";
 
 interface Segment {
@@ -23,6 +23,11 @@ interface SegmentedControlProps extends Omit<HTMLAttributes<HTMLDivElement>, "on
   ref?: Ref<PillControl>;
 }
 
+const markup = (label: ReactNode) => renderToStaticMarkup(<>{label}</>);
+
+// A React wrapper around Vitrium's segmented control. The control adopts its
+// items from the host, so they are built as static markup (labels hold no
+// handlers) and refreshed in place when the labels change, e.g. on a language switch.
 export function SegmentedControl({
   value,
   options,
@@ -31,98 +36,71 @@ export function SegmentedControl({
   ...attributes
 }: SegmentedControlProps) {
   const root = useRef<HTMLDivElement>(null);
-  const items = useRef<HTMLDivElement>(null);
-  const pill = useRef<HTMLDivElement>(null);
-  const hit = useRef<HTMLDivElement>(null);
-  const activeRow = useRef<HTMLDivElement>(null);
-  const core = useRef<ReturnType<typeof createPillDragCore> | null>(null);
-  const labels = useRef("");
+  const control = useRef<ReturnType<typeof createSegmentedControl> | null>(null);
   const current = useRef({ value, options, onSelect });
 
   useLayoutEffect(() => {
     current.current = { value, options, onSelect };
   });
-  useImperativeHandle(ref, () => ({ refresh: (config) => core.current?.refresh(config) }), []);
+  useImperativeHandle(ref, () => ({ refresh: (config) => control.current?.refresh(config) }), []);
   useLayoutEffect(() => {
-    if (!root.current || !items.current || !pill.current || !hit.current || !activeRow.current)
-      return;
+    if (!root.current) return;
 
-    const drag = createPillDragCore({
-      root: root.current,
-      items: items.current,
-      pill: pill.current,
-      hit: hit.current,
-      activeRow: activeRow.current,
-      cellSelector: ".seg-item",
-      liftedClass: "seg-pill--lifted",
-      onChange(index, { silent }) {
-        if (!silent) current.current.onSelect(current.current.options[index].value);
+    const host = root.current;
+
+    host.replaceChildren(
+      ...current.current.options.flatMap((option) => {
+        const button = document.createElement("button");
+
+        button.type = "button";
+        button.className = "lg-seg__item";
+        button.dataset.value = option.value;
+        button.innerHTML = markup(option.label);
+
+        if (!option.separator) return [button];
+
+        const separator = document.createElement("div");
+
+        separator.className = "lg-seg__separator";
+
+        return [separator, button];
+      }),
+    );
+
+    control.current = createSegmentedControl(host, {
+      value: current.current.value,
+      onSelect: (next: string, { silent }: { silent: boolean }) => {
+        if (!silent) current.current.onSelect(next);
       },
     });
 
-    core.current = drag;
-    const observer = new ResizeObserver(() => drag.refresh());
-    observer.observe(root.current);
-    drag.select(
-      current.current.options.findIndex((option) => option.value === current.current.value),
-      {
-        animate: false,
-        silent: true,
-      },
-    );
-
     return () => {
-      observer.disconnect();
-      drag.destroy();
-      core.current = null;
+      control.current?.destroy();
+      control.current = null;
+      host.replaceChildren();
     };
   }, []);
   useLayoutEffect(() => {
-    const text = activeRow.current?.textContent ?? "";
+    const host = root.current;
 
-    if (labels.current !== text) {
-      labels.current = text;
-      core.current?.refresh({ snap: true });
+    if (!host || !control.current) return;
+
+    let changed = false;
+
+    for (const option of options) {
+      const cell = host.querySelector<HTMLElement>(`.lg-seg__item[data-value="${option.value}"]`);
+      const html = markup(option.label);
+
+      if (cell && cell.innerHTML !== html) {
+        cell.innerHTML = html;
+        changed = true;
+      }
     }
 
-    const index = options.findIndex((option) => option.value === value);
+    if (control.current.value !== value) control.current.select(value);
 
-    if (core.current?.index !== index)
-      core.current?.select(index, { animate: false, silent: true });
+    if (changed) control.current.refresh({ snap: true });
   }, [value, options]);
 
-  return (
-    <div {...attributes} ref={root} className="seg" role="radiogroup">
-      <div className="seg-track">
-        <div ref={items} className="seg-items">
-          {options.map((option) => (
-            <Fragment key={option.value}>
-              {option.separator && <div className="seg-separator" />}
-              <button
-                className={`seg-item${option.value === value ? " active" : ""}`}
-                data-value={option.value}
-                role="radio"
-                aria-checked={option.value === value}
-                tabIndex={option.value === value ? 0 : -1}
-              >
-                {option.label}
-              </button>
-            </Fragment>
-          ))}
-        </div>
-      </div>
-      <div ref={pill} className="seg-pill">
-        <div className="seg-pill-inner">
-          <div ref={activeRow} className="seg-active-row">
-            {options.map((option) => (
-              <span key={option.value} className="seg-active-cell">
-                {option.label}
-              </span>
-            ))}
-          </div>
-        </div>
-      </div>
-      <div ref={hit} className="seg-hit" />
-    </div>
-  );
+  return <div {...attributes} ref={root} />;
 }

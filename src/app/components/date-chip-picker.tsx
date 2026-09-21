@@ -1,81 +1,87 @@
 import { useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
-import {
-  getLocale,
-  getTranslationVersion,
-  onTranslationChange,
-  t,
-  animateI18nElement,
-} from "../i18n";
+import { getLocale, getTranslationVersion, onTranslationChange, t } from "../i18n";
 import { DatePicker } from "./date-picker";
-import { PickerMotion } from "./picker-motion";
+import { ChipShell } from "./chip-shell";
 import { getDatePickerData, subscribeDates } from "./date-picker-state";
 
-function createPopupContainer() {
-  const popup = document.createElement("div");
-  popup.className = "dcp-popup liquid-glass";
-  popup.dataset.lgExclude = ".date-picker";
-  popup.setAttribute("role", "dialog");
-  popup.setAttribute("aria-modal", "true");
-  popup.tabIndex = -1;
-
-  return popup;
-}
-
+// A thin wrapper around the sliding date picker. The pill, the morph and the
+// panel are Vitrium's chip picker (see chip-shell.ts, which also handles the
+// docked desktop mode). This component adds the collapsed date label ("Tue 15"
+// over "Sep") and the "Today" badge, rendered into the chip's own slots.
 export function DateChipPicker() {
   const host = useRef<HTMLElement>(null);
   const select = useRef<HTMLSelectElement>(null);
-  const trigger = useRef<HTMLButtonElement>(null);
-  const overlay = useRef<HTMLDivElement>(null);
-  const inner = useRef<HTMLDivElement>(null);
-  const [popup] = useState(createPopupContainer);
+  const shell = useRef<ChipShell | null>(null);
+
+  const [body] = useState(() => {
+    const element = document.createElement("div");
+
+    element.className = "dcp-content";
+
+    return element;
+  });
+
+  const [slots, setSlots] = useState<{ trigger: HTMLElement; value: HTMLElement } | null>(null);
   const data = useSyncExternalStore(subscribeDates, getDatePickerData);
   const translationVersion = useSyncExternalStore(onTranslationChange, getTranslationVersion);
-  const previousTranslation = useRef(translationVersion);
   const [startupTranslation, setStartupTranslation] = useState(0);
   const [value, setValue] = useState("");
 
   useLayoutEffect(() => {
     const element = host.current;
-    const button = trigger.current;
-    const backdrop = overlay.current;
-    const content = inner.current;
     const dateSelect = select.current;
 
-    if (!element || !button || !backdrop || !content || !dateSelect) return;
-    document.body.appendChild(popup);
-    const motion = new PickerMotion(element, button, backdrop, popup, content);
+    if (!element || !dateSelect) return;
+
+    const chips = new ChipShell(element, {
+      icon: "hgi-calendar-03",
+      labelKey: "datepicker.label",
+      width: 24 * 16,
+      body,
+      exclude: ".date-picker",
+      onBuild(chip) {
+        const valueEl = chip.trigger.querySelector<HTMLElement>(".lg-chip__value")!;
+
+        valueEl.classList.add("dcp-value");
+        setSlots({ trigger: chip.trigger, value: valueEl });
+      },
+    });
+
+    shell.current = chips;
 
     // The remaining docking/startup controllers call these methods on the
     // original tag. There is no custom element renderer competing with React.
     const integration = Object.assign(element, {
-      setDocked: (docked: boolean) => motion.setDocked(docked),
+      setDocked: (docked: boolean) => {
+        chips.setDocked(docked);
+
+        // The sliding picker had no layout while it was hidden; nudge its
+        // ResizeObserver on the reveal.
+        if (docked) window.dispatchEvent(new Event("resize"));
+      },
       retranslate: () => setStartupTranslation((revision) => revision + 1),
     });
 
     const updateValue = () => setValue(dateSelect.value);
+
     dateSelect.addEventListener("change", updateValue);
 
     return () => {
       dateSelect.removeEventListener("change", updateValue);
-      motion.destroy();
-      popup.remove();
+      chips.destroy();
+      shell.current = null;
+      setSlots(null);
       // Keep detached elements inert if a legacy controller still holds one.
       integration.setDocked = () => {};
 
       integration.retranslate = () => {};
     };
-  }, [popup]);
+  }, [body]);
   useLayoutEffect(() => {
-    popup.setAttribute("aria-label", t("datepicker.label"));
+    shell.current?.retranslate();
     setValue(select.current?.value ?? "");
-
-    if (previousTranslation.current !== translationVersion) {
-      previousTranslation.current = translationVersion;
-      trigger.current?.querySelectorAll<HTMLElement>("[data-i18n]").forEach(animateI18nElement);
-      popup.querySelectorAll<HTMLElement>("[data-i18n]").forEach(animateI18nElement);
-    }
-  }, [popup, translationVersion, startupTranslation]);
+  }, [translationVersion, startupTranslation, slots]);
 
   let date: Date;
 
@@ -98,8 +104,8 @@ export function DateChipPicker() {
     date.getDate() === now.getDate();
 
   useLayoutEffect(() => {
-    trigger.current?.classList.toggle("dcp-trigger--today", isToday);
-  }, [isToday]);
+    slots?.trigger.classList.toggle("dcp-trigger--today", isToday);
+  }, [isToday, slots]);
 
   return (
     <date-chip-picker ref={host} data-loading="" data-react-owned="">
@@ -110,42 +116,23 @@ export function DateChipPicker() {
           </option>
         ))}
       </select>
-      <button
-        ref={trigger}
-        type="button"
-        className="dcp-trigger liquid-glass"
-        aria-haspopup="dialog"
-        aria-expanded="false"
-      >
-        <i className="hgi-stroke hgi-calendar-03 dcp-trigger__icon" aria-hidden="true" />
-        <span className="dcp-trigger__box">
-          <span className="dcp-trigger__label" data-i18n="datepicker.label">
-            {t("datepicker.label")}
-          </span>
-          <span className="dcp-trigger__skeleton" aria-hidden="true" />
-          <span className="dcp-trigger__value">
-            <span className="dcp-trigger__value-main">{capitalize(main)}</span>
-            <span className="dcp-trigger__value-month">{capitalize(month.replace(/\.$/, ""))}</span>
-          </span>
-        </span>
-        <i className="hgi-stroke hgi-arrow-down-01 dcp-trigger__chevron" aria-hidden="true" />
-        <span className="dcp-trigger__today-badge" data-i18n="datepicker.today" hidden={!isToday}>
-          {t("datepicker.today")}
-        </span>
-      </button>
-      {createPortal(<div ref={overlay} className="dcp-overlay" hidden />, document.body)}
-      {createPortal(
-        <div ref={inner} className="dcp-popup__inner" data-react-owned="">
-          <div className="dcp-popup__title" aria-hidden="true">
-            <i className="hgi-stroke hgi-calendar-03 dcp-popup__title-icon" />
-            <span className="dcp-popup__title-text" data-i18n="datepicker.label">
-              {t("datepicker.label")}
-            </span>
-          </div>
-          <DatePicker data={data} select={select} />
-        </div>,
-        popup,
-      )}
+      {slots &&
+        createPortal(
+          <>
+            <span className="chip-skeleton dcp-skeleton" aria-hidden="true" />
+            <span>{capitalize(main)}</span>
+            <span className="dcp-value__month">{capitalize(month.replace(/\.$/, ""))}</span>
+          </>,
+          slots.value,
+        )}
+      {slots &&
+        createPortal(
+          <span className="dcp-today-badge" data-i18n="datepicker.today" hidden={!isToday}>
+            {t("datepicker.today")}
+          </span>,
+          slots.trigger,
+        )}
+      {createPortal(<DatePicker data={data} select={select} />, body)}
     </date-chip-picker>
   );
 }

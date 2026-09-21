@@ -5,7 +5,6 @@ import { ClassroomCard } from "./classroom-card";
 import { buildingOverview, type OverviewContext } from "./building-overview";
 import { activateGroupTab } from "./bottom-nav";
 import { goToBuilding } from "./campus-buildings";
-import { haptics, defaultPatterns } from "./haptics";
 import { SHOW_PARTIAL_KEY } from "./settings";
 
 interface Results extends OverviewContext {
@@ -108,7 +107,6 @@ function BuildingSection({
           type="button"
           aria-label={t("building.viewInCampus").replace("{name}", building.name)}
           onClick={() => {
-            haptics.trigger(defaultPatterns.light);
             activateGroupTab("search-classrooms-container");
             goToBuilding(context.campusId, building.name);
           }}
@@ -184,7 +182,6 @@ function ResultsList({ context }: { context: OverviewContext }) {
           <button
             className={`results-filter-btn${showPartial ? " active" : ""}`}
             onClick={() => {
-              haptics.trigger(defaultPatterns.light);
               const next = !showPartial;
               setShowPartial(next);
               document

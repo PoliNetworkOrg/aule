@@ -1,8 +1,8 @@
 import { useLayoutEffect, useCallback, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
-import { animateI18nElement, getTranslationVersion, onTranslationChange, t } from "../i18n";
+import { getTranslationVersion, onTranslationChange } from "../i18n";
 import { createTimeFormatter } from "../utils/time-format";
-import { PickerMotion } from "./picker-motion";
+import { ChipShell } from "./chip-shell";
 import { TimePicker, TimePickerBackdrop } from "./time-picker";
 import { TimeRangeSlider } from "./time-range-slider";
 import { subscribeTimeControls, timeControlsReady } from "./time-controls-state";
@@ -16,16 +16,23 @@ function formatTime(value: string) {
   return createTimeFormatter({ hour: "numeric", minute: "2-digit" }).format(date);
 }
 
+// A thin wrapper around the drag-based time range slider. The pill, the morph
+// and the panel are Vitrium's chip picker (see chip-shell.ts, which also handles
+// the docked desktop mode). This component adds the collapsed range label
+// ("9:15 – 11:15"), rendered into the chip's own value slot.
+//
+// The two native <input type="time"> fields stay direct children of the element
+// so they remain submittable fields inside the <form>; only the slider is
+// relocated into the panel.
 export function TimeRangeChipPicker() {
   const host = useRef<HTMLElement>(null);
-  const trigger = useRef<HTMLButtonElement>(null);
-  const overlay = useRef<HTMLDivElement>(null);
-  const inner = useRef<HTMLDivElement>(null);
+  const shell = useRef<ChipShell | null>(null);
   const renderSlider = useRef<(() => void) | null>(null);
   const from = useRef<HTMLInputElement>(null);
   const to = useRef<HTMLInputElement>(null);
   const [fromInput, setFromInput] = useState<HTMLInputElement | null>(null);
   const [toInput, setToInput] = useState<HTMLInputElement | null>(null);
+  const [valueEl, setValueEl] = useState<HTMLElement | null>(null);
 
   const bindFrom = useCallback((input: HTMLInputElement | null) => {
     from.current = input;
@@ -37,37 +44,45 @@ export function TimeRangeChipPicker() {
     setToInput(input);
   }, []);
 
-  const [popup] = useState(() => {
+  const [body] = useState(() => {
     const element = document.createElement("div");
-    element.className = "trc-popup liquid-glass";
-    element.dataset.lgExclude = ".trs-bar-wrapper";
-    element.setAttribute("role", "dialog");
-    element.setAttribute("aria-modal", "true");
-    element.tabIndex = -1;
+
+    element.className = "trc-content";
 
     return element;
   });
 
   const ready = useSyncExternalStore(subscribeTimeControls, timeControlsReady);
   const language = useSyncExternalStore(onTranslationChange, getTranslationVersion);
-  const previousLanguage = useRef(language);
   const [, setRevision] = useState(0);
   const [values, setValues] = useState({ from: "", to: "" });
   useLayoutEffect(() => {
     const element = host.current;
-    const button = trigger.current;
-    const backdrop = overlay.current;
-    const content = inner.current;
 
-    if (!element || !button || !backdrop || !content) return;
-    document.body.appendChild(popup);
+    if (!element) return;
 
-    const motion = new PickerMotion(element, button, backdrop, popup, content, "trc", 26, () =>
-      renderSlider.current?.(),
-    );
+    const chips = new ChipShell(element, {
+      icon: "hgi-clock-01",
+      labelKey: "timepicker.timeLabel",
+      width: 26 * 16,
+      body,
+      title: false, // the slider brings its own title row
+      exclude: ".trs-bar-wrapper", // the bar, handles and Now badge track the pointer
+      deformFrom: ".trs-title",
+      onBuild(chip) {
+        const value = chip.trigger.querySelector<HTMLElement>(".lg-chip__value")!;
+
+        value.classList.add("trc-value");
+        setValueEl(value);
+      },
+      // The slider had no layout while its panel was hidden.
+      onShow: () => renderSlider.current?.(),
+    });
+
+    shell.current = chips;
 
     const integration = Object.assign(element, {
-      setDocked: (docked: boolean) => motion.setDocked(docked),
+      setDocked: (docked: boolean) => chips.setDocked(docked),
       retranslate: () => setRevision((revision) => revision + 1),
     });
 
@@ -82,55 +97,29 @@ export function TimeRangeChipPicker() {
     from.current?.addEventListener("input", update, { signal: events.signal });
     to.current?.addEventListener("input", update, { signal: events.signal });
     window.addEventListener("timeformatchange", update, { signal: events.signal });
+    window.addEventListener("resize", () => renderSlider.current?.(), { signal: events.signal });
 
     return () => {
       events.abort();
-      motion.destroy();
-      popup.remove();
+      chips.destroy();
+      shell.current = null;
+      setValueEl(null);
       integration.setDocked = () => {};
 
       integration.retranslate = () => {};
     };
-  }, [popup]);
+  }, [body]);
   useLayoutEffect(() => {
-    popup.setAttribute("aria-label", t("timepicker.timeLabel"));
+    shell.current?.retranslate();
     setValues({
       from: formatTime(from.current?.value ?? ""),
       to: formatTime(to.current?.value ?? ""),
     });
-
-    if (previousLanguage.current !== language) {
-      previousLanguage.current = language;
-      trigger.current?.querySelectorAll<HTMLElement>("[data-i18n]").forEach(animateI18nElement);
-      popup.querySelectorAll<HTMLElement>("[data-i18n]").forEach(animateI18nElement);
-    }
-  }, [ready, language, popup]);
+    // The slider's own title is React-rendered, so it follows the language itself.
+  }, [ready, language, valueEl]);
 
   return (
     <time-range-chip-picker ref={host} data-loading={ready ? undefined : ""} data-react-owned="">
-      <button
-        ref={trigger}
-        type="button"
-        className="trc-trigger liquid-glass"
-        aria-haspopup="dialog"
-        aria-expanded="false"
-      >
-        <i className="hgi-stroke hgi-clock-01 trc-trigger__icon" aria-hidden="true" />
-        <span className="trc-trigger__box">
-          <span className="trc-trigger__label" data-i18n="timepicker.timeLabel">
-            {t("timepicker.timeLabel")}
-          </span>
-          <span className="trc-trigger__skeleton" aria-hidden="true" />
-          <span className="trc-trigger__value">
-            <span className="trc-trigger__value-from">{values.from}</span>
-            <span className="trc-trigger__value-sep" aria-hidden="true">
-              –
-            </span>
-            <span className="trc-trigger__value-to">{values.to}</span>
-          </span>
-        </span>
-        <i className="hgi-stroke hgi-arrow-down-01 trc-trigger__chevron" aria-hidden="true" />
-      </button>
       <TimePickerBackdrop />
       <div className="time-pickers-container">
         <div className="time-picker">
@@ -158,14 +147,23 @@ export function TimeRangeChipPicker() {
           {ready && toInput && <TimePicker input={toInput} />}
         </div>
       </div>
-      {createPortal(<div ref={overlay} className="trc-overlay" hidden />, document.body)}
+      {valueEl &&
+        createPortal(
+          <>
+            <span className="chip-skeleton trc-skeleton" aria-hidden="true" />
+            <span>{values.from}</span>
+            <span className="trc-value__sep" aria-hidden="true">
+              –
+            </span>
+            <span>{values.to}</span>
+          </>,
+          valueEl,
+        )}
       {createPortal(
-        <div ref={inner} className="trc-popup__inner" data-react-owned="">
-          {ready && fromInput && toInput && (
-            <TimeRangeSlider fromInput={fromInput} toInput={toInput} renderRef={renderSlider} />
-          )}
-        </div>,
-        popup,
+        ready && fromInput && toInput ? (
+          <TimeRangeSlider fromInput={fromInput} toInput={toInput} renderRef={renderSlider} />
+        ) : null,
+        body,
       )}
     </time-range-chip-picker>
   );

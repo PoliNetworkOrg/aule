@@ -7,8 +7,7 @@
 // day-chip selector (classroom-detail.js), which share the same markup/CSS
 // but otherwise have independent selection logic (hidden <select> vs.
 // schedule row highlight).
-import { createPillDragCore, type PillSelection } from "./pill-drag-core.ts";
-import { haptics, defaultPatterns } from "./haptics.ts";
+import { createPillDragCore, type PillSelection } from "vitrium";
 
 // container: the `.date-picker-container` element (already position:relative,
 // already holding a `.date-indicator` sibling and some
@@ -62,7 +61,6 @@ export function createPillSelector(
       once: true,
       signal: events.signal,
     });
-    haptics.trigger(defaultPatterns.error);
   }
 
   const core = createPillDragCore({
@@ -72,13 +70,13 @@ export function createPillSelector(
     hit,
     activeRow,
     cellSelector: ".date-element-container",
+    activeCellClass: "date-indicator-cell",
     liftedClass: "date-indicator--lifted",
     tapScale: 1.6,
     // Wide row → the whole thing trails a bit more than the compact tabbar.
     trail: { follow: 0.12, give: 8, giveCross: 5 },
     canSelect: (i) => !isSkipped(core.cells[i]),
     onReject: shake,
-    haptic: null, // onSelect callers buzz (or deliberately don't) themselves
     // The shake keyframes (date-indicator-shake in date-picker.css) rotate
     // around the pill's current x.
     onRender: ({ pos }) => indicator.style.setProperty("--indicator-x", `${pos}px`),

@@ -12,7 +12,7 @@ import {
 import { createRoot, type Root } from "react-dom/client";
 import { flushSync } from "react-dom";
 import type { Campus, ClassroomEntry, Occupation, OccupancyDay } from "../types";
-import type { PillSelection } from "./pill-drag-core";
+import type { PillSelection } from "vitrium";
 import { FilledStar } from "./classroom-card";
 
 type VariableStyle = CSSProperties & { [key: `--${string}`]: string | number };
@@ -97,12 +97,11 @@ import {
   getClassroomStatusNow,
 } from "../available-rooms-script.ts";
 import { t, getLocale, onLanguageSwitch } from "../i18n.ts";
-import { haptics, defaultPatterns } from "./haptics.ts";
 import { createTimeFormatter } from "../utils/time-format.ts";
 import { infoPage } from "./info-page.tsx";
 import { fetchPhotoUrl, photoUrlCache } from "../utils/photo.ts";
 import { isFavourite, toggleFavourite } from "../utils/favourites.ts";
-import { DynamicPopover } from "./popover.ts";
+import { createPopover } from "vitrium";
 import { createPillSelector } from "./pill-selector.ts";
 
 function minutesToTimeDisplay(minutes: number) {
@@ -302,7 +301,6 @@ class ClassroomDetail {
       "click",
       () => {
         if (this._currentId === null) return;
-        haptics.trigger(defaultPatterns.light);
         toggleFavourite(this._currentId);
         this._syncFavBtn();
       },
@@ -315,8 +313,6 @@ class ClassroomDetail {
     this._backBtn?.addEventListener(
       "click",
       () => {
-        haptics.trigger(defaultPatterns.light);
-
         if (this._openedViaPushState) {
           goBack();
         } else {
@@ -407,7 +403,6 @@ class ClassroomDetail {
 
         if (!trigger) return;
         e.stopPropagation();
-        haptics.trigger(defaultPatterns.light);
 
         const id = parseInt(trigger.dataset.openClassroom!);
 
@@ -964,7 +959,6 @@ class ClassroomDetail {
     this._overlay!.querySelector<HTMLElement>(".detail-title")?.addEventListener(
       "click",
       () => {
-        haptics.trigger(defaultPatterns.light);
         this._loadSchedule(classroom.id);
 
         if (classroom.idfoto) this._loadPhoto(classroom.id);
@@ -1372,22 +1366,15 @@ class ClassroomDetail {
       })();
 
       // --- Mobile day selector chips ---
-      const selectorItemsHtml = (duplicate = false) =>
+      const selectorItemsHtml = () =>
         days.map(({ dayData, date }, i) => {
           const isSunday = !dayData;
 
-          if (duplicate && isSunday && localStorage.getItem("poliAule_hideSundays") === "true")
-            return null;
           const raw = date.toLocaleDateString(getLocale(), { weekday: "narrow" });
           const dayName = raw.charAt(0).toUpperCase() + raw.slice(1);
           const dayNum = date.getDate();
 
-          return duplicate ? (
-            <span key={i} className="date-indicator-cell">
-              <span className={`date-day-of-week${isSunday ? " date-sunday" : ""}`}>{dayName}</span>
-              <span className="date-number">{dayNum}</span>
-            </span>
-          ) : (
+          return (
             <>
               <div
                 className={
@@ -1417,7 +1404,7 @@ class ClassroomDetail {
               </div>
               <div className="date-indicator">
                 <div className="date-indicator-inner">
-                  <div className="date-indicator-active-row">{selectorItemsHtml(true)}</div>
+                  <div className="date-indicator-active-row" />
                 </div>
               </div>
               <div className="date-indicator-hit" />
@@ -1440,14 +1427,6 @@ class ClassroomDetail {
                   {Children.toArray(rowsHtml)}
                 </div>
               </div>
-            </div>
-            <div
-              id={"detail-timeline-popover"}
-              className={"popover timeline-occupation-popover liquid-glass"}
-              role={"tooltip"}
-            >
-              <div className={"arrow"} data-arrow></div>
-              <div className={"timeline-popover-body"}></div>
             </div>
           </Fragment>,
         ),
@@ -1501,7 +1480,6 @@ class ClassroomDetail {
           rowEls.forEach((row, i) => row.classList.toggle("selected", i === index));
 
           if (!silent) {
-            haptics.trigger(defaultPatterns.light);
             hideOccupationPopover();
           }
         },
@@ -1707,29 +1685,39 @@ class ClassroomDetail {
       );
 
       // ---------- TIMELINE OCCUPATION POPOVER ----------
-      const timelinePopoverEl = container.querySelector<HTMLElement>("#detail-timeline-popover");
+      // One popover reused for every block; it lives on <body>, so it is
+      // destroyed with the rest of this render (see _timelinePopoverCleanup).
+      const timelinePopover = createPopover({
+        placement: "top",
+        role: "tooltip",
+        dismissable: false,
+      });
 
-      const timelinePopoverBody =
-        timelinePopoverEl?.querySelector<HTMLElement>(".timeline-popover-body") ?? null;
+      timelinePopover.el.style.setProperty("--lg-popover-max-width", "min(280px, 70vw)");
 
-      const timelinePopover = timelinePopoverEl
-        ? new DynamicPopover(timelinePopoverEl, { placement: "top" })
-        : null;
+      const timelinePopoverBody = document.createElement("div");
 
-      const popoverRoot = timelinePopoverBody ? createRoot(timelinePopoverBody) : null;
+      timelinePopoverBody.className = "timeline-popover-body";
+      timelinePopover.setContent(timelinePopoverBody);
+
+      const popoverRoot = createRoot(timelinePopoverBody);
+      let _popoverBlock: HTMLElement | null = null;
 
       const showOccupationPopover = (blockEl: HTMLElement) => {
-        if (!timelinePopover || !timelinePopoverBody) return;
         const slot = scheduleSlots[Number(blockEl.dataset.slotIdx)];
 
         if (!slot) return;
-        flushSync(() => popoverRoot?.render(<OccupationPopover slot={slot} />));
+        flushSync(() => popoverRoot.render(<OccupationPopover slot={slot} />));
+        _popoverBlock = blockEl;
         timelinePopover.show(blockEl);
       };
 
-      const hideOccupationPopover = () => timelinePopover?.hide();
+      const hideOccupationPopover = () => {
+        _popoverBlock = null;
+        timelinePopover.hide();
+      };
 
-      if (timelinePopover) {
+      {
         // Desktop hover
         let _hoveredBlock: HTMLElement | null = null;
         container.addEventListener(
@@ -1807,9 +1795,8 @@ class ClassroomDetail {
             }
 
             e.stopPropagation();
-            haptics.trigger(defaultPatterns.light);
 
-            if (timelinePopover.trigger === block) hideOccupationPopover();
+            if (_popoverBlock === block) hideOccupationPopover();
             else showOccupationPopover(block);
           },
           { signal: this._scheduleEvents.signal },
@@ -1838,8 +1825,8 @@ class ClassroomDetail {
 
       this._timelinePopoverCleanup = () => {
         daySelector.destroy();
-        timelinePopover?.hide();
-        popoverRoot?.unmount();
+        timelinePopover.destroy();
+        popoverRoot.unmount();
         cursorRoots.forEach((root) => root.unmount());
       };
     } catch (err) {

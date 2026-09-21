@@ -8,7 +8,6 @@ import { createRoot, type Root } from "react-dom/client";
 import { flushSync } from "react-dom";
 import type { Building } from "../types";
 import { t } from "../i18n.ts";
-import { haptics, defaultPatterns } from "./haptics.ts";
 
 // The Campus tab's own "pages" inside the campus sheet (components/campus-sheet.js):
 //
@@ -136,7 +135,6 @@ function renderHeader() {
             hidden
             aria-label={t("campus.back")}
             onClick={() => {
-              haptics.trigger(defaultPatterns.light);
               goToCampusPage({ animate: true });
             }}
           >
@@ -154,7 +152,6 @@ function renderHeader() {
             hidden
             aria-label={t("campus.recenter")}
             onClick={() => {
-              haptics.trigger(defaultPatterns.light);
               document.dispatchEvent(new CustomEvent("campusrecenter"));
             }}
           >
@@ -498,7 +495,6 @@ function swapCampusPage(campusId: string, { animate = true } = {}) {
 
 function CampusBuildingCard({ building }: { building: Building }) {
   const go = () => {
-    haptics.trigger(defaultPatterns.light);
     openBuilding(building.name, { animate: true });
   };
 

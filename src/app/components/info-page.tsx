@@ -38,7 +38,6 @@ interface StatsCache {
 import { openPage, closePage, goBack } from "../../lib/navigation";
 import { queryClient } from "../../lib/query";
 import { onLanguageSwitch, t } from "../i18n.ts";
-import { haptics, defaultPatterns } from "./haptics.ts";
 import { safeUrl } from "../utils/html.ts";
 
 const GITHUB_REPO = "SummaCristian/poliaule";
@@ -120,7 +119,6 @@ class InfoPage {
           e.target.closest(".github-repo-chip") ||
           e.target.closest(".create-issue-btn")
         ) {
-          haptics.trigger(defaultPatterns.light);
         }
       },
       { signal: this._events.signal },
@@ -129,7 +127,6 @@ class InfoPage {
     document.getElementById("info-trigger")?.addEventListener(
       "click",
       () => {
-        haptics.trigger(defaultPatterns.light);
         openPage("/info");
       },
       { signal: this._events.signal },
@@ -142,7 +139,6 @@ class InfoPage {
       (e) => {
         if (!this._isOpen) return;
         e.stopImmediatePropagation();
-        haptics.trigger(defaultPatterns.light);
 
         if (this._openedFromDetail) {
           // Go back to the classroom hash; the route will leave the info page
@@ -525,7 +521,6 @@ class InfoPage {
             e.target instanceof Element ? e.target.closest<HTMLElement>(".pwa-tab") : null;
 
           if (!btn || btn.classList.contains("active")) return;
-          haptics.trigger(defaultPatterns.light);
           const idx = tabs.indexOf(btn);
           tabs.forEach((t, i) => {
             t.classList.toggle("active", i === idx);

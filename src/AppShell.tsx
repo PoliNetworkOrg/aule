@@ -155,17 +155,12 @@ export function AppShell() {
       </div>
 
       <footer className="footer">
-        <button
-          className="transparent-button version-info-button"
-          data-popover="version-info-popover"
-        >
+        <button className="transparent-button version-info-button">
           <label className="secondary" data-shell-i18n="" data-i18n="footer.versionInfo">
             <RichText text={t("footer.versionInfo")} />
           </label>
         </button>
-        <div id="version-info-popover" className="popover liquid-glass">
-          <div className="arrow" data-arrow=""></div>
-
+        <div id="version-info-content" hidden>
           <img src="/favicons/main/logo.webp" className="changelog-logo" width="434" height="500" />
           <h1 className="popover-title" data-shell-i18n="" data-i18n="footer.versionInfo">
             <RichText text={t("footer.versionInfo")} />
