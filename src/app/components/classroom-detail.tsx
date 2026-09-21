@@ -1754,6 +1754,10 @@ class ClassroomDetail {
 
       const popoverRoot = createRoot(timelinePopoverBody);
       let _popoverBlock: HTMLElement | null = null;
+      // Suppresses the close-on-scroll handler below while the auto-scroll
+      // to a searched lesson is still animating, so it doesn't dismiss the
+      // popover it just opened.
+      let _autoScrolling = false;
 
       const showOccupationPopover = (blockEl: HTMLElement) => {
         const slot = scheduleSlots[Number(blockEl.dataset.slotIdx)];
@@ -1781,11 +1785,22 @@ class ClassroomDetail {
 
         if (primaryBlock) {
           const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-          primaryBlock.scrollIntoView({
-            block: "center",
-            behavior: reduceMotion ? "auto" : "smooth",
-          });
+
           showOccupationPopover(primaryBlock);
+
+          if (reduceMotion) {
+            primaryBlock.scrollIntoView({ block: "center", behavior: "auto" });
+          } else {
+            _autoScrolling = true;
+            primaryBlock.scrollIntoView({ block: "center", behavior: "smooth" });
+            window.addEventListener(
+              "scrollend",
+              () => {
+                _autoScrolling = false;
+              },
+              { once: true, signal: this._scheduleEvents.signal },
+            );
+          }
         }
       }
 
@@ -1887,7 +1902,11 @@ class ClassroomDetail {
         // On desktop this already happens implicitly (scrolling moves the hovered
         // block out from under a stationary cursor, firing pointerout), but a tap
         // on mobile leaves the popover open with no such gesture to close it.
-        const onScroll = () => hideOccupationPopover();
+        const onScroll = () => {
+          if (_autoScrolling) return;
+          hideOccupationPopover();
+        };
+
         window.addEventListener("scroll", onScroll, {
           capture: true,
           passive: true,
