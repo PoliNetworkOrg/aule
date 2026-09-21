@@ -133,16 +133,28 @@ export async function fetchClassroomsData() {
       }
     }
 
-    if (results.length === 0 && dates.length > 0) {
-      // Every per-date fetch failed even though the dates list itself
-      // loaded fine — keep whatever (stale but real) data is already in
-      // classroomsData instead of wiping it out to an empty array, which
-      // would otherwise turn a transient per-date outage into "no data at
-      // all" for anyone reloading the page.
-      console.error("All per-date occupancy fetches failed; keeping previous data.");
-    } else {
-      classroomsData.splice(0, classroomsData.length, ...results);
+    // Merge per date rather than replacing the array wholesale: a partial
+    // outage (some per-date fetches rejected, others fine) would otherwise
+    // drop the still-valid data we already hold for the failed dates,
+    // turning a transient blip into missing days in the UI. Keep the
+    // requested order from `dates`, preferring a fresh response and falling
+    // back to the previous entry for that date.
+    const fetched = new Map(results.map((day) => [day.date, day]));
+    const previous = new Map(classroomsData.map((day) => [day.date, day]));
+
+    const merged = dates.flatMap((date) => {
+      const day = fetched.get(date) ?? previous.get(date);
+
+      return day ? [day] : [];
+    });
+
+    if (results.length < dates.length) {
+      console.error(
+        `${dates.length - results.length} of ${dates.length} per-date occupancy fetches failed; keeping previous data for those dates.`,
+      );
     }
+
+    classroomsData.splice(0, classroomsData.length, ...merged);
 
     console.log("All data loaded:", classroomsData);
   } catch (error) {

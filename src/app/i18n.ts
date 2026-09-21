@@ -90,15 +90,22 @@ export function onLanguageSwitch(cb: (lang: string) => void) {
   };
 }
 
-export async function setLocale(lang: string) {
-  if (!SUPPORTED.includes(lang) || lang === currentLocale) return;
+// Returns whether the switch actually happened, so callers that optimistically
+// moved a UI control (see settings.tsx's changeLanguage) can put it back when
+// the locale couldn't be loaded.
+export async function setLocale(lang: string): Promise<boolean> {
+  if (!SUPPORTED.includes(lang)) return false;
+
+  if (lang === currentLocale) return true;
   // Only persist/notify on success — a failed fetch shouldn't both wipe the
   // working translations *and* commit the broken language as the user's
   // saved preference (which initI18n() would then retry on every load).
   const ok = await loadLocale(lang);
 
-  if (!ok) return;
+  if (!ok) return false;
   localStorage.setItem(STORAGE_KEY, lang);
   notifyTranslations();
   switchCallbacks.forEach((cb) => cb(lang));
+
+  return true;
 }

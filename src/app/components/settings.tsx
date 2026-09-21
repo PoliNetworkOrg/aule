@@ -348,10 +348,16 @@ function SettingsPopup() {
   }, [translationVersion, locale]);
 
   function changeLanguage(value: string) {
+    // The control is moved optimistically so it tracks the tap immediately;
+    // if the locale JSON can't be loaded, setLocale() keeps the previous
+    // locale active, so put the control back rather than leaving it showing
+    // a language the app isn't actually using.
     setLanguage(value);
 
     if (value === getLocale()) return;
-    void setLocale(value);
+    void setLocale(value).then((ok) => {
+      if (!ok) setLanguage(getLocale());
+    });
   }
 
   function changeTimeFormat(value: string) {

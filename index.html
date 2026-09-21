@@ -20,11 +20,15 @@
       of the inline <script>/onload= handlers and critical-CSS <style>
       blocks below with no nonce/hash pipeline yet — tighten this once those
       are removed or nonced at build time. The Mapbox origins are temporary
-      and should be dropped once the map provider is replaced.
+      and should be dropped once the map provider is replaced; until then
+      they follow Mapbox's documented CSP requirements for GL JS loaded from
+      their CDN — api.mapbox.com in script-src/style-src (mapbox-gl.js and
+      mapbox-gl.css), 'wasm-unsafe-eval' and worker-src blob: for the
+      Standard style's WebAssembly renderer and its workers.
     -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self' 'unsafe-inline' https://api.mapbox.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://api.poliaule.com https://api-beta.poliaule.com https://*.tiles.mapbox.com https://avatars.githubusercontent.com; connect-src 'self' https://api.poliaule.com https://api-beta.poliaule.com https://api.mapbox.com https://events.mapbox.com https://*.tiles.mapbox.com https://api.github.com; worker-src 'self' blob:; base-uri 'self'; object-src 'none'"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://api.mapbox.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://api.mapbox.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://api.poliaule.com https://api-beta.poliaule.com https://api.mapbox.com https://*.tiles.mapbox.com https://avatars.githubusercontent.com; connect-src 'self' https://api.poliaule.com https://api-beta.poliaule.com https://api.mapbox.com https://events.mapbox.com https://*.tiles.mapbox.com https://api.github.com; worker-src 'self' blob:; base-uri 'self'; object-src 'none'"
     />
 
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />

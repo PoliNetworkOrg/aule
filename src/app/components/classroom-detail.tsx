@@ -1826,6 +1826,30 @@ class ClassroomDetail {
           { signal: this._scheduleEvents.signal },
         );
 
+        // Same toggle from the keyboard. The blocks are role="button", but a
+        // div gets no native Enter/Space activation, and focusin above only
+        // ever *shows* the popover — without this there's no way to dismiss
+        // it (or re-open it on the focused block) without a pointer.
+        container.addEventListener(
+          "keydown",
+          (e) => {
+            if (e.key !== "Enter" && e.key !== " ") return;
+
+            const block =
+              e.target instanceof Element
+                ? e.target.closest<HTMLElement>(".detail-schedule-block")
+                : null;
+
+            if (!block) return;
+            e.preventDefault(); // Space would otherwise scroll the page
+            e.stopPropagation();
+
+            if (_popoverBlock === block) hideOccupationPopover();
+            else showOccupationPopover(block);
+          },
+          { signal: this._scheduleEvents.signal },
+        );
+
         // Close on any interaction outside the schedule area (e.g. tapping the room title).
         const onDocClick = (e: MouseEvent) => {
           if (!(e.target instanceof Node) || !container.contains(e.target)) hideOccupationPopover();

@@ -16,6 +16,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          # This job runs repo-controlled install/lint/build scripts on
+          # pull_request; don't leave the checkout token in .git/config
+          # where they could read it. Nothing here pushes back to the repo.
+          persist-credentials: false
 
       - uses: pnpm/action-setup@v4
 
