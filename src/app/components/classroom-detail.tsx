@@ -77,19 +77,26 @@ function DetailPhoto({ ref }: { ref: Ref<PhotoHandle> }) {
   if (!photo.visible) return null;
 
   return (
-    <div className={`detail-photo-container${photo.loaded ? " loaded" : ""}`}>
-      <img
-        ref={img}
-        className={`detail-photo${photo.loaded ? " loaded" : ""}`}
-        alt=""
-        src={photo.url}
-        onError={() => setPhoto((current) => ({ ...current, visible: false }))}
+    <>
+      <div
+        className={`detail-photo-backdrop${photo.url ? " loaded" : ""}`}
+        style={photo.url ? cssVars({ "--backdrop-img": `url("${photo.url}")` }) : undefined}
       />
-      {photo.gradient && <div className="detail-photo-gradient" />}
-    </div>
+      <div className={`detail-photo-container${photo.loaded ? " loaded" : ""}`}>
+        <img
+          ref={img}
+          className={`detail-photo${photo.loaded ? " loaded" : ""}`}
+          alt=""
+          src={photo.url}
+          onError={() => setPhoto((current) => ({ ...current, visible: false }))}
+        />
+        {photo.gradient && <div className="detail-photo-gradient" />}
+      </div>
+    </>
   );
 }
 
+import { isNumber } from "../../lib/guards";
 import { openPage, closePage, goBack } from "../../lib/navigation";
 import {
   classroomsData as occupancyData,
@@ -99,10 +106,24 @@ import {
 import { t, getLocale, onLanguageSwitch } from "../i18n.ts";
 import { createTimeFormatter } from "../utils/time-format.ts";
 import { infoPage } from "./info-page.tsx";
-import { fetchPhotoUrl, photoUrlCache } from "../utils/photo.ts";
+import {
+  fetchPhotoUrl,
+  photoUrlCache,
+  extractPhotoColor,
+  getCachedPhotoColor,
+  getCachedPhotoLuminance,
+  getCachedPhotoAverageLuminance,
+} from "../utils/photo.ts";
 import { isFavourite, toggleFavourite } from "../utils/favourites.ts";
-import { createPopover } from "vitrium";
+import { createPopover, createButton, createSegmentedControl } from "vitrium";
+import { setZoomOrigin, clearZoomOrigin, cardRadius } from "../utils/vt-motion.ts";
+import { refreshHeaderBlur } from "../utils/header-blur.ts";
 import { createPillSelector } from "./pill-selector.ts";
+import { embedMap, parkMap, releaseMap, getEmbedPov, setEmbedPov } from "./campus-map.tsx";
+
+// No zoom and no shared element when motion is unwelcome: the pair of them is
+// the whole animation, so what is left is the browser's own cross-fade.
+const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)");
 
 function minutesToTimeDisplay(minutes: number) {
   const d = new Date();
@@ -202,6 +223,7 @@ class ClassroomDetail {
   _openTrigger: OpenTrigger | null = null;
   _openedViaPushState = false;
   _currentId: number | null = null;
+  _enteredId: number | null = null;
   _savedScrollPos = 0;
   _queryContext: QueryContext | null = null;
   _nowTimer: number | undefined;
@@ -220,6 +242,11 @@ class ClassroomDetail {
   _frames = new Set<number>();
   _disposed = false;
   _generation = 0;
+  _vtSettled: Promise<void> | null = null; // pending open/close transition, see _beginTransition
+  _vtResolve: (() => void) | null = null;
+  _mapObserver: IntersectionObserver | null = null; // waits for the map section to come into view
+  _mapTimer = 0; // ...and then for the page to settle
+  _reflowObservers: ResizeObserver[] = [];
   _frame(callback: () => void) {
     const id = requestAnimationFrame(() => {
       this._frames.delete(id);
@@ -265,6 +292,10 @@ class ClassroomDetail {
     this._scheduleEvents.abort();
     this._stopLanguage?.();
     clearInterval(this._nowTimer);
+    this._cancelMapEmbed();
+    releaseMap();
+    this._reflowObservers.forEach((o) => o.disconnect());
+    this._reflowObservers = [];
     this._frames.forEach(cancelAnimationFrame);
     this._timers.forEach(clearTimeout);
     this._frames.clear();
@@ -296,6 +327,73 @@ class ClassroomDetail {
     if (this._overlay) this._root = createRoot(this._overlay);
 
     if (this._favBtn) this._favRoot = createRoot(this._favBtn);
+
+    // The dark-mode dimming and the title tone both depend on the theme, so
+    // redo them for the open photo when the device theme flips at runtime.
+    window.matchMedia("(prefers-color-scheme: dark)").addEventListener(
+      "change",
+      () => {
+        const url = this._currentId === null ? undefined : photoUrlCache.get(this._currentId);
+
+        if (url) this._applyPhotoTone(url);
+      },
+      { signal: this._events.signal },
+    );
+
+    // Flags the overlay once the sticky title row reaches its stuck position
+    // (see the title-stuck rules in classroom-detail.css), and measures how far
+    // the title must slide to clear the back button: from where the row's
+    // content starts to 0.5rem past the button's right edge, whatever the
+    // width / scrollbar / centred column. Listens in the capture phase so it
+    // works whichever element is the scroller.
+    let stuckFrame = 0;
+
+    const syncTitleStuck = () => {
+      stuckFrame = 0;
+      const overlay = this._overlay;
+
+      if (!overlay) return;
+      const row = overlay.querySelector<HTMLElement>(".detail-title-row");
+      let stuck = false;
+
+      if (row && !overlay.hidden && getComputedStyle(row).position === "sticky") {
+        const cs = getComputedStyle(row);
+        const top = parseFloat(cs.top);
+        const rect = row.getBoundingClientRect();
+
+        const scrolled = window.scrollY > 0 || overlay.scrollTop > 0 || document.body.scrollTop > 0;
+        stuck = scrolled && rect.top <= top + 0.5;
+        const back = document.getElementById("detail-back-btn");
+
+        if (back && !back.hidden) {
+          const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+
+          const shift =
+            back.getBoundingClientRect().right +
+            0.5 * rem -
+            (rect.left + parseFloat(cs.paddingLeft));
+
+          overlay.style.setProperty("--title-shift", `${Math.round(shift)}px`);
+        }
+      }
+
+      overlay.classList.toggle("title-stuck", stuck);
+    };
+
+    const queueTitleStuck = () => {
+      if (!stuckFrame) {
+        stuckFrame = this._frame(() => {
+          syncTitleStuck();
+        });
+      }
+    };
+
+    document.addEventListener("scroll", queueTitleStuck, {
+      passive: true,
+      capture: true,
+      signal: this._events.signal,
+    });
+    window.addEventListener("resize", queueTitleStuck, { signal: this._events.signal });
 
     this._favBtn?.addEventListener(
       "click",
@@ -508,6 +606,9 @@ class ClassroomDetail {
   _silentClose() {
     if (!this._overlay || this._overlay!.hidden) return;
     this._currentId = null;
+    this._enteredId = null;
+    releaseMap();
+    this._cancelMapEmbed();
     clearInterval(this._nowTimer);
     document.body.classList.remove("detail-open");
     // Leave tabbar.detail-open and backBtn visibility intact — info page takes over both
@@ -516,6 +617,116 @@ class ClassroomDetail {
     this._clearContent();
     this._openTrigger = null;
     this._queryContext = null;
+  }
+
+  // ---------- TRANSITION PLUMBING ----------
+
+  /* The page's end of the card morph: the hero photo. Null for a room with no
+     photo, and deliberately so — there is nothing on that page for the card to
+     become, and every stand-in is worse than none. The card's snapshot is
+     `object-fit: cover`-ed into whatever box the morph lands on, so a stand-in
+     the size of its box blows the card up by that box's scale.
+
+     With no page-side element the card is alone in its group, the group stays
+     at the card's own rect, and the `:only-child` rules in
+     classroom-detail.css fade it out in place over the page growing out from
+     under it. That is also what SwiftUI's `.zoom` does with nothing to pair up:
+     the source view simply becomes the destination page. */
+  _heroTarget() {
+    return this._overlay?.querySelector<HTMLElement>(".detail-photo-container") ?? null;
+  }
+
+  /* Anything that blocks the main thread while the snapshots are animating is
+     a stutter in the animation, so work that can wait (the map's WebGL boot,
+     mainly) waits on this. */
+  _beginTransition() {
+    if (this._vtSettled) return;
+    this._vtSettled = new Promise<void>((resolve) => {
+      this._vtResolve = resolve;
+    });
+  }
+
+  _settleTransition() {
+    refreshHeaderBlur();
+    const resolve = this._vtResolve;
+    this._vtSettled = null;
+    this._vtResolve = null;
+    resolve?.();
+  }
+
+  _afterTransition(fn: () => void) {
+    if (this._vtSettled) void this._vtSettled.then(fn);
+    else fn();
+  }
+
+  /* The header's progressive blur samples whatever is painted behind it, and
+     on this page that is the hero photo. refreshHeaderBlur() runs when the
+     transition settles, which covers a photo that was already cached and
+     stamped inside the transition, and misses one that was not: a cold room has
+     to resolve /v1/photos/:id, fetch the bytes and decode them first, so its
+     photo lands well after. Safari then keeps the blur it sampled over the
+     empty skeleton until something else forces a repaint. So: refresh again
+     when the photo is actually up. */
+  _photoRevealed() {
+    refreshHeaderBlur();
+  }
+
+  _cancelMapEmbed() {
+    this._mapObserver?.disconnect();
+    this._mapObserver = null;
+    clearTimeout(this._mapTimer);
+    this._mapTimer = 0;
+  }
+
+  /* Booting the map is the most expensive thing on this page by a distance:
+     fetching the token, parsing mapbox-gl, building a WebGL context and its
+     first tiles, all on the main thread. Doing that inside the view
+     transition's update callback is what made the very first open of any
+     detail page stutter.
+
+     So it waits for three things: the map section coming close to the viewport
+     (a reader who doesn't scroll down there never pays for it at all), the
+     transition being over, and then a beat longer — a room with no photo has a
+     short page, so the map section is already in range when it opens, and the
+     page's own entrance animations are still running for another half second. */
+  _scheduleMapEmbed(host: HTMLElement, opts: Parameters<typeof embedMap>[1]) {
+    this._cancelMapEmbed();
+
+    const start = () => {
+      this._mapObserver?.disconnect();
+      this._mapObserver = null;
+      this._afterTransition(() => {
+        const run = () => {
+          if (!host.isConnected) return;
+          void embedMap(host, opts);
+        };
+
+        const idle = () => {
+          if ("requestIdleCallback" in window) {
+            requestIdleCallback(run, { timeout: 500 });
+          } else {
+            run();
+          }
+        };
+
+        // Long enough for the page's own entrance animations to be over.
+        this._mapTimer = window.setTimeout(idle, 600);
+      });
+    };
+
+    if (!("IntersectionObserver" in window)) {
+      start();
+
+      return;
+    }
+
+    this._mapObserver = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) start();
+      },
+      { rootMargin: "600px 0px" },
+    );
+    this._mapObserver.observe(host);
   }
 
   // ---------- OPEN ----------
@@ -530,6 +741,7 @@ class ClassroomDetail {
 
     if (!entry) return;
 
+    if (this._currentId !== id) document.documentElement.style.removeProperty("--detail-tint");
     this._currentId = id;
     this._openTrigger = pending ?? null;
     this._queryContext = pending?.queryContext ?? null;
@@ -562,14 +774,33 @@ class ClassroomDetail {
       // (which removes the photo container entirely) run normally instead of being
       // skipped via its "already loaded" short-circuit.
       if (!decoded) validPhotoUrl = null;
+
+      // Warm the tint cache too, so _setBackdrop can apply --detail-tint
+      // synchronously inside the VT callback (the "new" snapshot is taken
+      // right after it, before any async extraction could land).
+      if (validPhotoUrl) await extractPhotoColor(validPhotoUrl);
+
+      if (this._currentId !== id || generation !== this._generation) return;
     }
 
     if (document.startViewTransition) {
-      // -- Whole-card zoom: one shared element, the card's own bounding box
-      // morphs straight into the full page (SwiftUI .zoom-style), rather than
-      // morphing name/photo/icons independently. --
+      // -- SwiftUI .zoom-style open: the whole page grows out of the card's
+      // rounded box (a transform + clip on the root snapshot, see
+      // utils/vt-motion.ts), while the card and the page's hero photo morph
+      // into each other as one shared element on top of it. --
       const cardEl = pending?.cardEl ?? null;
       const cardInDom = !!(cardEl && document.body.contains(cardEl));
+
+      // No card to zoom from (hash navigation, info -> detail): leave the root
+      // cross-fade alone instead of inventing an origin for the page to fly
+      // out of.
+      const zoomingCard =
+        cardInDom && !reduceMotion?.matches
+          ? setZoomOrigin(cardEl.getBoundingClientRect(), cardRadius(cardEl))
+            ? cardEl
+            : null
+          : null;
+
       // The header is a constant translucent/blurred overlay, not content that
       // changes — it doesn't need to cross-fade with the rest of "root". But
       // a VT freezes everything (including backdrop-filter's live sampling)
@@ -583,11 +814,24 @@ class ClassroomDetail {
 
       if (fromInfo) infoPage._prepareReturnVT();
 
-      if (cardInDom) cardEl.style.viewTransitionName = "classroom-detail-zoom";
+      // Only when the page has a hero for it to become. A room with no photo
+      // has none, and naming the card anyway put its snapshot on top of the
+      // growing page at its own unscaled size, so the card's title showed over
+      // the page's title. Unnamed, the card stays in the list's snapshot, which
+      // does not move, and the page's box covers it from frame one.
+      if (zoomingCard && hasPhoto) zoomingCard.style.viewTransitionName = "detail-hero";
+
+      // The page's end of the morph, resolved inside the callback.
+      let heroTargetEl: HTMLElement | null = null;
+
+      this._beginTransition();
 
       // Strip the glass blur off the scaling header controls for the transition
       // (see .header-ctl-vt in classroom-detail.css).
       document.documentElement.classList.add("header-ctl-vt");
+
+      // Direction of the zoom (see .detail-vt-open in classroom-detail.css).
+      if (zoomingCard) document.documentElement.classList.add("detail-vt-open");
 
       const vt = document.startViewTransition(() => {
         if (this._disposed || generation !== this._generation) return;
@@ -598,7 +842,7 @@ class ClassroomDetail {
           this._tabbar.classList.add("detail-open");
         }
 
-        if (cardInDom) cardEl.style.viewTransitionName = "";
+        if (zoomingCard) zoomingCard.style.viewTransitionName = "";
 
         document.body.classList.add("detail-open");
 
@@ -629,13 +873,25 @@ class ClassroomDetail {
 
         window.scrollTo(0, 0);
 
-        // Force a synchronous layout flush before naming the overlay, so its
-        // flex-resolved size (siblings hidden via .detail-open above) is fully
-        // settled at the exact moment the VT captures the "new" state geometry.
+        // The card's counterpart: the hero photo, which the page's zoom lands
+        // exactly on top of. Named after the layout flush below so it is
+        // captured at its settled size (siblings hidden via .detail-open
+        // above), and only when there is a card to morph out of.
         void this._overlay!.offsetHeight;
-        this._overlay!.style.viewTransitionName = "classroom-detail-zoom";
 
-        if (validPhotoUrl) this._photo.current?.reveal(validPhotoUrl);
+        if (zoomingCard) {
+          heroTargetEl = this._heroTarget();
+
+          if (heroTargetEl) {
+            heroTargetEl.style.viewTransitionName = "detail-hero";
+            document.documentElement.classList.add("detail-vt-hero");
+          }
+        }
+
+        if (validPhotoUrl) {
+          this._photo.current?.reveal(validPhotoUrl);
+          this._setBackdrop(validPhotoUrl);
+        }
 
         this._loadSchedule(id);
 
@@ -644,14 +900,26 @@ class ClassroomDetail {
 
       const cleanup = () => {
         if (generation !== this._generation) return;
-        this._overlay!.style.viewTransitionName = "";
+
+        if (heroTargetEl) heroTargetEl.style.viewTransitionName = "";
 
         if (cardEl) cardEl.style.viewTransitionName = "";
 
         if (headerEl) headerEl.style.viewTransitionName = "";
-        document.documentElement.classList.remove("header-ctl-vt");
+        document.documentElement.classList.remove(
+          "header-ctl-vt",
+          "detail-vt-open",
+          "detail-vt-hero",
+        );
+        clearZoomOrigin();
 
         if (fromInfo) infoPage._cleanupReturnVT();
+        this._settleTransition();
+
+        // Nothing scrolls while the snapshots are up, so a non-zero offset here
+        // is one the page kept from before (Safari restoring one as the
+        // document's height changes, mostly) rather than the reader's doing.
+        if (this._currentId === id && window.scrollY !== 0) window.scrollTo(0, 0);
       };
 
       // A second VT firing before this one settles rejects .ready/.finished with
@@ -672,7 +940,10 @@ class ClassroomDetail {
       this._renderContent(entry);
 
       // Stamp cached photo immediately in the fallback path too
-      if (validPhotoUrl) this._photo.current?.reveal(validPhotoUrl);
+      if (validPhotoUrl) {
+        this._photo.current?.reveal(validPhotoUrl);
+        this._setBackdrop(validPhotoUrl);
+      }
 
       if (this._backBtn) this._backBtn.removeAttribute("hidden");
 
@@ -701,6 +972,7 @@ class ClassroomDetail {
     if (!this._overlay || this._overlay!.hidden) return;
 
     this._currentId = null;
+    this._enteredId = null;
 
     const cardEl = this._openTrigger?.cardEl ?? null;
     const cardInDom = !!(cardEl && document.body.contains(cardEl));
@@ -708,18 +980,34 @@ class ClassroomDetail {
 
     const cleanup = () => {
       if (generation !== this._generation) return;
+      releaseMap();
+      this._cancelMapEmbed();
       this._clearContent();
       this._openTrigger = null;
       this._queryContext = null;
-      this._overlay!.style.viewTransitionName = "";
 
       if (headerEl) headerEl.style.viewTransitionName = "";
-      document.documentElement.classList.remove("header-vt-fixed");
-      document.documentElement.classList.remove("header-ctl-vt");
+      document.documentElement.classList.remove(
+        "header-vt-fixed",
+        "header-ctl-vt",
+        "detail-vt-close",
+        "detail-vt-hero",
+      );
+      clearZoomOrigin();
 
       if (cardEl) {
         cardEl.style.viewTransitionName = "";
         cardEl.style.removeProperty("content-visibility");
+      }
+
+      this._settleTransition();
+
+      // The list's own position: restored inside the callback, but the document
+      // is still growing back to its full height at that point, so the browser
+      // may have clamped it short. Now that it has settled, put it where it
+      // belongs.
+      if (this._currentId === null && Math.abs(window.scrollY - this._savedScrollPos) > 1) {
+        window.scrollTo(0, this._savedScrollPos);
       }
     };
 
@@ -734,7 +1022,13 @@ class ClassroomDetail {
       // lumped into root and frozen mid-way through the wrong state.
       if (headerEl) headerEl.style.viewTransitionName = "app-header";
 
-      this._overlay!.style.viewTransitionName = "classroom-detail-zoom";
+      // The hero the page shrinks into the card around. Only worth pulling out
+      // of the page when there is a card waiting for it on the other side.
+      const heroEl = cardInDom && !reduceMotion?.matches ? this._heroTarget() : null;
+
+      if (heroEl) heroEl.style.viewTransitionName = "detail-hero";
+
+      this._beginTransition();
 
       // Strip the glass blur off the scaling header controls for the transition
       // (see .header-ctl-vt in classroom-detail.css).
@@ -752,7 +1046,6 @@ class ClassroomDetail {
         if (this._backBtn) this._backBtn.setAttribute("hidden", "");
 
         if (this._favBtn) this._favBtn.setAttribute("hidden", "");
-        this._overlay!.style.viewTransitionName = "";
 
         if (headerEl) {
           document.documentElement.style.setProperty(
@@ -774,12 +1067,30 @@ class ClassroomDetail {
         // Restore scroll position so VT can morph back to the correct spot
         window.scrollTo(0, this._savedScrollPos);
 
+        // Hand the shared map back to the Campus tab now, so this transition's
+        // new-state snapshot already shows it. The tab's container just
+        // regained its size above; flush layout so the map resizes into it.
+        void document.body.offsetHeight;
+        releaseMap();
+
         // Force a synchronous layout flush before naming the card, so its
         // resolved position/size (list re-scrolled above) is fully settled at
-        // the exact moment the VT captures the "new" state geometry.
-        if (cardInDom) {
+        // the exact moment the VT captures the "new" state geometry — and so
+        // the rect the page shrinks into is the one the card really lands on.
+        if (cardInDom && !reduceMotion?.matches) {
           void cardEl.offsetHeight;
-          cardEl.style.viewTransitionName = "classroom-detail-zoom";
+
+          if (setZoomOrigin(cardEl.getBoundingClientRect(), cardRadius(cardEl))) {
+            document.documentElement.classList.add("detail-vt-close");
+
+            // Named only against a real hero, the same way the open is: with
+            // nothing to pair with, the card's snapshot would fade in at its
+            // own small size on top of a page that is still full-screen.
+            if (heroEl) {
+              document.documentElement.classList.add("detail-vt-hero");
+              cardEl.style.viewTransitionName = "detail-hero";
+            }
+          }
         }
       });
 
@@ -836,20 +1147,82 @@ class ClassroomDetail {
     this._contentEvents = new AbortController();
     this._revision++;
 
+    // Chips only stagger in when opening a classroom, not on re-renders
+    // (occupancy refresh) of the one already showing.
+    const enter = this._enteredId !== classroom.id;
+    this._enteredId = classroom.id;
+
     const featuresHtml = (classroom.features ?? [])
       .filter((f) => FEATURE_ICONS.has(String(f.id)))
-      .map(({ id }) => {
+      .map(({ id }, i) => {
         const { icon, key } = FEATURE_ICONS.get(String(id))!;
 
         return (
-          <>
-            <div className={"detail-feature-chip liquid-glass"} data-feature-id={id}>
-              <i className={"hgi-stroke " + icon} aria-hidden={"true"}></i>
-              <span>{t(key)}</span>
-            </div>
-          </>
+          <div
+            key={id}
+            className={
+              "detail-feature-chip liquid-glass" + (enter ? " detail-feature-chip--enter" : "")
+            }
+            data-feature-id={id}
+            style={cssVars({ "--i": i })}
+          >
+            <i className={"hgi-stroke " + icon} aria-hidden={"true"}></i>
+            <span>{t(key)}</span>
+          </div>
         );
       });
+
+    // building.hours is resolved upstream (building > campus default > global
+    // default); opening hours are only defined per building, never per room.
+    const hours =
+      building.hours ??
+      occupancyData
+        .flatMap((d) => d.campuses ?? [])
+        .find((c) => c.id === campus.id)
+        ?.buildings?.find((b) => b.name === building.name)?.hours;
+
+    let hoursHtml: ReactNode = null;
+
+    if (hours) {
+      const dow = new Date().getDay(); // 0 = Sunday
+
+      const rows = [
+        { key: "mon_fri", label: "detail.monFri", isToday: dow >= 1 && dow <= 5 },
+        { key: "sat", label: "detail.saturday", isToday: dow === 6 },
+        { key: "sun", label: "detail.sunday", isToday: dow === 0 },
+      ] as const;
+
+      hoursHtml = (
+        <div className="detail-hours">
+          {rows.map(({ key, label, isToday }) => {
+            const range = hours[key];
+
+            return (
+              <div
+                key={key}
+                className={
+                  "detail-hours-row" +
+                  (isToday ? " detail-hours-row--today" : "") +
+                  (range ? "" : " detail-hours-row--closed")
+                }
+              >
+                <span className="detail-hours-day">{t(label)}</span>
+                <span className="detail-hours-time">
+                  {range ? `${range[0]} – ${range[1]}` : t("detail.closed")}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      );
+    }
+
+    const mapPoint =
+      isNumber(building.lat) && isNumber(building.long)
+        ? { lat: building.lat, long: building.long }
+        : null;
+
+    const mapLabel = building.altName?.trim() || `${t("building.prefix")} ${building.name}`;
 
     const status = getClassroomStatusNow(classroom.id);
     let statusHtml: ReactNode = null;
@@ -871,6 +1244,12 @@ class ClassroomDetail {
         </>
       );
     }
+
+    this._overlay?.removeAttribute("data-title-tone");
+    // The shared campus Map() may be sitting inside the old card — step it
+    // out before the markup is replaced, or it would be destroyed with it.
+    parkMap();
+    this._overlay?.classList.remove("title-stuck");
 
     flushSync(() =>
       this._root?.render(
@@ -935,6 +1314,19 @@ class ClassroomDetail {
               </div>
               <div id="detail-schedule-container" />
             </section>
+            {hoursHtml && (
+              <section className={"detail-section"}>
+                <h2 className={"detail-section-title"}>{t("detail.openingHours")}</h2>
+                {hoursHtml}
+              </section>
+            )}
+            {mapPoint && (
+              <section className={"detail-section detail-map-section"}>
+                <h2 className={"detail-section-title"}>{t("detail.location")}</h2>
+                <div className={"detail-map"} />
+                <div className={"detail-map-links"} />
+              </section>
+            )}
           </div>
         </Fragment>,
       ),
@@ -955,6 +1347,72 @@ class ClassroomDetail {
       );
     }
 
+    if (mapPoint) {
+      const links = this._overlay!.querySelector<HTMLElement>(".detail-map-links")!;
+
+      const targets = [
+        {
+          href: `https://www.google.com/maps/search/?api=1&query=${mapPoint.lat},${mapPoint.long}`,
+          icon: "google-maps",
+          key: "detail.openGoogleMaps",
+        },
+        {
+          href: `https://maps.apple.com/?ll=${mapPoint.lat},${mapPoint.long}&q=${encodeURIComponent(mapLabel)}`,
+          icon: "apple-maps",
+          key: "detail.openAppleMaps",
+        },
+      ];
+
+      for (const { href, icon, key } of targets) {
+        const img = new Image();
+        img.className = "detail-map-link-icon";
+        img.src = `/assets/${icon}.png`;
+        img.alt = "";
+        links.appendChild(
+          createButton({
+            icon: img,
+            text: t(key),
+            className: "detail-map-link",
+            onClick: () => window.open(href, "_blank", "noopener,noreferrer"),
+          }),
+        );
+      }
+
+      const mapHost = this._overlay!.querySelector<HTMLElement>(".detail-map")!;
+      const pov = document.createElement("div");
+      pov.className = "detail-map-pov";
+      mapHost.appendChild(pov);
+
+      const segmented = createSegmentedControl(pov, {
+        items: [
+          { value: "2d", label: "2D" },
+          { value: "3d", label: "3D" },
+        ],
+        value: getEmbedPov(),
+        orientation: "vertical",
+        blur: true,
+        onSelect: setEmbedPov,
+      });
+
+      this._contentEvents.signal.addEventListener("abort", () => segmented.destroy(), {
+        once: true,
+      });
+
+      this._scheduleMapEmbed(mapHost, {
+        lat: mapPoint.lat,
+        long: mapPoint.long,
+        label: mapLabel,
+        // Every building on the campus, for the 2D overview.
+        siblings: campus.buildings.flatMap((b) =>
+          isNumber(b.lat) && isNumber(b.long) ? [{ lat: b.lat, long: b.long }] : [],
+        ),
+      });
+    } else {
+      releaseMap();
+    }
+
+    this._animateMasonry(this._overlay!.querySelector<HTMLElement>(".detail-content"));
+
     // Title click -> manual refresh of photo and schedule
     this._overlay!.querySelector<HTMLElement>(".detail-title")?.addEventListener(
       "click",
@@ -967,7 +1425,149 @@ class ClassroomDetail {
     );
   }
 
+  /**
+   * FLIP-animates layout reflows on resize that CSS can't transition on its
+   * own: the masonry cards, and the wrapping feature chips. Each
+   * ResizeObserver tick measures where an item landed, then slides it from
+   * where it visually was (including any in-flight slide) to its new spot.
+   * Uses the Web Animations API so it never fights the elements' own
+   * transform/translate/transition styles.
+   */
+  _animateReflow(container: HTMLElement | null, itemSelector: string, observers: ResizeObserver[]) {
+    if (!container || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    const items = [...container.querySelectorAll<HTMLElement>(itemSelector)];
+
+    const measure = () =>
+      new Map(
+        items.map((el) => {
+          const r = el.getBoundingClientRect();
+          const m = new DOMMatrix(getComputedStyle(el).transform);
+
+          return [el, { x: r.left - m.e, y: r.top - m.f, tx: m.e, ty: m.f }] as const;
+        }),
+      );
+
+    let prev: ReturnType<typeof measure> | null = null;
+
+    const ro = new ResizeObserver(() => {
+      const cur = measure();
+
+      if (prev) {
+        for (const el of items) {
+          const a = prev.get(el);
+          const b = cur.get(el);
+
+          if (!a || !b) continue;
+          // Old visual spot = old layout spot + the slide still in flight now
+          const dx = a.x + b.tx - b.x;
+          const dy = a.y + b.ty - b.y;
+
+          if (Math.abs(dx - b.tx) < 1 && Math.abs(dy - b.ty) < 1) continue;
+          el.getAnimations()
+            .filter((an) => an.id === "reflow")
+            .forEach((an) => an.cancel());
+
+          const anim = el.animate(
+            [{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "none" }],
+            { duration: 350, easing: "cubic-bezier(0.22, 1, 0.36, 1)" },
+          );
+
+          anim.id = "reflow";
+        }
+      }
+
+      prev = measure();
+    });
+
+    ro.observe(container);
+    observers.push(ro);
+  }
+
+  _animateMasonry(content: HTMLElement | null) {
+    this._reflowObservers.forEach((o) => o.disconnect());
+    this._reflowObservers = [];
+
+    if (!content) return;
+    this._animateReflow(content, ":scope > .detail-section", this._reflowObservers);
+    this._animateReflow(
+      content.querySelector<HTMLElement>(".detail-features"),
+      ".detail-feature-chip",
+      this._reflowObservers,
+    );
+  }
+
   // ---------- RENDER: HERO PHOTO ----------
+
+  /** Colors derived from the photo: the page tint, the dark-mode dimming and the title tone. */
+  _setBackdrop(url: string) {
+    // Base color under the backdrop's fade (see #classroom-detail-overlay's
+    // background). Best-effort: without it the page just stays --background-color.
+    const cached = getCachedPhotoColor(url);
+
+    if (cached) document.documentElement.style.setProperty("--detail-tint", cached);
+    this._applyPhotoTone(url);
+
+    void extractPhotoColor(url).then((color) => {
+      if (!this._backdropEl()) return;
+
+      if (color) document.documentElement.style.setProperty("--detail-tint", color);
+      this._applyPhotoTone(url);
+    });
+  }
+
+  _backdropEl() {
+    return this._overlay?.querySelector<HTMLElement>(".detail-photo-backdrop") ?? null;
+  }
+
+  _applyPhotoTone(url: string) {
+    if (!this._backdropEl()) return;
+    this._applyPhotoDim(url);
+    this._applyTitleTone(url);
+  }
+
+  /**
+   * Brightness multiplier for the photo: 1 for dark/mid photos, down to 0.7 for
+   * very bright ones. Dark mode only (1 in light mode). CSS applies it to the
+   * photo and its backdrop together so the fade between them stays seamless.
+   */
+  _photoDim(url: string) {
+    if (!window.matchMedia("(prefers-color-scheme: dark)").matches) return 1;
+    const lum = getCachedPhotoAverageLuminance(url);
+
+    if (lum == null) return 1;
+    // Linear-light: mid-grey is ~0.18, a white-walled room ~0.5+.
+    const k = Math.min(1, Math.max(0, (lum - 0.2) / 0.35));
+
+    return 1 - 0.3 * k;
+  }
+
+  /** Publishes _photoDim as --photo-dim on the overlay (read by the dark-mode CSS). */
+  _applyPhotoDim(url: string) {
+    if (getCachedPhotoAverageLuminance(url) == null || !this._overlay) return;
+    this._overlay.style.setProperty("--photo-dim", this._photoDim(url).toFixed(3));
+  }
+
+  /**
+   * Picks black or white for the title from what's actually behind it: the
+   * photo's bottom strip, faded into the theme background (the title sits in
+   * that fade). Sets data-title-tone="light"|"dark" on the overlay, meaning
+   * the backdrop is light/dark; CSS turns that into the text color.
+   */
+  _applyTitleTone(url: string) {
+    const photoLum = getCachedPhotoLuminance(url);
+
+    if (photoLum == null || !this._overlay) return;
+    const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const bgLum = dark ? 0.02 : 0.9;
+    // The photo is what's on screen after dark-mode dimming: CSS brightness()
+    // scales sRGB values, which is roughly dim^2.2 in linear light.
+    const shownLum = photoLum * this._photoDim(url) ** 2.2;
+    const lum = shownLum * 0.8 + bgLum * 0.2;
+    // 0.179 is where black and white text have equal WCAG contrast; sitting
+    // higher gives white the benefit on mid-tones, where it reads better.
+    this._overlay.dataset.titleTone = lum > 0.3 ? "light" : "dark";
+  }
 
   async _loadPhoto(classroomId: number) {
     if (this._currentId !== classroomId) return;
@@ -983,6 +1583,8 @@ class ClassroomDetail {
 
       if (cachedUrl) {
         photo.reveal(cachedUrl);
+        this._setBackdrop(cachedUrl);
+        this._photoRevealed();
 
         return;
       }
@@ -991,11 +1593,15 @@ class ClassroomDetail {
 
       if (this._currentId !== classroomId || this._photo.current !== photo) return;
       const img = photo.load(url);
+      this._setBackdrop(url);
 
       if (!img) return;
       await img.decode();
 
-      if (this._currentId === classroomId && this._photo.current === photo) photo.reveal(url);
+      if (this._currentId === classroomId && this._photo.current === photo) {
+        photo.reveal(url);
+        this._photoRevealed();
+      }
     } catch (err) {
       console.error("Classroom photo load error:", err);
 
@@ -1585,19 +2191,48 @@ class ClassroomDetail {
       // Re-position the indicator when resizing from desktop → mobile, because
       // offsetLeft/offsetWidth read as 0 while the selector is display:none.
       const mobileQuery = window.matchMedia("(max-width: 599px)");
+
+      const relayoutMobile = () => {
+        daySelector.refresh();
+        selectScheduleDay(selectedDayIndex, { silent: true, animate: false });
+        positionDetailTodayIndicator();
+      };
+
       mobileQuery.addEventListener(
         "change",
         (e) => {
-          if (e.matches) {
-            daySelector.refresh();
-            selectScheduleDay(selectedDayIndex, { silent: true, animate: false });
-            positionDetailTodayIndicator();
-          } else {
-            positionDesktopTodayIndicator();
-          }
+          if (e.matches) relayoutMobile();
+          else positionDesktopTodayIndicator();
         },
         { signal: this._scheduleEvents.signal },
       );
+
+      // The picker is centered in its wrapper, so resizing the window moves it
+      // without necessarily changing its own size; the pill and Today badge are
+      // placed with absolute offsets and would stay behind. Re-measure whenever
+      // the wrapper or the picker changes size (also covers display:none → block).
+      if ("ResizeObserver" in window) {
+        let raf = 0;
+
+        const ro = new ResizeObserver(() => {
+          cancelAnimationFrame(raf);
+          raf = requestAnimationFrame(() => {
+            if (pickerContainer!.offsetWidth) relayoutMobile();
+          });
+        });
+
+        ro.observe(pickerContainer!);
+
+        if (pickerContainer!.parentElement) ro.observe(pickerContainer!.parentElement);
+        this._scheduleEvents.signal.addEventListener(
+          "abort",
+          () => {
+            cancelAnimationFrame(raf);
+            ro.disconnect();
+          },
+          { once: true },
+        );
+      }
 
       // ---------- TIMELINE HOVER ----------
       const cursorRoots = new Map<HTMLElement, Root>();

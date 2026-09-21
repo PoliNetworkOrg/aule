@@ -180,6 +180,12 @@ export function AppShell() {
               <li data-shell-i18n="" data-i18n="changelog.item3">
                 <RichText text={t("changelog.item3")} />
               </li>
+              <li data-shell-i18n="" data-i18n="changelog.item4">
+                <RichText text={t("changelog.item4")} />
+              </li>
+              <li data-shell-i18n="" data-i18n="changelog.item5">
+                <RichText text={t("changelog.item5")} />
+              </li>
             </ul>
 
             <a

@@ -32,8 +32,8 @@ declare module "vitrium" {
 
   export function attachLiquidGlass(
     el: HTMLElement,
-    options?: { from?: string; exclude?: string },
-  ): () => void;
+    options?: { from?: string; exclude?: string; controls?: boolean },
+  ): void;
   export function initLiquidGlass(): (() => void) | undefined;
 
   export interface PillDragCore {
@@ -95,6 +95,15 @@ declare module "vitrium" {
     label?: string;
   }): Toggle;
 
+  export function createButton(options: {
+    icon?: Node | string;
+    text?: string;
+    label?: string;
+    className?: string;
+    tint?: string;
+    onClick?: (event: MouseEvent) => void;
+  }): HTMLButtonElement;
+
   export interface SegmentedControl {
     value: string | undefined;
     select(value: string, options?: { animate?: boolean; silent?: boolean }): void;
@@ -104,6 +113,9 @@ declare module "vitrium" {
   export function createSegmentedControl(
     root: HTMLElement,
     options: {
+      items?: { value: string; label?: string; icon?: string }[];
+      orientation?: "horizontal" | "vertical";
+      blur?: boolean;
       value?: string;
       onSelect?: (value: string, info: { silent: boolean }) => void;
     },
@@ -180,6 +192,7 @@ declare module "vitrium" {
     trigger?: HTMLElement;
     content?: Node;
     placement?: string;
+    offset?: number;
     role?: string;
     dismissable?: boolean;
   }): Popover;

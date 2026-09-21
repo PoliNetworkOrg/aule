@@ -10,7 +10,10 @@ const router = createRouter({
   routeTree,
   history: appHistory,
   caseSensitive: true,
-  scrollRestoration: false,
+  // A function, not `false`: the router's post-navigation "scroll to top" only
+  // stands down when this returns falsy. Scrolling is ours: the list must stay
+  // where it is under the detail transition and be restored by the close.
+  scrollRestoration: () => false,
 });
 
 declare module "@tanstack/react-router" {

@@ -161,3 +161,13 @@ Final production/beta builds, strict application TypeScript, full lint/format ch
 A failed directory response shows the original reload screen, and reloading recovers. A directory response delayed beyond the 15-second startup timeout first shows that screen and then reveals the application successfully when loading completes. Both behaviors were checked against the source. Optional opening-hours failure leaves successful occupancy days usable; a failed day recovers on reload with the source's option-appending behavior.
 
 An isolated production harness unmounted the whole app during a time-picker animation: no popup hosts or scroll lock remained. Remounting produced one working settings popup, campus header, form, and time-entry backdrop. Further checks unmounted/remounted Info and classroom details during transitions and found one working view with no JavaScript exceptions. Physical-device haptics and Safari-specific transitions remain unverified.
+
+## Upstream sync: `d4df4687ef5fd025c15c85efdb2c513005eca85e`
+
+Parity with PoliAule `dev` moved from `bb9f1ce` to `d4df468` (v2.0.0-beta7): the redesigned Details page (zoom transition from the card, blurred photo backdrop with tint, title tone and dark-mode dimming, opening hours, embedded 2D/3D building map with Google/Apple Maps links), the one-time info hint popover, the header blur refresh for Safari, and the deferred Mapbox boot.
+
+React-specific choices:
+
+- The Mapbox `Map()` element is no longer rendered by React. `campus-map.tsx` creates it imperatively and reparents it between the Campus tab and the detail card, since React would otherwise fail to reconcile a node that moved. Cleanup removes it and resets the embed state.
+- The photo backdrop is part of `DetailPhoto`, so it follows the photo's state and disappears with it.
+- Upstream's `playwright` dev dependency was not carried over; it is only used by upstream's own tooling.

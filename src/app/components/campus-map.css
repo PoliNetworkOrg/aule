@@ -137,10 +137,28 @@ html:has(#search-classrooms-container.visible) .footer {
 }
 
 .campus-map {
-  @apply absolute;
-  @apply inset-0;
-  @apply w-full;
-  @apply h-full;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+
+  /* The map is booted late on purpose (see deferredBoot() in campus-map.js and
+     _scheduleMapEmbed() in classroom-detail.js), so it arrives after whatever
+     brought it into view has settled — fade it in rather than having it snap
+     in. Once it is up this class stays on, so moving the same map into the
+     detail page later is instant. */
+  opacity: 0;
+  transition: opacity 0.45s ease;
+}
+
+.campus-map--ready {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .campus-map {
+    transition: none;
+  }
 }
 
 .campus-map:focus,
@@ -723,4 +741,45 @@ html:has(#search-classrooms-container.visible) .footer {
   text-align: center;
   font-weight: 600;
   color: var(--text-color-secondary);
+}
+
+/* --- Embedded in the classroom detail page ------------------------------
+   The one shared Map() (see embedMap() in campus-map.js) is moved into the
+   detail page's location card. The Campus tab's fullscreen chrome placement
+   (fixed controls clearing the sheet/tabbar) makes no sense there, so: hide
+   the interactive controls (the preview is view-only) and pin the required
+   Mapbox logo / attribution to the card's own bottom corners. */
+.campus-map.campus-map--embedded .mapboxgl-ctrl-top-right {
+  display: none;
+}
+
+.campus-map.campus-map--embedded .mapboxgl-ctrl-bottom-left,
+.campus-map.campus-map--embedded .mapboxgl-ctrl-bottom-right {
+  position: absolute;
+  bottom: 4px;
+}
+
+.campus-map.campus-map--embedded .mapboxgl-ctrl-bottom-left {
+  left: 6px;
+  right: auto;
+}
+
+.campus-map.campus-map--embedded .mapboxgl-ctrl-bottom-right {
+  right: 6px;
+  left: auto;
+}
+
+.campus-marker--static {
+  pointer-events: none;
+}
+
+/* 2D overview of the detail preview: the other buildings of the campus are
+   quiet dots, the building being viewed keeps its label. */
+.campus-marker--dim {
+  padding: 0.2rem;
+  opacity: 0.7;
+}
+
+.campus-marker--current .campus-marker__dot {
+  background: var(--marker-accent);
 }

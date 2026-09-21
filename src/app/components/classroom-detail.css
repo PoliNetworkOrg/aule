@@ -8,7 +8,35 @@
   @apply flex;
   @apply flex-col;
   flex: 1;
-  background: var(--background-color);
+  /* The photo's extracted color (--detail-tint, set by classroom-detail.js),
+     mixed into the theme background so lightness and contrast stay
+     predictable. This is what the backdrop's fade lands on. Without a tint it
+     is exactly --background-color. */
+  background: color-mix(
+    in srgb,
+    var(--detail-tint, var(--background-color)) 35%,
+    var(--background-color)
+  );
+  transition: background-color 0.6s ease;
+  /* Containing block for .detail-photo-backdrop. Deliberately NOT a stacking
+     context (no isolation / z-index / will-change): an isolated overlay is its
+     own compositing surface in Safari, and the header's progressive
+     backdrop-filter then doesn't sample it until something forces a repaint
+     (it stayed blank until scrolled). The backdrop instead sits at z-index: 0
+     and the page content above it at z-index: 1 (rule below), which paints in
+     the same order without isolating the overlay. */
+  position: relative;
+}
+
+#classroom-detail-overlay > :not(.detail-photo-backdrop) {
+  position: relative;
+  z-index: 1;
+}
+
+/* Sticky (not relative) so the photo stays pinned while the content scrolls
+   over it; needs the overlay's specificity to beat the rule above. */
+#classroom-detail-overlay > .detail-photo-container {
+  position: sticky;
 }
 
 /* Fallback fade-in for browsers without View Transitions only. When VT IS
@@ -27,12 +55,11 @@
 /* Extend this element's own box up behind the header (cancelling the shift
    with matching padding, so children keep their normal position) — matches
    .detail-photo-container's negative margin below; only relevant when a
-   photo is actually there to fill that reserved space. A VT names and
-   snapshots THIS element for the card→page zoom, and that snapshot is
-   clipped to its own layout box; without this, the photo's negative margin
-   overflows past that box and is simply absent from the animating snapshot,
-   only appearing once the transition ends and the real, unclipped DOM
-   takes over. */
+   photo is actually there to fill that reserved space. Keeping the photo
+   inside this box (rather than overflowing above it) is also what makes the
+   page's top edge and the photo's top edge the same line, which the card→page
+   zoom relies on: it scales the page by width alone, so the photo only lands
+   on the card if the two share a top. */
 #classroom-detail-overlay:not([hidden]):has(.detail-photo-container) {
   margin-top: calc(-1 * var(--header-height, 84px) - 0.5rem);
   padding-top: calc(var(--header-height, 84px) + 0.5rem);
@@ -42,6 +69,72 @@
   opacity: 1;
 }
 
+/* .body-container reserves --bottom-nav-height at its bottom for the tab bar,
+   but that strip is outside the overlay, so the overlay's tinted background
+   stopped short of the screen's bottom edge. Hand the reservation to the
+   overlay itself (the tab bar is hidden here anyway) so its background runs to
+   the bottom. Mobile only, like the original padding. */
+@media (max-width: 599px) {
+  body.detail-open .body-container {
+    padding-bottom: 0;
+  }
+
+  #classroom-detail-overlay:not([hidden]) {
+    padding-bottom: var(--bottom-nav-height, 88px);
+  }
+}
+
+/* The canvas behind the overlay (body's background, which viewport-fit=cover
+   extends under the safe areas and mobile browser bars) has to carry the same
+   tint, or those strips show the plain page color. --detail-tint lives on
+   <html> for this reason. */
+body.detail-open {
+  background-color: color-mix(
+    in srgb,
+    var(--detail-tint, var(--background-color)) 35%,
+    var(--background-color)
+  );
+  /* The header's top strip, safe-area rectangle and fade gradient (style.css)
+     take the same color, so the top of the screen follows the page instead of
+     staying the plain theme background. */
+  --header-bg: var(--detail-page-bg);
+  transition:
+    background-color 0.6s ease,
+    --header-bg 0.35s ease;
+}
+
+/* Registered so it can transition (a gradient can't, but the color stops that
+   read it can). Everywhere but the detail page it is just the theme background. */
+@property --header-bg {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: transparent;
+}
+
+:root {
+  --header-bg: var(--background-color);
+}
+
+/* Header color across the open/close VT. During the VT the header is a frozen
+   snapshot pinned to its OLD state, so its color can't interpolate inside it.
+   Hold --header-bg at the plain theme background for the whole VT, open or
+   close (a tinted header over the untinted list, which is what close would
+   otherwise show, looks wrong). On open the registered property then
+   transitions theme -> tint right after the morph, when .header-ctl-vt is
+   removed; on close it is already at the theme color, so nothing changes. */
+body {
+  --detail-page-bg: color-mix(
+    in srgb,
+    var(--detail-tint, var(--background-color)) 35%,
+    var(--background-color)
+  );
+  transition: --header-bg 0.35s ease;
+}
+
+.header-ctl-vt body {
+  --header-bg: var(--background-color);
+}
+
 /* Hide tab contents and footer while the detail panel is open */
 body.detail-open .tab-content {
   visibility: hidden;
@@ -49,7 +142,18 @@ body.detail-open .tab-content {
   opacity: 0;
   @apply pointer-events-none;
   height: 0;
-  @apply overflow-hidden;
+  overflow: hidden;
+
+  /* Out of flow so it stops being a flex item (`.tab-content.visible` is
+     `flex: 1` and would otherwise grow straight back to full height), but
+     pinned to the same width it has in flow. Without these insets it
+     shrink-to-fits — 284px instead of 390 — the results grid re-lays-out at
+     that width, and every card's `contain-intrinsic-size: auto` remembers the
+     wrong size (220x280 rather than 157x200). That stale size is what the list
+     then reports for the whole of the closing transition, which put the card's
+     captured rect 300px from where it actually lands. */
+  left: 0;
+  right: 0;
 }
 
 body.detail-open .footer {
@@ -90,6 +194,11 @@ body.detail-open .tab-content * {
      through the blurred header instead of sitting below it. Using the real
      height instead of a fixed guess keeps this correct at every breakpoint. */
   margin-top: calc(-1 * var(--header-height, 84px) - 0.5rem);
+
+  /* Pinned in place: the header and content (z-index above, later in the DOM)
+     scroll over the photo instead of carrying it away. */
+  position: sticky;
+  top: 0;
 }
 
 /* Mobile "Hero Header" style */
@@ -121,12 +230,37 @@ body.detail-open .tab-content * {
 
 .detail-photo-container.loaded {
   animation: none;
-  background: var(--background-color-secondary);
+  /* Transparent so the photo's bottom fade dissolves into the blurred
+     backdrop behind the container, not into a flat page color. */
+  background: transparent;
 }
 
-@media (max-width: 599px) {
+/* Shrinks a little as the page scrolls (scroll-driven, no JS). Only once
+   loaded, so it doesn't fight the skeleton pulse. Mobile animates the height,
+   desktop the aspect-ratio. */
+@supports (animation-timeline: scroll()) {
   .detail-photo-container.loaded {
-    background: var(--background-color);
+    animation: detail-photo-shrink linear both;
+    animation-timeline: scroll(root block);
+    animation-range: 0 220px;
+  }
+  @media (min-width: 600px) {
+    .detail-photo-container.loaded {
+      animation-name: detail-photo-shrink-wide;
+    }
+  }
+}
+
+@keyframes detail-photo-shrink {
+  to {
+    height: max(33vh, 240px);
+    min-height: 0;
+  }
+}
+
+@keyframes detail-photo-shrink-wide {
+  to {
+    aspect-ratio: 21 / 8;
   }
 }
 
@@ -145,8 +279,28 @@ body.detail-open .tab-content * {
 
   /* Use a mask to fade out the image itself at the bottom to avoid "line" artifacts
      between the image and the background blur layer. */
-  mask-image: linear-gradient(to bottom, black 70%, transparent 100%);
-  -webkit-mask-image: linear-gradient(to bottom, black 70%, transparent 100%);
+  /* Eased (smoothstep-like) instead of a 2-stop linear ramp, so the fade has no
+     visible kink where it starts. */
+  mask-image: linear-gradient(
+    to bottom,
+    black 45%,
+    rgba(0, 0, 0, 0.92) 55%,
+    rgba(0, 0, 0, 0.75) 65%,
+    rgba(0, 0, 0, 0.5) 75%,
+    rgba(0, 0, 0, 0.27) 85%,
+    rgba(0, 0, 0, 0.1) 93%,
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    black 45%,
+    rgba(0, 0, 0, 0.92) 55%,
+    rgba(0, 0, 0, 0.75) 65%,
+    rgba(0, 0, 0, 0.5) 75%,
+    rgba(0, 0, 0, 0.27) 85%,
+    rgba(0, 0, 0, 0.1) 93%,
+    transparent 100%
+  );
 }
 
 .detail-photo.loaded {
@@ -193,6 +347,141 @@ body.detail-open .tab-content * {
   opacity: 1;
 }
 
+/* With the backdrop present the photo's own mask does the fade, and this flat
+   page-colored gradient would just paint a band over the blur. */
+#classroom-detail-overlay:has(.detail-photo-backdrop) .detail-photo-gradient {
+  display: none;
+}
+
+/* ── Photo backdrop ─────────────────────────────────────────────────
+   A blurred copy of the photo behind everything, so the sharp photo fades into
+   its own colors instead of a flat surface. The image is set on the wrapper as
+   --backdrop-img by classroom-detail.js.
+
+   Geometry: the wrapper is twice the photo's height. ::before is the photo's
+   box, cropped exactly like .detail-photo (same width, same height, same
+   `cover`), so the blur is aligned with the sharp image at the seam. ::after
+   is that same box mirrored underneath, which continues the photo's bottom-edge
+   colors with no jump. Both bleed 60px past the wrapper (padding + content-box
+   origin keeps `cover` sized to the photo box) so the blur's transparent
+   fringe lands outside the wrapper's overflow clip. No tint layer: the sharp
+   photo is untinted, and a tinted backdrop behind it made the fade step. */
+
+.detail-photo-backdrop {
+  --photo-h: max(38vh, 280px);
+  --bd-blur: 40px;
+  /* Bleed is what keeps the blur's transparent fringe outside the clip, so it
+     has to grow with the blur radius. */
+  --bd-bleed: calc(var(--bd-blur) * 1.5);
+  /* Sticky like the photo, but pulled out of the flow with a negative bottom
+     margin (and the overlay's top padding cancelled) so it still sits exactly
+     behind the photo and the content scrolls over it. */
+  position: sticky;
+  top: 0;
+  flex-shrink: 0;
+  margin-top: calc(-1 * var(--header-height, 84px) - 0.5rem);
+  margin-bottom: calc(var(--photo-h) * -2 + var(--header-height, 84px) + 0.5rem);
+  height: calc(var(--photo-h) * 2);
+  /* Never taller than the overlay: the overlay is the VT's shared element, and
+     Safari sizes its snapshot from ink overflow (Chromium uses the border box),
+     so a backdrop poking out below the overlay made the "new" image taller than
+     the group and squeezed it during the zoom. */
+  max-height: 100%;
+  z-index: 0; /* above the overlay's background, below its other children (z-index: 1) */
+  overflow: hidden; /* the bleed must not cause horizontal scroll */
+  container-type: inline-size;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.6s ease;
+
+  mask-image: linear-gradient(
+    to bottom,
+    black 45%,
+    rgba(0, 0, 0, 0.85) 55%,
+    rgba(0, 0, 0, 0.6) 65%,
+    rgba(0, 0, 0, 0.35) 75%,
+    rgba(0, 0, 0, 0.15) 85%,
+    rgba(0, 0, 0, 0.04) 93%,
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    black 45%,
+    rgba(0, 0, 0, 0.85) 55%,
+    rgba(0, 0, 0, 0.6) 65%,
+    rgba(0, 0, 0, 0.35) 75%,
+    rgba(0, 0, 0, 0.15) 85%,
+    rgba(0, 0, 0, 0.04) 93%,
+    transparent 100%
+  );
+}
+
+@media (min-width: 600px) {
+  .detail-photo-backdrop {
+    --photo-h: calc(100cqw * 9 / 21); /* .detail-photo-container's 21 / 9 */
+    /* The photo is drawn much larger here, so a fixed radius reads as weaker.
+       Scale with width, capped so the blur stays affordable. */
+    --bd-blur: clamp(40px, 4.5cqw, 90px);
+  }
+}
+
+.detail-photo-backdrop.loaded {
+  opacity: 1;
+}
+
+.detail-photo-backdrop::before,
+.detail-photo-backdrop::after {
+  content: "";
+  position: absolute;
+  left: calc(var(--bd-bleed) * -1);
+  right: calc(var(--bd-bleed) * -1);
+  top: calc(var(--bd-bleed) * -1);
+  height: calc(var(--photo-h) + var(--bd-bleed) * 2);
+  padding: var(--bd-bleed);
+  box-sizing: border-box;
+  background: var(--backdrop-img) center / cover repeat;
+  background-origin: content-box;
+  filter: blur(var(--bd-blur)) saturate(1.25);
+}
+
+.detail-photo-backdrop::after {
+  top: calc(var(--photo-h) - var(--bd-bleed));
+  transform: scaleY(-1);
+}
+
+/* Desktop: no mirror. At this size the reflected half is hundreds of px tall and
+   the gradient reversing at the mirror line reads as a dark/light crease; the
+   tile-wrapped bleed at the seam also shows the wrong part of the photo. The
+   single blurred copy just ends at the photo's bottom edge (no vertical
+   repeat), so its own blur fringe fades into the tint. */
+@media (min-width: 600px) {
+  .detail-photo-backdrop::after {
+    display: none;
+  }
+
+  .detail-photo-backdrop::before {
+    background-repeat: repeat-x;
+  }
+}
+
+/* Adaptive dimming (dark mode only): --photo-dim is set per photo from its
+   average brightness (classroom-detail.js _applyPhotoDim). The backdrop copies
+   get the same factor so they keep matching the sharp photo's edge. */
+@media (prefers-color-scheme: dark) {
+  .detail-photo {
+    filter: brightness(var(--photo-dim, 1));
+    transition:
+      opacity 0.6s ease,
+      transform 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+      filter 0.4s ease;
+  }
+
+  .detail-photo-backdrop::before,
+  .detail-photo-backdrop::after {
+    filter: blur(var(--bd-blur)) saturate(1.25) brightness(var(--photo-dim, 1));
+  }
+}
+
 /* ── Header ─────────────────────────────────────────────────────── */
 
 /* Back button is a sibling of <header> (not a child — see index.html) so it
@@ -228,31 +517,48 @@ body.detail-open .tab-content * {
   gap: 1rem;
 }
 
-@media (min-width: 600px) {
-  .detail-title-row {
-    @apply flex-col;
-    @apply items-center;
-    gap: 0.5rem;
-    width: auto;
-  }
-}
-
 .detail-status-wrapper {
-  @apply flex;
-  @apply flex-col;
-  @apply items-end;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  padding: 0.375rem 0.875rem;
+  border-radius: var(--radius-lg);
+
+  /* Clear glass container (Vitrium's .lg-glass--clear material). */
+  background: var(--lg-tint-clear);
+  -webkit-backdrop-filter: blur(var(--lg-blur-clear));
+  backdrop-filter: blur(var(--lg-blur-clear));
+  box-shadow:
+    0 0 0 0.1px var(--lg-outline),
+    var(--lg-highlight),
+    0 4px 40px 0 var(--lg-shadow-color);
 }
 
-@media (min-width: 600px) {
-  .detail-status-wrapper {
-    @apply items-center;
-  }
+.detail-status-wrapper::after {
+  content: "";
+  position: absolute;
+  inset: -0.5px;
+  border-radius: inherit;
+  padding: 0.5px;
+
+  background: var(--lg-stroke-gradient);
+  opacity: var(--lg-stroke-opacity);
+
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+
+  pointer-events: none;
 }
 
 .detail-status-label {
   font-size: var(--text-70);
   font-weight: 700;
   color: var(--text-color-secondary);
+  transition: color 0.6s ease;
   opacity: 0.65;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -264,74 +570,143 @@ body.detail-open .tab-content * {
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  opacity: 0.85;
 }
 
-@media (min-width: 600px) {
-  .detail-header {
-    @apply items-center; /* Desktop centered */
+/* The status colors are tuned for flat surfaces; over the colorful glass they
+   wash out (green worst). Push each toward black on a light backdrop and white
+   on a dark one so it keeps its hue but gains contrast. Full opacity, too.
+   Which one is decided by data-title-tone (see _applyTitleTone in
+   classroom-detail.js), the same computation as the title. It also picks which
+   theme's status tokens to start from (below). Without it (no photo, or not
+   read yet) it falls back to the system color scheme. */
+.detail-status-wrapper .classroom-status-txt {
+  --status-base: var(--text-color-primary);
+  --status-mix: black;
+  --status-keep: 82%;
+  color: color-mix(in srgb, var(--status-base) var(--status-keep), var(--status-mix));
+}
+
+.detail-status-wrapper .classroom-status-txt.free {
+  --status-base: var(--color-status-free);
+}
+.detail-status-wrapper .classroom-status-txt.free-soon {
+  --status-base: var(--color-status-free-soon);
+}
+.detail-status-wrapper .classroom-status-txt.occupied-soon {
+  --status-base: var(--color-status-partial);
+}
+.detail-status-wrapper .classroom-status-txt.occupied {
+  --status-base: var(--color-status-busy);
+}
+
+@media (prefers-color-scheme: dark) {
+  .detail-status-wrapper .classroom-status-txt {
+    --status-mix: white;
+    --status-keep: 85%;
   }
 }
 
-@media (max-width: 599px) {
-  .detail-header {
-    padding-top: 1rem;
-    gap: 0;
-    @apply relative;
-    z-index: 2; /* Stay above the blur layer */
+/* Light backdrop → the light theme's tokens (:root in style.css and
+   Vitrium's tokens.css), dark backdrop → the dark theme's. Scoped to the
+   wrapper so nothing else sees them. */
+#classroom-detail-overlay[data-title-tone="light"] .detail-status-wrapper {
+  --color-status-free: #2a9e47;
+  --color-status-free-soon: #5a7a10;
+  --color-status-partial: #f0b429;
+  --color-status-busy: #e53935;
+  --text-color-primary: #1a1a1a;
+}
 
-    display: grid;
-    grid-template-columns: 1fr auto;
-    align-items: start;
-    text-align: left;
-  }
+#classroom-detail-overlay[data-title-tone="light"] .detail-status-wrapper .classroom-status-txt {
+  --status-mix: black;
+  --status-keep: 82%;
+}
 
-  .detail-title-row {
-    display: contents;
-  }
+#classroom-detail-overlay[data-title-tone="dark"] .detail-status-wrapper {
+  --color-status-free: #3ce065;
+  --color-status-free-soon: color-mix(in srgb, #3ce065 70%, #f5a623);
+  --color-status-partial: #f5a623;
+  --color-status-busy: #ff5252;
+  --text-color-primary: #eaeaea;
+}
 
-  .detail-title {
-    grid-column: 1;
-    grid-row: 1;
-    text-align: left;
-    /* Align perfectly with the floating back button */
-    padding-top: 0.25rem;
-    /* Shrink to text width (like it did as a flex item before) so the VT morph
-       from the card name stays positional rather than expanding across the full column */
-    width: fit-content;
-    max-width: 100%;
-  }
+#classroom-detail-overlay[data-title-tone="dark"] .detail-status-wrapper .classroom-status-txt {
+  --status-mix: white;
+  --status-keep: 85%;
+}
 
-  .detail-status-wrapper {
-    grid-column: 2;
-    grid-row: 1;
-    @apply flex;
-    @apply flex-col;
-    @apply items-end;
-    /* Match title's padding-top for alignment */
-    padding-top: 0.25rem;
+/* Mixing toward black/white dulls the color; put the chroma back with a boost
+   in OKLCH. Browsers without relative color syntax keep the plain mix above. */
+@supports (color: oklch(from red l c h)) {
+  .detail-status-wrapper .classroom-status-txt {
+    color: oklch(
+      from color-mix(in oklch, var(--status-base) var(--status-keep), var(--status-mix)) l
+        calc(c * 1.3) h
+    );
   }
+}
 
-  .detail-subtitle {
-    grid-column: 1 / -1;
-    grid-row: 2;
-    margin-bottom: 0.25rem;
-    text-align: left;
-    align-self: start;
-  }
+/* Header layout (same on mobile and desktop) */
+.detail-header {
+  /* Same column as .detail-content below, so the edges line up */
+  width: 100%;
+  max-width: 680px;
+  margin-inline: auto;
+  padding-top: 1rem;
+  gap: 0;
+  position: relative;
+  z-index: 2; /* Stay above the blur layer */
 
-  .detail-stats {
-    grid-column: 1 / -1;
-    grid-row: 3;
-    margin-top: 0;
-  }
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: start;
+  text-align: left;
+}
 
-  /* Pull header up to overlay the blurred hero only when the photo container is present.
-     This also handles the photo-load-error case: once the container is removed from the DOM
-     the negative margin is lifted and the header reflows into its natural position. */
-  #classroom-detail-overlay:has(.detail-photo-container) .detail-header {
-    margin-top: -6rem;
-  }
+.detail-title-row {
+  display: contents;
+}
+
+.detail-title {
+  grid-column: 1;
+  grid-row: 1;
+  text-align: left;
+  /* Align perfectly with the floating back button */
+  padding-top: 0.25rem;
+  /* Shrink to text width (like it did as a flex item before) so the VT morph
+     from the card name stays positional rather than expanding across the full column */
+  width: fit-content;
+  max-width: 100%;
+}
+
+.detail-status-wrapper {
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  align-self: start;
+}
+
+.detail-subtitle {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  margin-bottom: 0.25rem;
+  text-align: left;
+  align-self: start;
+}
+
+.detail-stats {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  margin-top: 0;
+}
+
+/* Pull header up to overlay the blurred hero only when the photo container is present.
+   This also handles the photo-load-error case: once the container is removed from the DOM
+   the negative margin is lifted and the header reflows into its natural position. */
+#classroom-detail-overlay:has(.detail-photo-container) .detail-header {
+  margin-top: -6rem;
 }
 
 .detail-title {
@@ -339,7 +714,31 @@ body.detail-open .tab-content * {
   font-weight: 700;
   margin: 0;
   color: var(--text-color-primary);
+  transition: color 0.6s ease;
   user-select: none;
+}
+
+/* Black or white per photo (see _applyTitleTone in classroom-detail.js). */
+#classroom-detail-overlay[data-title-tone="light"] .detail-title {
+  color: #111;
+}
+
+#classroom-detail-overlay[data-title-tone="dark"] .detail-title {
+  color: #fff;
+}
+
+/* The subtitle and the status label follow the same choice, slightly softened
+   to stay secondary. */
+#classroom-detail-overlay[data-title-tone="light"] .detail-subtitle,
+#classroom-detail-overlay[data-title-tone="light"] .detail-status-label {
+  color: rgba(17, 17, 17, 0.8);
+  opacity: 1; /* the label's own 0.65 would stack on the alpha above */
+}
+
+#classroom-detail-overlay[data-title-tone="dark"] .detail-subtitle,
+#classroom-detail-overlay[data-title-tone="dark"] .detail-status-label {
+  color: rgba(255, 255, 255, 0.8);
+  opacity: 1;
 }
 
 .detail-stats {
@@ -350,17 +749,49 @@ body.detail-open .tab-content * {
 }
 
 .detail-stat {
-  @apply flex;
-  @apply items-center;
+  position: relative;
+  display: flex;
+  align-items: center;
   gap: 0.375rem;
+  padding: 0.25rem 0.625rem 0.25rem 0.5rem;
+  border-radius: var(--radius-pill);
   font-size: var(--text-85);
   font-weight: 600;
-  color: var(--text-color-secondary);
+  color: var(--text-color-primary);
+
+  /* Small clear-glass capsule (Vitrium's .lg-glass--clear material). */
+  background: var(--lg-tint-clear);
+  -webkit-backdrop-filter: blur(var(--lg-blur-clear));
+  backdrop-filter: blur(var(--lg-blur-clear));
+  box-shadow:
+    0 0 0 0.1px var(--lg-outline),
+    var(--lg-highlight),
+    0 4px 40px 0 var(--lg-shadow-color);
+}
+
+/* Outside 0.5px gradient stroke — same recipe as .detail-feature-chip::after. */
+.detail-stat::after {
+  content: "";
+  position: absolute;
+  inset: -0.5px;
+  border-radius: inherit;
+  padding: 0.5px;
+
+  background: var(--lg-stroke-gradient);
+  opacity: var(--lg-stroke-opacity);
+
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+
+  pointer-events: none;
 }
 
 .detail-stat .hgi-stroke {
   font-size: var(--text-110) !important;
-  color: var(--text-color-accent);
+  color: var(--text-color-primary);
 }
 
 .detail-back-btn {
@@ -426,7 +857,7 @@ body.detail-open .tab-content * {
     #fff calc(100% - 0.5px)
   );
 
-  @apply pointer-events-none;
+  pointer-events: none;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -457,6 +888,182 @@ body.detail-open .tab-content * {
 
 /* ── Content ─────────────────────────────────────────────────────── */
 
+#classroom-detail-overlay {
+  --detail-col: 680px;
+}
+
+@media (min-width: 1000px) {
+  #classroom-detail-overlay {
+    --detail-col: 1100px;
+  }
+}
+
+/* The title row sticks beside the back button (all widths).
+   .detail-header dissolves (display: contents) so the row becomes a direct
+   child of the overlay, whose height is the sticky containing block; a
+   header-sized box would unstick as soon as the header scrolled away. When
+   stuck (.title-stuck, toggled from classroom-detail.js) the title slides right
+   of the back button and gets a glass pill. */
+.detail-header {
+  display: contents;
+}
+
+.detail-title-row,
+.detail-subtitle,
+.detail-stats {
+  width: 100%;
+  max-width: var(--detail-col, 680px);
+  margin-inline: auto;
+  padding-inline: 1.25rem;
+  box-sizing: border-box;
+}
+
+.detail-stats {
+  padding-bottom: 0.5rem;
+}
+
+/* No longer painted through .detail-header's z-index: 2 (it is display:
+   contents now), so without this the sticky photo paints over them. */
+.detail-subtitle,
+.detail-stats {
+  position: relative;
+  z-index: 2;
+}
+
+.detail-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-height: 3rem;
+  margin-top: 1rem;
+}
+
+#classroom-detail-overlay:has(.detail-photo-container) .detail-title-row {
+  margin-top: -5rem; /* the header's old -6rem pull-up minus its 1rem padding */
+}
+
+/* Same centre line as #detail-back-btn (a 3rem circle). */
+#classroom-detail-overlay .detail-title-row {
+  position: sticky;
+  top: calc(11px + var(--header-height, 84px) - 3.25rem);
+  z-index: 1001; /* above .header (1000), below the back button (1002) */
+  pointer-events: none;
+}
+
+.detail-title-row > * {
+  pointer-events: auto;
+}
+
+.detail-title {
+  position: relative;
+  display: block;
+  min-width: 0;
+  height: 3rem;
+  line-height: 3rem;
+  padding: 0 0.875rem;
+  margin-left: -0.875rem; /* text stays on the page gutter until stuck */
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition:
+    margin-left 0.35s var(--lg-ease-spring, ease),
+    background-color 0.25s ease,
+    box-shadow 0.25s ease,
+    color 0.6s ease;
+}
+
+.detail-title {
+  isolation: isolate;
+}
+
+.detail-title::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.detail-title::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 0.5px;
+  background: var(--lg-stroke-gradient);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+#classroom-detail-overlay.title-stuck .detail-title {
+  /* Slide to just right of the back button; --title-shift is measured in
+     classroom-detail.js (syncTitleStuck). */
+  margin-left: var(--title-shift, 3.25rem);
+  box-shadow:
+    0 0 0 0.1px var(--lg-outline),
+    var(--lg-highlight),
+    0 4px 40px 0 var(--lg-shadow-color);
+}
+
+/* The glass sits on a child layer: the title itself clips (overflow: hidden,
+   for the ellipsis), and a backdrop-filter on a clipping element can fail to
+   sample what is behind it. */
+#classroom-detail-overlay.title-stuck .detail-title::before {
+  background: var(--lg-tint);
+  -webkit-backdrop-filter: blur(var(--lg-blur-sm));
+  backdrop-filter: blur(var(--lg-blur-sm));
+}
+
+#classroom-detail-overlay.title-stuck .detail-title::after {
+  opacity: var(--lg-stroke-opacity);
+}
+
+/* The photo-tone colours are for text over the photo; the pill sits over
+   scrolled content, so back to the theme's own. */
+#classroom-detail-overlay.title-stuck[data-title-tone] .detail-title {
+  color: var(--text-color-primary);
+}
+
+/* Same for the status badge: back to the system theme's tokens and label
+   colour instead of the photo-tone ones. */
+#classroom-detail-overlay.title-stuck[data-title-tone] .detail-status-wrapper {
+  --color-status-free: unset;
+  --color-status-free-soon: unset;
+  --color-status-partial: unset;
+  --color-status-busy: unset;
+  --text-color-primary: unset;
+}
+
+#classroom-detail-overlay.title-stuck[data-title-tone]
+  .detail-status-wrapper
+  .classroom-status-txt {
+  --status-mix: black;
+  --status-keep: 82%;
+}
+
+#classroom-detail-overlay.title-stuck[data-title-tone] .detail-status-label {
+  color: var(--text-color-secondary);
+  opacity: 0.65;
+}
+
+@media (prefers-color-scheme: dark) {
+  #classroom-detail-overlay.title-stuck[data-title-tone]
+    .detail-status-wrapper
+    .classroom-status-txt {
+    --status-mix: white;
+    --status-keep: 85%;
+  }
+}
+
 .detail-content {
   @apply w-full;
   padding: 1rem 1.25rem 4rem;
@@ -466,23 +1073,51 @@ body.detail-open .tab-content * {
 }
 
 .detail-subtitle {
-  margin: 0 0 1.5rem;
+  margin-block: 0 1.5rem; /* not `margin`: the title-row rule centres it with margin-inline: auto */
   font-size: var(--text-100);
   font-weight: 600;
   text-align: left;
+  transition: color 0.6s ease;
 }
 
-@media (min-width: 600px) {
-  .detail-subtitle {
-    text-align: center;
-    margin-bottom: 2rem;
+/* Desktop: sections flow as a masonry grid of cards (CSS multi-column, so
+   each card lands in the shortest column and keeps its natural height). */
+@media (min-width: 1000px) {
+  .detail-header {
+    max-width: 1100px;
+  }
+
+  .detail-content {
+    max-width: 1100px;
+    column-count: 2;
+    column-gap: 1rem;
+  }
+
+  .detail-content > .detail-section {
+    break-inside: avoid;
+    display: inline-block; /* keeps backdrop-filter cards unsplit in WebKit */
+    width: 100%;
   }
 }
 
 /* ── Section ─────────────────────────────────────────────────────── */
 
 .detail-section {
-  margin-bottom: 2rem;
+  position: relative;
+  margin-bottom: 1rem;
+  padding: 1rem;
+  border-radius: var(--radius-xl);
+
+  /* Clear glass card (Vitrium's .lg-glass--clear material): keeps the
+     section's text readable over the colorful photo backdrop while
+     letting the colors through. */
+  background: var(--lg-tint-clear);
+  -webkit-backdrop-filter: blur(var(--lg-blur-clear));
+  backdrop-filter: blur(var(--lg-blur-clear));
+  box-shadow:
+    0 0 0 0.1px var(--lg-outline),
+    var(--lg-highlight),
+    0 4px 40px 0 var(--lg-shadow-color);
 }
 
 .detail-section-title {
@@ -604,6 +1239,81 @@ body.detail-open .tab-content * {
 .detail-feature-chip .hgi-stroke {
   font-size: var(--text-110);
   color: var(--text-color-accent);
+}
+
+/* ── Location map ───────────────────────────────────────────────── */
+
+/* Host of the shared campus map (components/campus-map.js embedMap()). */
+.detail-map {
+  position: relative;
+  height: 280px;
+  --detail-map-radius: calc(var(--radius-xl) - 0.5rem);
+  border-radius: var(--detail-map-radius);
+  overflow: hidden;
+  /* Firefox doesn't clip the composited WebGL canvas to `overflow: hidden` +
+     border-radius (it happens inside the backdrop-filtered card), so clip the
+     box explicitly as well. */
+  clip-path: inset(0 round var(--detail-map-radius));
+  isolation: isolate;
+  background: var(--lg-tint-clear);
+}
+
+.detail-map .campus-map,
+.detail-map .mapboxgl-canvas-container,
+.detail-map .mapboxgl-canvas {
+  border-radius: inherit;
+}
+
+.detail-map-pov {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  z-index: 2;
+}
+
+.detail-map-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.detail-map-link {
+  height: 2.5rem;
+  padding: 0 1rem 0 0.75rem;
+  font-size: var(--text-90);
+  font-weight: 600;
+}
+
+.detail-map-link-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 0.3rem;
+  pointer-events: none;
+}
+
+.detail-map-section {
+  /* Keep the card's own title inside its glass; the map fills the rest. */
+  overflow: hidden;
+}
+
+/* Staggered entrance: each chip fades and pops in a beat after the last. */
+.detail-feature-chip--enter {
+  animation: detail-chip-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation-delay: calc(0.15s + var(--i, 0) * 45ms);
+}
+
+@keyframes detail-chip-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.9);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .detail-feature-chip--enter {
+    animation: none;
+  }
 }
 
 .detail-no-features {
@@ -1551,6 +2261,20 @@ body.detail-open .tab-content * {
   }
 }
 
+/* The photo backdrop and tinted backgrounds fade in over 0.6s for the normal
+   (non-VT) load. During an open/close VT that fade would start inside the
+   update callback, so the "new" snapshot would capture a transparent backdrop
+   and an untinted background that then pop in when the live DOM takes over.
+   Same for the photo's own opacity + scale(1.05 -> 1.001) settle: it would
+   start mid-callback, so the snapshot catches it faded/zoomed and the live
+   image finishes the zoom after the morph ends. */
+.header-ctl-vt #classroom-detail-overlay,
+.header-ctl-vt .detail-photo-backdrop,
+.header-ctl-vt .detail-photo,
+.header-ctl-vt body {
+  transition: none;
+}
+
 /* Detail-only header controls (back button, favourite toggle) scaling in/out
    in step with the page morph. */
 
@@ -1599,6 +2323,67 @@ body.detail-open .tab-content * {
 
 /* ── View Transition animation overrides ──────────────────────────── */
 
+/* Card <-> page transition (open and close), modelled on SwiftUI's `.zoom`
+   navigation transition:
+
+   - The destination page starts scaled down to the card's width and clipped to
+     the card's rounded rect, then grows to fill the screen (close plays it
+     backwards). The screen it came from never moves — it is simply covered,
+     the way iOS pushes a zoomed view over its source.
+   - The card and the page's hero photo are one shared element (`detail-hero`)
+     riding on top of that growing box, so the thing the eye tracks — the photo
+     — stays continuous, and the only cross-fade is between two crops of the
+     SAME image. It happens in the first third, while the box is small and
+     moving fastest, which is why this needs no blur to hide the swap.
+
+   Everything animates `transform` / `clip-path` / `opacity` on snapshots that
+   are at most viewport-sized: no filters, and no full-page snapshot (the
+   overlay is ~2000px tall — capturing it was the single most expensive thing
+   the old version did).
+
+   --vt-spring is a critically damped spring (omega 6.5 over the duration,
+   normalised to land exactly on 1): no overshoot, and unlike the old omega-19
+   curve it still has visible travel left after 100ms, so the eye can follow
+   the box instead of only seeing its tail. */
+:root {
+  --vt-duration: 0.4s;
+  --vt-spring: linear(
+    0,
+    0.0182,
+    0.064,
+    0.1264,
+    0.1979,
+    0.2731,
+    0.3481,
+    0.4204,
+    0.4886,
+    0.5517,
+    0.6093,
+    0.6612,
+    0.7076,
+    0.7488,
+    0.7851,
+    0.817,
+    0.8447,
+    0.8689,
+    0.8898,
+    0.9078,
+    0.9233,
+    0.9366,
+    0.948,
+    0.9577,
+    0.966,
+    0.9731,
+    0.9791,
+    0.9842,
+    0.9885,
+    0.9921,
+    0.9952,
+    0.9978,
+    1
+  );
+}
+
 @supports (view-transition-name: none) {
   /* Suppress the CSS opacity fallback transition when VT is available.
      Must match/exceed the base rule's specificity (#id:not([hidden]) = 1,1,0),
@@ -1609,14 +2394,147 @@ body.detail-open .tab-content * {
     transition: none;
   }
 
-  /* Root cross-fade (for everything else: background, tabbar, etc. — the
-     header is pinned separately below, since backdrop-filter can't stay
-     "live" during a VT and freezing it into root would show the wrong,
-     pre-transition blur for most of the animation). */
+  /* Root cross-fade for everything that is NOT a card->page zoom (opening the
+     detail page from a hash with no card on screen, info <-> detail, ...).
+     The zoom itself overrides both of these below. */
   ::view-transition-old(root),
   ::view-transition-new(root) {
     animation-duration: 0.25s;
   }
+
+  /* ---- The page surface ------------------------------------------------
+     `detail-vt-open` / `detail-vt-close` are set on <html> only when there is
+     a real card to zoom from (classroom-detail.js), and come with the
+     --zoom-* geometry from utils/vt-motion.js.
+
+     The snapshot that belongs to the detail page (new on open, old on close)
+     is scaled down so its width matches the card's and translated so its top
+     left corner sits on the card's, which — because the hero photo is
+     full-bleed and starts at the very top of the page — puts the page's photo
+     exactly where the card is. `clip-path` then trims it to the card's box:
+     `inset(0 0 B 0)`, where B is in the snapshot's own (pre-scale)
+     coordinates, so only the bottom edge needs a value — the left and right
+     ones stay at 0 at every scale, since the scale is derived from the width.
+
+     The other snapshot doesn't animate at all: the page we came from stays
+     put and gets covered / uncovered, which is both what iOS does and one
+     less full-screen animation to composite. */
+  :root.detail-vt-open::view-transition-old(root),
+  :root.detail-vt-close::view-transition-new(root) {
+    animation: none;
+    opacity: 1;
+  }
+
+  /* Two animations, because the box's path is not a straight line: the zoom
+     itself on `transform`, and the arc on `translate`, which composes on top
+     of it in screen pixels (individual transform properties apply outside
+     `transform`, and so are not touched by its scale). See detail-zoom-arc. */
+  :root.detail-vt-open::view-transition-new(root) {
+    animation:
+      detail-zoom-in var(--vt-duration) var(--vt-spring) both,
+      detail-zoom-arc var(--vt-duration) linear both;
+    transform-origin: 0 0;
+  }
+
+  :root.detail-vt-close::view-transition-old(root) {
+    animation:
+      detail-zoom-out var(--vt-duration) var(--vt-spring) both,
+      detail-zoom-arc-back var(--vt-duration) linear both;
+    transform-origin: 0 0;
+    z-index: 1; /* the shrinking page rides above the list it shrinks into */
+  }
+
+  /* ---- The shared element (card <-> hero photo) ------------------------ */
+
+  ::view-transition-group(detail-hero) {
+    animation-duration: var(--vt-duration);
+    animation-timing-function: var(--vt-spring);
+    overflow: hidden;
+    z-index: 1; /* above the page surface, below the header (2) */
+  }
+
+  /* Fill the morphing box and crop — never letterbox, never stretch. Both
+     snapshots are crops of the same photo (the card's portrait one, the
+     page's landscape one), so cropping both to the box in flight keeps them
+     on top of each other through the cross-fade. */
+  ::view-transition-old(detail-hero),
+  ::view-transition-new(detail-hero) {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+    animation-duration: var(--vt-duration);
+  }
+
+  /* Only ONE of the two fades: the outgoing snapshot is stacked on top and
+     dissolves over an incoming one that stays fully opaque. Fading both (the
+     UA's default, and what the old version did) leaves the pair translucent in
+     the middle of the cross-fade — 1 - a + a² is 0.75 at its worst — and the
+     page behind shows through the photo. This way the pair is opaque at every
+     frame.
+
+     It is over in the first fifth of the transition, which is the other half of
+     why this needs no blur: that is roughly 95ms, while the box is still small
+     and travelling fastest, so the only thing that can be caught ghosting —
+     the card's name against the page's title — is gone before the eye can
+     resolve it. */
+  ::view-transition-old(detail-hero) {
+    animation-name: detail-hero-out;
+    animation-timing-function: ease-out;
+    z-index: 1;
+  }
+
+  ::view-transition-new(detail-hero) {
+    animation: none;
+    opacity: 1;
+  }
+
+  /* Safety net. classroom-detail.js names the card only when the page has a
+     hero for it to pair with, so a half-empty group should not happen — but if
+     one ever does (a hero that went missing between the two snapshots) this
+     keeps it a fade instead of a hard pop. Gentler than the paired fade above:
+     there is no second snapshot underneath to hide the swap. */
+  ::view-transition-old(detail-hero):only-child {
+    animation-name: detail-hero-solo-out;
+  }
+
+  ::view-transition-new(detail-hero):only-child {
+    animation: detail-hero-solo-in var(--vt-duration) ease-out both;
+  }
+
+  /* Corner radius morphs with the box, on the image pair (which fills the
+     group and is never moved by the group's own animation). Only when both
+     ends exist — a lone card snapshot already has its rounded corners baked
+     in, and squaring them off would clip them. */
+  :root.detail-vt-hero.detail-vt-open::view-transition-image-pair(detail-hero) {
+    animation:
+      detail-hero-unround var(--vt-duration) var(--vt-spring) both,
+      detail-zoom-arc var(--vt-duration) linear both;
+  }
+
+  :root.detail-vt-hero.detail-vt-close::view-transition-image-pair(detail-hero) {
+    animation:
+      detail-hero-round var(--vt-duration) var(--vt-spring) both,
+      detail-zoom-arc-back var(--vt-duration) linear both;
+  }
+
+  /* A room with no photo: nothing to round off, but the lone card snapshot
+     still has to arc. The page surface it sits on is arcing, and the card is
+     supposed to be glued to the box the page grows out of — without this it
+     would hang back on a straight line while the page swung out from under it. */
+  :root.detail-vt-open::view-transition-image-pair(detail-hero) {
+    animation: detail-zoom-arc var(--vt-duration) linear both;
+  }
+
+  :root.detail-vt-close::view-transition-image-pair(detail-hero) {
+    animation: detail-zoom-arc-back var(--vt-duration) linear both;
+  }
+
+  ::view-transition-image-pair(detail-hero) {
+    overflow: hidden;
+  }
+
+  /* ---- Header ---------------------------------------------------------- */
 
   /* The header is a constant translucent/blurred overlay, not changing
      content — pin it with no animation so its frozen snapshot is just
@@ -1639,7 +2557,7 @@ body.detail-open .tab-content * {
      snapshot is taken from the settled page and is always full width. The only
      thing "old" lacks is the back button / taller nav row, and that just
      appears when the live DOM takes over at the end — imperceptible against
-     the 0.5s morph. */
+     the morph. */
   ::view-transition-old(app-header) {
     animation: none;
     opacity: 1;
@@ -1667,23 +2585,6 @@ body.detail-open .tab-content * {
 
   :root:not(.no-safari).header-vt-fixed .body-container {
     padding-top: calc(1.5rem + var(--header-height, 0px));
-  }
-
-  /* Shared element: whole card morphs into the whole page (SwiftUI .zoom-style).
-     Group (size/position) and both snapshots (opacity cross-fade) share the same
-     duration/easing — a mismatch here makes the shorter one snap back to full
-     opacity before the transition ends, reading as a sudden pop instead of a fade. */
-  ::view-transition-group(classroom-detail-zoom) {
-    animation-duration: 0.5s;
-    animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
-    @apply overflow-hidden; /* clip both snapshots to the group's morphing bounds */
-  }
-
-  ::view-transition-old(classroom-detail-zoom),
-  ::view-transition-new(classroom-detail-zoom) {
-    animation-duration: 0.5s;
-    animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
-    animation-fill-mode: both;
   }
 
   /* Detail-only header controls get their own VT groups (pulled out of the
@@ -1717,6 +2618,196 @@ body.detail-open .tab-content * {
   }
 }
 
+/* The page grows out of / shrinks into the card's rounded box. --zoom-* are
+   written by utils/vt-motion.js right before the transition starts; the
+   fallbacks make these a plain no-op if they ever aren't. */
+@keyframes detail-zoom-in {
+  from {
+    transform: translate(var(--zoom-x, 0px), var(--zoom-y, 0px)) scale(var(--zoom-scale, 1));
+    clip-path: inset(0 0 var(--zoom-clip, 0px) 0 round var(--zoom-radius, 0px));
+  }
+  to {
+    transform: none;
+    clip-path: inset(0 0 0 0 round 0);
+  }
+}
+
+@keyframes detail-zoom-out {
+  from {
+    transform: none;
+    clip-path: inset(0 0 0 0 round 0);
+  }
+  to {
+    transform: translate(var(--zoom-x, 0px), var(--zoom-y, 0px)) scale(var(--zoom-scale, 1));
+    clip-path: inset(0 0 var(--zoom-clip, 0px) 0 round var(--zoom-radius, 0px));
+  }
+}
+
+/* The arc. A straight line from the card to the page reads as a slide; Apple's
+   zoom sweeps, and it sweeps *under* the straight line, not over it. Two
+   things put it there: the horizontal runs ahead of the spring (a
+   time-compressed copy of it) while the vertical drags behind (the spring
+   raised to a power), so the box swings out and stays low, then rises into
+   place at the end. Both parts are back to zero when the spring lands, so the
+   box still arrives exactly where the zoom puts it.
+
+   utils/vt-motion.js writes the two peak offsets into --arc-x / --arc-y; the
+   stops here are the shape, sampled from the spring, so they hold at any
+   distance. Linear timing: the shape IS the easing.
+
+   The close is not this played backwards. Its spring is front-loaded the same
+   way the open's is, so reversing in time would put the bulge of the curve at
+   the wrong end of the journey; -back is the same offset expressed against how
+   far along the straight line the box is, which is what makes the two
+   directions trace the same path through space. */
+@keyframes detail-zoom-arc {
+  0% {
+    translate: 0 0;
+  }
+  5% {
+    translate: calc(var(--arc-x, 0px) * 0.183) calc(var(--arc-y, 0px) * 0.231);
+  }
+  10% {
+    translate: calc(var(--arc-x, 0px) * 0.5) calc(var(--arc-y, 0px) * 0.592);
+  }
+  15% {
+    translate: calc(var(--arc-x, 0px) * 0.768) calc(var(--arc-y, 0px) * 0.857);
+  }
+  20% {
+    translate: calc(var(--arc-x, 0px) * 0.933) calc(var(--arc-y, 0px) * 0.982);
+  }
+  25% {
+    translate: calc(var(--arc-x, 0px) * 0.997) calc(var(--arc-y, 0px) * 0.993);
+  }
+  30% {
+    translate: calc(var(--arc-x, 0px) * 0.983) calc(var(--arc-y, 0px) * 0.927);
+  }
+  35% {
+    translate: calc(var(--arc-x, 0px) * 0.917) calc(var(--arc-y, 0px) * 0.819);
+  }
+  40% {
+    translate: calc(var(--arc-x, 0px) * 0.822) calc(var(--arc-y, 0px) * 0.696);
+  }
+  50% {
+    translate: calc(var(--arc-x, 0px) * 0.607) calc(var(--arc-y, 0px) * 0.461);
+  }
+  60% {
+    translate: calc(var(--arc-x, 0px) * 0.414) calc(var(--arc-y, 0px) * 0.28);
+  }
+  75% {
+    translate: calc(var(--arc-x, 0px) * 0.208) calc(var(--arc-y, 0px) * 0.112);
+  }
+  90% {
+    translate: calc(var(--arc-x, 0px) * 0.052) calc(var(--arc-y, 0px) * 0.029);
+  }
+  100% {
+    translate: 0 0;
+  }
+}
+
+@keyframes detail-zoom-arc-back {
+  0% {
+    translate: 0 0;
+  }
+  5% {
+    translate: calc(var(--arc-x, 0px) * 0.25) calc(var(--arc-y, 0px) * 0.141);
+  }
+  10% {
+    translate: calc(var(--arc-x, 0px) * 0.567) calc(var(--arc-y, 0px) * 0.422);
+  }
+  15% {
+    translate: calc(var(--arc-x, 0px) * 0.82) calc(var(--arc-y, 0px) * 0.694);
+  }
+  20% {
+    translate: calc(var(--arc-x, 0px) * 0.961) calc(var(--arc-y, 0px) * 0.887);
+  }
+  25% {
+    translate: calc(var(--arc-x, 0px) * 1) calc(var(--arc-y, 0px) * 0.983);
+  }
+  30% {
+    translate: calc(var(--arc-x, 0px) * 0.963) calc(var(--arc-y, 0px) * 0.996);
+  }
+  35% {
+    translate: calc(var(--arc-x, 0px) * 0.879) calc(var(--arc-y, 0px) * 0.947);
+  }
+  40% {
+    translate: calc(var(--arc-x, 0px) * 0.77) calc(var(--arc-y, 0px) * 0.859);
+  }
+  50% {
+    translate: calc(var(--arc-x, 0px) * 0.541) calc(var(--arc-y, 0px) * 0.635);
+  }
+  60% {
+    translate: calc(var(--arc-x, 0px) * 0.346) calc(var(--arc-y, 0px) * 0.421);
+  }
+  75% {
+    translate: calc(var(--arc-x, 0px) * 0.148) calc(var(--arc-y, 0px) * 0.187);
+  }
+  90% {
+    translate: calc(var(--arc-x, 0px) * 0.04) calc(var(--arc-y, 0px) * 0.052);
+  }
+  100% {
+    translate: 0 0;
+  }
+}
+
+@keyframes detail-hero-out {
+  0% {
+    opacity: 1;
+  }
+  20% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes detail-hero-solo-out {
+  0% {
+    opacity: 1;
+  }
+  30% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes detail-hero-solo-in {
+  0% {
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes detail-hero-unround {
+  from {
+    border-radius: var(--zoom-card-radius, var(--radius-lg));
+  }
+  to {
+    border-radius: 0;
+  }
+}
+
+@keyframes detail-hero-round {
+  from {
+    border-radius: 0;
+  }
+  to {
+    border-radius: var(--zoom-card-radius, var(--radius-lg));
+  }
+}
+
+/* The zoom and the shared element are skipped entirely under
+   prefers-reduced-motion (classroom-detail.js never sets the classes or the
+   names), which leaves the root cross-fade and these, the last two moving
+   things. */
 @media (prefers-reduced-motion: reduce) {
   ::view-transition-new(detail-back-btn):only-child,
   ::view-transition-new(favourite-btn):only-child,
@@ -1737,4 +2828,34 @@ body.detail-open .tab-content * {
   .detail-today-indicator:hover {
     background: var(--color-accent-dark-hover);
   }
+}
+
+.detail-hours {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.detail-hours-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  padding: 0.35rem 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-color-primary);
+}
+
+.detail-hours-day {
+  color: var(--text-color-secondary);
+}
+
+.detail-hours-row--today,
+.detail-hours-row--today .detail-hours-day {
+  font-weight: 700;
+  color: var(--text-color-accent);
+}
+
+.detail-hours-row--closed:not(.detail-hours-row--today) .detail-hours-time {
+  color: var(--text-color-secondary);
 }

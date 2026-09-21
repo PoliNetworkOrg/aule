@@ -483,7 +483,7 @@ label {
 
   height: 11px;
 
-  background-color: var(--background-color);
+  background-color: var(--header-bg, var(--background-color));
 }
 
 .header {
@@ -514,7 +514,7 @@ label {
   @apply absolute;
   inset: 0 0 auto 0;
   height: env(safe-area-inset-top);
-  background-color: var(--background-color);
+  background-color: var(--header-bg, var(--background-color));
   z-index: 0;
   @apply pointer-events-none;
 }
@@ -534,11 +534,17 @@ label {
 .header-blur-layer {
   @apply absolute;
   @apply inset-0;
+
+  /* Both the radius and the box are variables so the refresh below can nudge
+     all four layers at once. Zero except for the few frames after a view
+     transition; see .header-blur-refresh. */
+  bottom: var(--hbl-bottom-nudge, 0px);
+  backdrop-filter: blur(calc(var(--hbl-blur) + var(--hbl-nudge, 0px)));
+  -webkit-backdrop-filter: blur(calc(var(--hbl-blur) + var(--hbl-nudge, 0px)));
 }
 
 .header-blur-layer:nth-child(1) {
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  --hbl-blur: 8px;
   mask-image: linear-gradient(to bottom, transparent 0%, black 12.5%, black 25%, transparent 37.5%);
   -webkit-mask-image: linear-gradient(
     to bottom,
@@ -550,8 +556,7 @@ label {
 }
 
 .header-blur-layer:nth-child(2) {
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  --hbl-blur: 4px;
   mask-image: linear-gradient(
     to bottom,
     transparent 12.5%,
@@ -569,8 +574,7 @@ label {
 }
 
 .header-blur-layer:nth-child(3) {
-  backdrop-filter: blur(2px);
-  -webkit-backdrop-filter: blur(2px);
+  --hbl-blur: 2px;
   mask-image: linear-gradient(
     to bottom,
     transparent 25%,
@@ -588,10 +592,24 @@ label {
 }
 
 .header-blur-layer:nth-child(4) {
-  backdrop-filter: blur(1px);
-  -webkit-backdrop-filter: blur(1px);
+  --hbl-blur: 1px;
   mask-image: linear-gradient(to bottom, transparent 37.5%, black 50%, black 100%);
   -webkit-mask-image: linear-gradient(to bottom, transparent 37.5%, black 50%, black 100%);
+}
+
+.header-blur-refresh .header-blur-layer {
+  --hbl-nudge: 0.75px;
+  --hbl-bottom-nudge: -0.02px;
+}
+
+/* Alternated with the above, so two refreshes in a row are still a change:
+   re-applying an identical computed value is the no-op we are avoiding.
+   (refreshHeaderBlur() in utils/header-blur.ts explains why the blur must be
+   re-sampled after a view transition; never hint the wrapper with
+   will-change: backdrop-filter, which makes it the backdrop root in WebKit.) */
+.header-blur-refresh-alt .header-blur-layer {
+  --hbl-nudge: 0.6px;
+  --hbl-bottom-nudge: -0.04px;
 }
 
 .header-fade-overlay {
@@ -600,9 +618,9 @@ label {
 
   background: linear-gradient(
     to bottom,
-    var(--background-color) 0%,
-    color-mix(in srgb, var(--background-color) 70%, transparent) 45%,
-    color-mix(in srgb, var(--background-color) 25%, transparent) 70%,
+    var(--header-bg, var(--background-color)) 0%,
+    color-mix(in srgb, var(--header-bg, var(--background-color)) 70%, transparent) 45%,
+    color-mix(in srgb, var(--header-bg, var(--background-color)) 25%, transparent) 70%,
     transparent 100%
   );
 }
@@ -682,6 +700,22 @@ label {
 
   user-select: none;
   -webkit-user-drag: none;
+
+  transition: filter 0.35s ease;
+}
+
+/* The detail page tints the header with the classroom's colour, so the logo
+   loses contrast against it. A tight halo in the theme background colour
+   separates it without adding a container (which would show up in the
+   app-header view-transition snapshot). */
+body.detail-open .header-logo {
+  filter: drop-shadow(0 0 0.5px color-mix(in srgb, var(--background-color) 90%, transparent))
+    drop-shadow(0 0 6px color-mix(in srgb, var(--background-color) 75%, transparent));
+}
+
+.header-ctl-vt .header-logo {
+  filter: none;
+  transition: none;
 }
 
 .header-buttons-container {

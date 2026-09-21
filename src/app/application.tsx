@@ -12,6 +12,7 @@ import {
 } from "./classroom-search-data.ts";
 import { classroomDetail } from "./components/classroom-detail.tsx";
 import { infoPage } from "./components/info-page.tsx";
+import { initInfoHint } from "./components/info-hint.ts";
 import { initTimeControls } from "./components/time-controls-state.ts";
 import { setupCampusPicker } from "./components/campus-picker.tsx";
 import { initCampusMap } from "./components/campus-map.tsx";
@@ -342,6 +343,7 @@ export function mountApplication() {
 
       // Init info page overlay immediately — no data dependency
       infoPage.init();
+      cleanups.push(initInfoHint());
 
       // Search overlay (bottom-nav FAB) — lazy-loads its data on first open
 
