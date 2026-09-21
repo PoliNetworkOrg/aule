@@ -1826,14 +1826,18 @@ class ClassroomDetail {
           { signal: this._scheduleEvents.signal },
         );
 
-        // Same toggle from the keyboard. The blocks are role="button", but a
-        // div gets no native Enter/Space activation, and focusin above only
-        // ever *shows* the popover — without this there's no way to dismiss
-        // it (or re-open it on the focused block) without a pointer.
+        // Keyboard activation for the blocks, which are role="button" divs and
+        // so get no native Enter/Space handling. Deliberately *not* a toggle
+        // like the click handler above: focusin already shows the popover for
+        // the focused block, so toggling would fight it (that interference is
+        // also why the first click on an unfocused block opens and then
+        // immediately closes it). Enter/Space re-show idempotently and Escape
+        // dismisses, which is the behaviour a keyboard user expects anyway.
+        // preventDefault matters on its own: without it Space scrolls the page.
         container.addEventListener(
           "keydown",
           (e) => {
-            if (e.key !== "Enter" && e.key !== " ") return;
+            if (e.key !== "Enter" && e.key !== " " && e.key !== "Escape") return;
 
             const block =
               e.target instanceof Element
@@ -1841,10 +1845,10 @@ class ClassroomDetail {
                 : null;
 
             if (!block) return;
-            e.preventDefault(); // Space would otherwise scroll the page
+            e.preventDefault();
             e.stopPropagation();
 
-            if (_popoverBlock === block) hideOccupationPopover();
+            if (e.key === "Escape") hideOccupationPopover();
             else showOccupationPopover(block);
           },
           { signal: this._scheduleEvents.signal },
