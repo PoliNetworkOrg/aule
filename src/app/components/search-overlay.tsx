@@ -85,6 +85,12 @@ function EventCard({
             type="button"
             className="search-event-session liquid-glass"
             data-open-classroom={s.roomId}
+            data-highlight-date={s.date}
+            data-highlight-from={s.inizio}
+            data-highlight-to={s.fine}
+            data-highlight-professors={
+              g.matchedProfessors.length ? g.matchedProfessors.join("|") : undefined
+            }
           >
             <span className="ses-when">
               {formatDate(s.date, dateFmt)} · {formatTime(s.inizio, timeFmt)}–

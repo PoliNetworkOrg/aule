@@ -27,9 +27,17 @@ interface QueryContext {
   to: string;
 }
 
+interface ScheduleHighlight {
+  date: string;
+  from: string;
+  to: string;
+  professors: string[];
+}
+
 interface OpenTrigger {
   cardEl: HTMLElement;
   queryContext: QueryContext | null;
+  highlight: ScheduleHighlight | null;
 }
 
 interface PhotoState {
@@ -204,6 +212,8 @@ class ClassroomDetail {
   _currentId: number | null = null;
   _savedScrollPos = 0;
   _queryContext: QueryContext | null = null;
+  _highlight: ScheduleHighlight | null = null;
+  _highlightConsumed = false;
   _nowTimer: number | undefined;
   _timelinePopoverCleanup: (() => void) | null = null;
   _root: Root | null = null;
@@ -258,6 +268,7 @@ class ClassroomDetail {
     this._pendingTrigger = null;
     this._openTrigger = null;
     this._queryContext = null;
+    this._highlight = null;
     this._openedViaPushState = false;
     this._disposed = true;
     this._events.abort();
@@ -418,7 +429,22 @@ class ClassroomDetail {
             ? { date: queryDate, from: queryFrom, to: queryTo }
             : null;
 
-        this._pendingTrigger = { queryContext, cardEl: card };
+        const highlightDate = card.dataset.highlightDate ?? null;
+        const highlightFrom = card.dataset.highlightFrom ?? null;
+        const highlightTo = card.dataset.highlightTo ?? null;
+        const highlightProfessors = card.dataset.highlightProfessors ?? null;
+
+        const highlight =
+          highlightDate && highlightFrom && highlightTo
+            ? {
+                date: highlightDate,
+                from: highlightFrom,
+                to: highlightTo,
+                professors: highlightProfessors ? highlightProfessors.split("|") : [],
+              }
+            : null;
+
+        this._pendingTrigger = { queryContext, highlight, cardEl: card };
         this._openedViaPushState = true;
         this._buildFlatIndex();
         const _entry = this._flatIndex?.get(id);
@@ -516,6 +542,7 @@ class ClassroomDetail {
     this._clearContent();
     this._openTrigger = null;
     this._queryContext = null;
+    this._highlight = null;
   }
 
   // ---------- OPEN ----------
@@ -533,6 +560,8 @@ class ClassroomDetail {
     this._currentId = id;
     this._openTrigger = pending ?? null;
     this._queryContext = pending?.queryContext ?? null;
+    this._highlight = pending?.highlight ?? null;
+    this._highlightConsumed = false;
 
     // Save scroll position for when we return
     this._savedScrollPos = window.scrollY;
@@ -711,6 +740,7 @@ class ClassroomDetail {
       this._clearContent();
       this._openTrigger = null;
       this._queryContext = null;
+      this._highlight = null;
       this._overlay!.style.viewTransitionName = "";
 
       if (headerEl) headerEl.style.viewTransitionName = "";
@@ -1089,6 +1119,10 @@ class ClassroomDetail {
 
       // Query context: from/to range carried over from the Available Tab
       const queryDateKey = this._queryContext?.date?.replace(/-/g, "") ?? null;
+      const highlightDateKey = this._highlight?.date?.replace(/-/g, "") ?? null;
+      const highlightProfessors = new Set(
+        (this._highlight?.professors ?? []).map((p) => p.trim().toLowerCase()),
+      );
 
       let queryFromPct = null,
         queryToPct = null,
@@ -1108,7 +1142,11 @@ class ClassroomDetail {
       // so the popover can look up its full metadata without re-parsing the DOM.
       const scheduleSlots: Occupation[] = [];
 
-      const _dayParts = days.map(({ dayData, date }) => {
+      // Which days have a secondary-highlighted block — drives the mobile day
+      // chip dot marker, since only the active day's row is visible there.
+      const dayHighlightFlags: boolean[] = [];
+
+      const _dayParts = days.map(({ dayData, date }, dayIndex) => {
         const isSunday = !dayData;
 
         const dayNum = date.getDate();
@@ -1135,6 +1173,8 @@ class ClassroomDetail {
         );
 
         if (isSunday) {
+          dayHighlightFlags[dayIndex] = false;
+
           return {
             labelHtml,
             rowHtml: (
@@ -1162,6 +1202,8 @@ class ClassroomDetail {
           }
         }
 
+        let daySecondaryHighlight = false;
+
         const blocksHtml = (occupancy || []).map((slot, idx) => {
           if (!slot.inizio || !slot.fine) return "";
           const s = Math.max(timeToMinutes(slot.inizio), DAY_START);
@@ -1172,10 +1214,27 @@ class ClassroomDetail {
           const width = (((e - s) / total) * 100).toFixed(2);
           const slotIdx = scheduleSlots.push(slot) - 1;
 
+          const isPrimaryHighlight =
+            highlightDateKey !== null &&
+            dayData.date === highlightDateKey &&
+            slot.inizio === this._highlight?.from &&
+            slot.fine === this._highlight?.to;
+
+          const isSecondaryHighlight =
+            !isPrimaryHighlight &&
+            highlightProfessors.size > 0 &&
+            (slot.professors ?? []).some((p) => highlightProfessors.has(p.trim().toLowerCase()));
+
+          if (isSecondaryHighlight) daySecondaryHighlight = true;
+
           return (
             <>
               <div
-                className={"detail-schedule-block"}
+                className={
+                  "detail-schedule-block" +
+                  (isPrimaryHighlight ? " detail-schedule-block--highlight" : "") +
+                  (isSecondaryHighlight ? " detail-schedule-block--highlight-secondary" : "")
+                }
                 data-slot-idx={slotIdx}
                 tabIndex={0}
                 role={"button"}
@@ -1188,6 +1247,8 @@ class ClassroomDetail {
             </>
           );
         });
+
+        dayHighlightFlags[dayIndex] = daySecondaryHighlight;
 
         const queryOverlayHtml =
           isQueryDay && queryFromPct !== null ? (
@@ -1387,6 +1448,9 @@ class ClassroomDetail {
                   {dayName}
                 </span>
                 <span className={"date-number"}>{dayNum}</span>
+                {dayHighlightFlags[i] && (
+                  <span className="detail-schedule-day-highlight-dot" aria-hidden="true" />
+                )}
               </div>
             </>
           );
@@ -1465,6 +1529,30 @@ class ClassroomDetail {
       const gridEl = container.querySelector<HTMLElement>(".detail-schedule-bars");
       const rowEls = gridEl!.querySelectorAll<HTMLElement>(".detail-schedule-row");
 
+      // The highlight is a one-shot cue for the lesson the user just searched
+      // for — the first tap, keypress or day change inside the schedule drops it.
+      const clearHighlight = () => {
+        if (!this._highlight) return;
+        this._highlight = null;
+        container
+          .querySelectorAll(
+            ".detail-schedule-block--highlight, .detail-schedule-block--highlight-secondary",
+          )
+          .forEach((el) =>
+            el.classList.remove(
+              "detail-schedule-block--highlight",
+              "detail-schedule-block--highlight-secondary",
+            ),
+          );
+      };
+
+      container.addEventListener("pointerdown", clearHighlight, {
+        signal: this._scheduleEvents.signal,
+      });
+      container.addEventListener("keydown", clearHighlight, {
+        signal: this._scheduleEvents.signal,
+      });
+
       let selectedDayIndex = 0;
 
       const daySelector = createPillSelector(pickerContainer!, {
@@ -1493,17 +1581,19 @@ class ClassroomDetail {
         if (chip) daySelector.selectElement(chip, opts);
       }
 
-      // Auto-select: prefer the queried day when coming from the Available Tab,
-      // otherwise today, or next available day if after 20:15, or first available
+      // Auto-select: prefer the queried or highlighted day when coming from the
+      // Available Tab or search overlay, otherwise today, or next available day
+      // if after 20:15, or first available
       const todayDayIndex = days.findIndex((d) => d.dayData?.date === todayKey);
       const nowMins = new Date().getHours() * 60 + new Date().getMinutes();
+      const preferredDateKey = queryDateKey ?? highlightDateKey;
       let initialDayIndex;
 
-      if (queryDateKey) {
-        const queryDayIndex = days.findIndex((d) => d.dayData?.date === queryDateKey);
+      if (preferredDateKey) {
+        const preferredDayIndex = days.findIndex((d) => d.dayData?.date === preferredDateKey);
         initialDayIndex =
-          queryDayIndex >= 0
-            ? queryDayIndex
+          preferredDayIndex >= 0
+            ? preferredDayIndex
             : todayDayIndex >= 0
               ? todayDayIndex
               : days.findIndex((d) => d.dayData !== null);
@@ -1716,6 +1806,22 @@ class ClassroomDetail {
         _popoverBlock = null;
         timelinePopover.hide();
       };
+
+      // Scroll to and open the popover on the searched lesson — once per open,
+      // so a later re-render (language switch, refreshOccupancy) doesn't jump
+      // the page back or re-pop it after the user has moved on.
+      if (this._highlight && !this._highlightConsumed) {
+        this._highlightConsumed = true;
+        const primaryBlock = container.querySelector<HTMLElement>(
+          ".detail-schedule-block--highlight",
+        );
+
+        if (primaryBlock) {
+          const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+          primaryBlock.scrollIntoView({ block: "center", behavior: reduceMotion ? "auto" : "smooth" });
+          showOccupationPopover(primaryBlock);
+        }
+      }
 
       {
         // Desktop hover
