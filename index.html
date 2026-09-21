@@ -9,6 +9,24 @@
       content="A website to find available classrooms around Politecnico di Milano"
     />
 
+    <!--
+      GitHub Pages (this app's actual host — see public/CNAME) has no
+      mechanism for custom response headers, so a public/_headers file (the
+      Cloudflare/Netlify convention) would be silently inert here; a CSP meta
+      tag is the only lever still available (X-Frame-Options/
+      X-Content-Type-Options/Referrer-Policy have no meta-tag equivalent at
+      all — those need real headers, i.e. a host that supports them, or a CDN
+      in front of Pages). script-src/style-src keep 'unsafe-inline' because
+      of the inline <script>/onload= handlers and critical-CSS <style>
+      blocks below with no nonce/hash pipeline yet — tighten this once those
+      are removed or nonced at build time. The Mapbox origins are temporary
+      and should be dropped once the map provider is replaced.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline' https://api.mapbox.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://api.poliaule.com https://api-beta.poliaule.com https://*.tiles.mapbox.com https://avatars.githubusercontent.com; connect-src 'self' https://api.poliaule.com https://api-beta.poliaule.com https://api.mapbox.com https://events.mapbox.com https://*.tiles.mapbox.com https://api.github.com; worker-src 'self' blob:; base-uri 'self'; object-src 'none'"
+    />
+
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 
     <meta name="theme-color" content="#ECECEC" media="(prefers-color-scheme: light)" />

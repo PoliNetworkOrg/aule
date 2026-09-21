@@ -130,6 +130,17 @@ function timeToMinutes(time: string) {
   return h * 60 + m;
 }
 
+// A short accessible name for a schedule block — the full detail (course
+// code, professors, ...) is in the popover (OccupationPopover), which isn't
+// wired to the block through ARIA, so screen-reader users need at least this
+// much just from tabbing to the block itself.
+function slotAriaLabel(slot: Occupation) {
+  const title = slot.course ?? slot.name ?? slot.raw ?? t("detail.occupied");
+  const timeRange = `${minutesToTimeDisplay(timeToMinutes(slot.inizio))} – ${minutesToTimeDisplay(timeToMinutes(slot.fine))}`;
+
+  return `${title}, ${timeRange}`;
+}
+
 // Builds the popover body for a single occupancy slot. Course/exam slots carry
 // structured fields (course, code, professors, section); anything the scrape
 // couldn't parse only has `raw`; very old cached data may only have `name`.
@@ -956,12 +967,24 @@ class ClassroomDetail {
     }
 
     // Title click -> manual refresh of photo and schedule
-    this._overlay!.querySelector<HTMLElement>(".detail-title")?.addEventListener(
-      "click",
-      () => {
-        this._loadSchedule(classroom.id);
+    const refreshOnActivate = () => {
+      this._loadSchedule(classroom.id);
 
-        if (classroom.idfoto) this._loadPhoto(classroom.id);
+      if (classroom.idfoto) this._loadPhoto(classroom.id);
+    };
+
+    const titleEl = this._overlay!.querySelector<HTMLElement>(".detail-title");
+
+    titleEl?.addEventListener("click", refreshOnActivate, { signal: this._contentEvents.signal });
+    // role="button" on a non-native element gets no automatic Enter/Space ->
+    // click synthesis from the browser — without this, the refresh action is
+    // unreachable by keyboard.
+    titleEl?.addEventListener(
+      "keydown",
+      (e) => {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        e.preventDefault();
+        refreshOnActivate();
       },
       { signal: this._contentEvents.signal },
     );
@@ -1179,6 +1202,7 @@ class ClassroomDetail {
                 data-slot-idx={slotIdx}
                 tabIndex={0}
                 role={"button"}
+                aria-label={slotAriaLabel(slot)}
                 style={cssVars({
                   "--block-start": left + "%",
                   "--block-size": width + "%",

@@ -68,13 +68,16 @@ export function setupDatePicker(getPreferInitialDate: () => string | null = () =
 
   while (cursor <= end) {
     const date = formatLocalDate(cursor);
-    const parsed = new Date(date);
+    // Read weekday/day-of-month straight off `cursor` (local Date, not yet
+    // advanced) instead of re-parsing the formatted string: `new Date(date)`
+    // parses a "YYYY-MM-DD" string as UTC midnight, which local getters then
+    // read back a day early for any viewer behind UTC.
     const skipped = !availableDates.includes(date.replace(/-/g, ""));
     days.push({
       date,
-      weekday: dayNames[parsed.getDay()],
-      day: parsed.getDate(),
-      sunday: parsed.getDay() === 0,
+      weekday: dayNames[cursor.getDay()],
+      day: cursor.getDate(),
+      sunday: cursor.getDay() === 0,
       skipped,
     });
 

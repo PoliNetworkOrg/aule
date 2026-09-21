@@ -9,6 +9,59 @@ import type {
 import { fetchJson } from "../lib/query";
 import { getApiBase } from "./config.ts";
 
+// Occupancy data (both the "HH:MM" slot boundaries and the YYYYMMDD day keys)
+// is expressed in Europe/Rome wall-clock time. Reading a Date's *local*
+// getters instead (as the browser sees them) silently computes classroom
+// status/date-of-day against the wrong "now" for any visitor whose device
+// isn't in that timezone.
+const romeHHMMFormatter = new Intl.DateTimeFormat("en-GB", {
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+  timeZone: "Europe/Rome",
+});
+
+const romeDatePartsFormatter = new Intl.DateTimeFormat("en-CA", {
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  timeZone: "Europe/Rome",
+});
+
+function formatRomeHHMM(date: Date) {
+  return romeHHMMFormatter.format(date);
+}
+
+function formatRomeYYYYMMDD(date: Date) {
+  // en-CA formats as YYYY-MM-DD; strip the dashes to match the API's key shape.
+  return romeDatePartsFormatter.format(date).replace(/-/g, "");
+}
+
+const romeDateTimePartsFormatter = new Intl.DateTimeFormat("en-CA", {
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+  timeZone: "Europe/Rome",
+});
+
+// Returns a Date whose *local* wall-clock components (getHours/getDate/
+// setDate/getDay/...) represent "now" in Europe/Rome, regardless of the
+// browser's own timezone. Its underlying instant/epoch value is meaningless
+// (it isn't the real UTC moment "now" would give) — only use it via local
+// getters/setters, the same way date-picker-state.ts builds local-only Date
+// objects to represent calendar dates.
+export function getRomeNow() {
+  const parts = romeDateTimePartsFormatter.formatToParts(new Date());
+
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((p) => p.type === type)?.value ?? 0);
+
+  return new Date(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"));
+}
+
 // ---------- DATA ----------
 
 // Data fetched from the API will be stored here,
@@ -80,7 +133,17 @@ export async function fetchClassroomsData() {
       }
     }
 
-    classroomsData.splice(0, classroomsData.length, ...results);
+    if (results.length === 0 && dates.length > 0) {
+      // Every per-date fetch failed even though the dates list itself
+      // loaded fine — keep whatever (stale but real) data is already in
+      // classroomsData instead of wiping it out to an empty array, which
+      // would otherwise turn a transient per-date outage into "no data at
+      // all" for anyone reloading the page.
+      console.error("All per-date occupancy fetches failed; keeping previous data.");
+    } else {
+      classroomsData.splice(0, classroomsData.length, ...results);
+    }
+
     console.log("All data loaded:", classroomsData);
   } catch (error) {
     console.error("Error fetching classrooms data:", error);
@@ -105,7 +168,7 @@ export function findAvailableClassrooms(
   fromTime: string,
   toTime: string,
 ) {
-  const formattedDate = formatDateYYYYMMDD(new Date(date));
+  const formattedDate = dateKeyFromISODate(date);
 
   // Find the day's data
   const dayData = classroomsData.find((day) => day.date === formattedDate);
@@ -165,13 +228,14 @@ export function findAvailableClassrooms(
 
 // ---------- HELPERS ----------
 
-// Formats Date objects in the format used by the API (YYYYMMDD)
-function formatDateYYYYMMDD(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-
-  return `${year}${month}${day}`;
+// Converts a "YYYY-MM-DD" date-picker value straight into the API's YYYYMMDD
+// key via string manipulation, deliberately avoiding a Date round-trip:
+// `new Date("YYYY-MM-DD")` parses as UTC midnight, so reading it back with
+// local getters (as formatDateYYYYMMDD does) silently shifts the date by a
+// day for any viewer behind UTC. Use this for date-only strings; keep
+// formatDateYYYYMMDD for real Date instances.
+function dateKeyFromISODate(isoDate: string) {
+  return isoDate.replace(/-/g, "");
 }
 
 // Returns the free time slots within [fromTime, toTime]
@@ -213,12 +277,15 @@ function getFreeSlots(occupancy: Occupation[], fromTime: string, toTime: string)
  */
 export function computeClassroomStatus(occupancy: Occupation[] | null | undefined, refDate: Date) {
   const slots = occupancy ?? [];
-  const currentTime = `${String(refDate.getHours()).padStart(2, "0")}:${String(refDate.getMinutes()).padStart(2, "0")}`;
-
+  // Occupancy slot times ("09:15", etc.) are Europe/Rome wall-clock time, so
+  // refDate must be read in that timezone rather than the browser's local
+  // one — otherwise a visitor abroad (or a UTC-configured device) sees
+  // classroom status computed against the wrong "now".
+  const currentTime = formatRomeHHMM(refDate);
   const isOccupiedNow = slots.some((slot) => currentTime >= slot.inizio && currentTime < slot.fine);
 
   const thirtyMinsLater = new Date(refDate.getTime() + 30 * 60 * 1000);
-  const thirtyMinsLaterTime = `${String(thirtyMinsLater.getHours()).padStart(2, "0")}:${String(thirtyMinsLater.getMinutes()).padStart(2, "0")}`;
+  const thirtyMinsLaterTime = formatRomeHHMM(thirtyMinsLater);
 
   if (isOccupiedNow) {
     // Check if it will be free within 30 mins
@@ -258,7 +325,7 @@ export function getClassroomStatusNow(classroomId: number | string) {
   if (!classroomsData || classroomsData.length === 0) return null;
 
   const now = new Date();
-  const dateKey = formatDateYYYYMMDD(now);
+  const dateKey = formatRomeYYYYMMDD(now);
 
   // Find today's data
   const dayData = classroomsData.find((day) => day.date === dateKey);
@@ -298,7 +365,7 @@ export function getCampusBuildingsOverview(
   fromTime: string,
   toTime: string,
 ) {
-  const formattedDate = formatDateYYYYMMDD(new Date(date));
+  const formattedDate = dateKeyFromISODate(date);
   const dayData = classroomsData.find((day) => day.date === formattedDate);
 
   if (!dayData) return [];

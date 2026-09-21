@@ -125,8 +125,12 @@ export function DatePicker({ data, select }: DatePickerProps) {
     todayIndicator.addEventListener(
       "click",
       () => {
-        // Preserve the source's UTC date lookup for the Today action.
-        const today = new Date().toISOString().slice(0, 10);
+        // Use the local calendar date (matching data-date's own
+        // formatLocalDate), not toISOString() — which is UTC and picks the
+        // wrong day between local midnight and 01:00/02:00 CET/CEST. (The
+        // original vanilla-JS version had this same bug; it wasn't a
+        // deliberate behavior to preserve.)
+        const today = formatLocalDate(new Date());
         const cell = cells().find((element) => element.dataset.date === today);
 
         if (cell) selector.selectElement(cell);

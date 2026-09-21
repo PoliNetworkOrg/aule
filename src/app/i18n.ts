@@ -41,14 +41,20 @@ export async function initI18n() {
   notifyTranslations();
 }
 
-async function loadLocale(lang: string) {
+// Returns whether the load succeeded. On failure, deliberately leaves
+// `translations`/`currentLocale` untouched — the previous (working) locale
+// keeps rendering instead of every string falling back to its raw key.
+async function loadLocale(lang: string): Promise<boolean> {
   try {
     translations = await fetchJson<Record<string, string>>(`/locales/${lang}.json`);
     currentLocale = lang;
     document.documentElement.lang = lang;
+
+    return true;
   } catch (e) {
     console.warn(`i18n: failed to load locale "${lang}"`, e);
-    translations = {};
+
+    return false;
   }
 }
 
@@ -86,7 +92,12 @@ export function onLanguageSwitch(cb: (lang: string) => void) {
 
 export async function setLocale(lang: string) {
   if (!SUPPORTED.includes(lang) || lang === currentLocale) return;
-  await loadLocale(lang);
+  // Only persist/notify on success — a failed fetch shouldn't both wipe the
+  // working translations *and* commit the broken language as the user's
+  // saved preference (which initI18n() would then retry on every load).
+  const ok = await loadLocale(lang);
+
+  if (!ok) return;
   localStorage.setItem(STORAGE_KEY, lang);
   notifyTranslations();
   switchCallbacks.forEach((cb) => cb(lang));

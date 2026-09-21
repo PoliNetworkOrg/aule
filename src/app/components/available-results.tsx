@@ -145,8 +145,14 @@ function ResultsList({ context }: { context: OverviewContext }) {
   );
 
   useLayoutEffect(() => {
-    if (hasPartial && !showPartial)
-      document.getElementById("available-classrooms-results")?.classList.add("hide-partial");
+    // Unconditional toggle, not a one-way add: the container persists across
+    // searches (ResultsList remounts per search via a `key`, but this
+    // container doesn't), so a stale "hide-partial" class from a previous
+    // search with the filter on would otherwise never get removed once the
+    // condition to hide again turns false.
+    document
+      .getElementById("available-classrooms-results")
+      ?.classList.toggle("hide-partial", hasPartial && !showPartial);
   }, [hasPartial, showPartial]);
   useEffect(() => {
     let timer = 0;
@@ -183,10 +189,14 @@ function ResultsList({ context }: { context: OverviewContext }) {
             className={`results-filter-btn${showPartial ? " active" : ""}`}
             onClick={() => {
               const next = !showPartial;
+
               setShowPartial(next);
-              document
-                .getElementById("available-classrooms-results")
-                ?.classList.toggle("hide-partial", !next);
+              // Persist like the equivalent Settings-panel toggle does
+              // (settings.tsx) — otherwise this preference silently reverts
+              // on the next search, which re-reads localStorage from scratch.
+              localStorage.setItem(SHOW_PARTIAL_KEY, String(next));
+              // The DOM class itself is owned by the useLayoutEffect above,
+              // which reacts to `showPartial`.
             }}
           >
             <i className="hgi-stroke hgi-filter" /> {t("results.filterPartial")}

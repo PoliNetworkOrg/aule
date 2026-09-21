@@ -4,6 +4,7 @@ import {
   classroomsData,
   findAvailableClassrooms,
   fetchClassroomsData,
+  getRomeNow,
   SKIP_DAYS,
 } from "./available-rooms-script.ts";
 import {
@@ -53,6 +54,17 @@ export function mountApplication() {
   const cleanups: (() => void)[] = [];
   const timers = new Set<number>();
   let disposed = false;
+
+  // initOccupancyData() and startApplication()'s own setupTimePickers() call
+  // race each other — both start from an unawaited fire-and-forget branch.
+  // If occupancy resolves first, an auto-search submit would fire with the
+  // #from-time-picker/#to-time-picker inputs still empty (no HTML default
+  // value). Gate the auto-search on this instead of assuming ordering.
+  let resolveTimePickersReady: () => void;
+
+  const timePickersReady = new Promise<void>((resolve) => {
+    resolveTimePickersReady = resolve;
+  });
 
   function later(callback: () => void, delay: number) {
     const id = window.setTimeout(() => {
@@ -392,6 +404,7 @@ export function mountApplication() {
       // Setup the time pickers to ensure valid time ranges
       // (these don't depend on occupancy data)
       setupTimePickers();
+      resolveTimePickersReady();
       initTimeControls();
 
       // Decide pill vs. inline-expanded pickers based on the form column's width
@@ -452,29 +465,43 @@ export function mountApplication() {
   // Fetches occupancy data in the background (independent of the splash
   // screen) and populates everything that depends on it once it's ready.
   async function initOccupancyData() {
-    await fetchClassroomsData();
+    try {
+      await fetchClassroomsData();
 
-    if (disposed) return;
+      if (disposed) return;
 
-    // Use the fetched data to set the only valid dates into the date picker
-    setupDatePicker(() => preferInitialDate);
-    document.getElementById("available-classrooms-form")!.removeAttribute("data-loading");
-    document.querySelector<HTMLElement>("date-chip-picker")?.removeAttribute("data-loading");
+      // Use the fetched data to set the only valid dates into the date picker
+      setupDatePicker(() => preferInitialDate);
+      document.getElementById("available-classrooms-form")!.removeAttribute("data-loading");
+      document.querySelector<HTMLElement>("date-chip-picker")?.removeAttribute("data-loading");
 
-    setupDataFetchIndicator();
-    setupLiveSearch();
+      setupDataFetchIndicator();
+      setupLiveSearch();
 
-    // If a classroom detail page was opened before occupancy data arrived
-    // (e.g. a direct link), fill in its status badge and timeline now.
-    classroomDetail.refreshOccupancy();
-    renderFavourites();
+      // If a classroom detail page was opened before occupancy data arrived
+      // (e.g. a direct link), fill in its status badge and timeline now.
+      classroomDetail.refreshOccupancy();
+      renderFavourites();
 
-    const autoSearchEnabled = localStorage.getItem(AUTO_SEARCH_KEY) !== "false";
+      const autoSearchEnabled = localStorage.getItem(AUTO_SEARCH_KEY) !== "false";
 
-    if (autoSearchEnabled) {
-      document
-        .getElementById("available-classrooms-form")!
-        .dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+      if (autoSearchEnabled) {
+        // Wait for setupTimePickers() so #from-time-picker/#to-time-picker
+        // are actually populated before submitting — see
+        // timePickersReady above.
+        await timePickersReady;
+
+        if (disposed) return;
+        document
+          .getElementById("available-classrooms-form")!
+          .dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+      }
+    } catch (error) {
+      // Everything after the first `await` above ran with no surrounding
+      // try/catch before this change, so any exception here (e.g. a missing
+      // DOM node) became an unhandled promise rejection instead of a
+      // visible/loggable failure — this function is called fire-and-forget.
+      console.error("Error initializing occupancy data:", error);
     }
   }
 
@@ -575,7 +602,11 @@ export function mountApplication() {
 
     // Set initial values
     const intervalHours = parseInt(localStorage.getItem(INTERVAL_HOURS_KEY) ?? "", 10) || 2;
-    const now = new Date();
+    // Occupancy hours (07:15–20:15) are Europe/Rome wall-clock time; use
+    // Rome's "now" here too, not the browser's local time, so a visitor
+    // abroad gets the right default search window instead of one shifted by
+    // their device's own timezone offset.
+    const now = getRomeNow();
 
     // Snap to next :15 slot
     const snapped = new Date(now);

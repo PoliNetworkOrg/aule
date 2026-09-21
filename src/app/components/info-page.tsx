@@ -38,9 +38,13 @@ interface StatsCache {
 import { openPage, closePage, goBack } from "../../lib/navigation";
 import { queryClient } from "../../lib/query";
 import { onLanguageSwitch, t } from "../i18n.ts";
-import { safeUrl } from "../utils/html.ts";
+import { safeUrl, appendSafeUrlParam } from "../utils/html.ts";
 
-const GITHUB_REPO = "SummaCristian/poliaule";
+// This app now lives at PoliNetworkOrg/aule (the SummaCristian/PoliAule
+// upstream it was ported from is being retired) — point stats/links here.
+const GITHUB_REPO = "PoliNetworkOrg/aule";
+
+const GITHUB_REPO_URL = `https://github.com/${GITHUB_REPO}`;
 
 const STATS_CACHE_KEY = "poliaule_github_stats";
 
@@ -106,23 +110,6 @@ class InfoPage {
     this._logoEl = document.querySelector<HTMLElement>(".header-logo");
     this._titleEl = document.querySelector<HTMLElement>(".header-title");
     this._badgeEl = document.getElementById("env-badge");
-
-    // Haptics for interactive GitHub elements
-    this._overlay?.addEventListener(
-      "click",
-      (e) => {
-        if (!(e.target instanceof Element)) return;
-
-        if (
-          e.target.closest(".github-stat-card") ||
-          e.target.closest(".contributor-item") ||
-          e.target.closest(".github-repo-chip") ||
-          e.target.closest(".create-issue-btn")
-        ) {
-        }
-      },
-      { signal: this._events.signal },
-    );
 
     document.getElementById("info-trigger")?.addEventListener(
       "click",
@@ -966,7 +953,7 @@ function InfoContent({
                   <RichText text={t("info.github.title")} />
                 </h2>
                 <a
-                  href={"https://github.com/SummaCristian/poliaule"}
+                  href={GITHUB_REPO_URL}
                   target={"_blank"}
                   rel={"noopener"}
                   className={"github-repo-chip"}
@@ -983,7 +970,7 @@ function InfoContent({
               </div>
               <div className={"github-stats-grid"}>
                 <a
-                  href={"https://github.com/SummaCristian/poliaule/stargazers"}
+                  href={`${GITHUB_REPO_URL}/stargazers`}
                   target={"_blank"}
                   rel={"noopener"}
                   className={"github-stat-card"}
@@ -999,7 +986,7 @@ function InfoContent({
                   </span>
                 </a>
                 <a
-                  href={"https://github.com/SummaCristian/poliaule/commits/main"}
+                  href={`${GITHUB_REPO_URL}/commits/main`}
                   target={"_blank"}
                   rel={"noopener"}
                   className={"github-stat-card"}
@@ -1016,7 +1003,7 @@ function InfoContent({
                   </span>
                 </a>
                 <a
-                  href={"https://github.com/SummaCristian/poliaule/issues"}
+                  href={`${GITHUB_REPO_URL}/issues`}
                   target={"_blank"}
                   rel={"noopener"}
                   className={"github-stat-card"}
@@ -1030,7 +1017,7 @@ function InfoContent({
                   </span>
                 </a>
                 <a
-                  href={"https://github.com/SummaCristian/poliaule/blob/main/LICENSE"}
+                  href={`${GITHUB_REPO_URL}/blob/main/LICENSE`}
                   target={"_blank"}
                   rel={"noopener"}
                   className={"github-stat-card"}
@@ -1048,7 +1035,7 @@ function InfoContent({
                 </a>
               </div>
               <a
-                href={"https://github.com/SummaCristian/poliaule/issues/new"}
+                href={`${GITHUB_REPO_URL}/issues/new`}
                 target={"_blank"}
                 rel={"noopener"}
                 className={"create-issue-btn"}
@@ -1138,7 +1125,11 @@ function Stargazers({ stargazers }: { stargazers?: GithubUser[] | null }) {
           data-login={user.login}
           style={{ zIndex: 3 - index }}
         >
-          <img src={`${safeUrl(user.avatar_url)}&s=48`} alt={user.login} loading="lazy" />
+          <img
+            src={appendSafeUrlParam(safeUrl(user.avatar_url), "s", "48")}
+            alt={user.login}
+            loading="lazy"
+          />
         </span>
       ))}
     </div>
@@ -1160,7 +1151,7 @@ function Contributors({ contributors }: { contributors?: GithubContributor[] | n
           title={user.login}
         >
           <img
-            src={`${safeUrl(user.avatar_url)}&s=64`}
+            src={appendSafeUrlParam(safeUrl(user.avatar_url), "s", "64")}
             alt={user.login}
             className="contributor-avatar"
             loading="lazy"
