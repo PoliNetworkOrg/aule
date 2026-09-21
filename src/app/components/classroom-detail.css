@@ -859,11 +859,6 @@ body.detail-open .tab-content * {
   animation: detail-highlight-pulse 1.2s ease-out 1;
 }
 
-.detail-schedule-block--highlight-secondary {
-  opacity: 1;
-  border: 2px solid color-mix(in srgb, var(--text-color-accent) 55%, transparent);
-}
-
 @keyframes detail-highlight-pulse {
   0% {
     box-shadow: 0 0 0 0 color-mix(in srgb, var(--text-color-accent) 55%, transparent);
@@ -885,10 +880,6 @@ body.detail-open .tab-content * {
     box-shadow: 0 0 0 1px var(--color-accent-dark);
   }
 
-  .detail-schedule-block--highlight-secondary {
-    border-color: color-mix(in srgb, var(--color-accent-dark) 55%, transparent);
-  }
-
   @keyframes detail-highlight-pulse {
     0% {
       box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-accent-dark) 55%, transparent);
@@ -896,29 +887,6 @@ body.detail-open .tab-content * {
     100% {
       box-shadow: 0 0 0 10px color-mix(in srgb, var(--color-accent-dark) 0%, transparent);
     }
-  }
-}
-
-/* Dot marker on mobile day chips that hold a secondary-highlighted block,
-   since only the selected day's row is visible there. */
-.detail-schedule-day-selector .date-element-container {
-  position: relative;
-}
-
-.detail-schedule-day-highlight-dot {
-  @apply absolute;
-  bottom: 2px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--text-color-accent);
-}
-
-@media (prefers-color-scheme: dark) {
-  .detail-schedule-day-highlight-dot {
-    background: var(--color-accent-dark);
   }
 }
 

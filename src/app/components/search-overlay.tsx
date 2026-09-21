@@ -88,9 +88,6 @@ function EventCard({
             data-highlight-date={s.date}
             data-highlight-from={s.inizio}
             data-highlight-to={s.fine}
-            data-highlight-professors={
-              g.matchedProfessors.length ? g.matchedProfessors.join("|") : undefined
-            }
           >
             <span className="ses-when">
               {formatDate(s.date, dateFmt)} · {formatTime(s.inizio, timeFmt)}–

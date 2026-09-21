@@ -31,7 +31,6 @@ interface ScheduleHighlight {
   date: string;
   from: string;
   to: string;
-  professors: string[];
 }
 
 interface OpenTrigger {
@@ -432,16 +431,10 @@ class ClassroomDetail {
         const highlightDate = card.dataset.highlightDate ?? null;
         const highlightFrom = card.dataset.highlightFrom ?? null;
         const highlightTo = card.dataset.highlightTo ?? null;
-        const highlightProfessors = card.dataset.highlightProfessors ?? null;
 
         const highlight =
           highlightDate && highlightFrom && highlightTo
-            ? {
-                date: highlightDate,
-                from: highlightFrom,
-                to: highlightTo,
-                professors: highlightProfessors ? highlightProfessors.split("|") : [],
-              }
+            ? { date: highlightDate, from: highlightFrom, to: highlightTo }
             : null;
 
         this._pendingTrigger = { queryContext, highlight, cardEl: card };
@@ -1121,10 +1114,6 @@ class ClassroomDetail {
       const queryDateKey = this._queryContext?.date?.replace(/-/g, "") ?? null;
       const highlightDateKey = this._highlight?.date?.replace(/-/g, "") ?? null;
 
-      const highlightProfessors = new Set(
-        (this._highlight?.professors ?? []).map((p) => p.trim().toLowerCase()),
-      );
-
       let queryFromPct = null,
         queryToPct = null,
         queryFromDisplay = "",
@@ -1143,11 +1132,7 @@ class ClassroomDetail {
       // so the popover can look up its full metadata without re-parsing the DOM.
       const scheduleSlots: Occupation[] = [];
 
-      // Which days have a secondary-highlighted block — drives the mobile day
-      // chip dot marker, since only the active day's row is visible there.
-      const dayHighlightFlags: boolean[] = [];
-
-      const _dayParts = days.map(({ dayData, date }, dayIndex) => {
+      const _dayParts = days.map(({ dayData, date }) => {
         const isSunday = !dayData;
 
         const dayNum = date.getDate();
@@ -1174,8 +1159,6 @@ class ClassroomDetail {
         );
 
         if (isSunday) {
-          dayHighlightFlags[dayIndex] = false;
-
           return {
             labelHtml,
             rowHtml: (
@@ -1203,8 +1186,6 @@ class ClassroomDetail {
           }
         }
 
-        let daySecondaryHighlight = false;
-
         const blocksHtml = (occupancy || []).map((slot, idx) => {
           if (!slot.inizio || !slot.fine) return "";
           const s = Math.max(timeToMinutes(slot.inizio), DAY_START);
@@ -1221,20 +1202,12 @@ class ClassroomDetail {
             slot.inizio === this._highlight?.from &&
             slot.fine === this._highlight?.to;
 
-          const isSecondaryHighlight =
-            !isPrimaryHighlight &&
-            highlightProfessors.size > 0 &&
-            (slot.professors ?? []).some((p) => highlightProfessors.has(p.trim().toLowerCase()));
-
-          if (isSecondaryHighlight) daySecondaryHighlight = true;
-
           return (
             <>
               <div
                 className={
                   "detail-schedule-block" +
-                  (isPrimaryHighlight ? " detail-schedule-block--highlight" : "") +
-                  (isSecondaryHighlight ? " detail-schedule-block--highlight-secondary" : "")
+                  (isPrimaryHighlight ? " detail-schedule-block--highlight" : "")
                 }
                 data-slot-idx={slotIdx}
                 tabIndex={0}
@@ -1248,8 +1221,6 @@ class ClassroomDetail {
             </>
           );
         });
-
-        dayHighlightFlags[dayIndex] = daySecondaryHighlight;
 
         const queryOverlayHtml =
           isQueryDay && queryFromPct !== null ? (
@@ -1449,9 +1420,6 @@ class ClassroomDetail {
                   {dayName}
                 </span>
                 <span className={"date-number"}>{dayNum}</span>
-                {dayHighlightFlags[i] && (
-                  <span className="detail-schedule-day-highlight-dot" aria-hidden="true" />
-                )}
               </div>
             </>
           );
@@ -1536,15 +1504,8 @@ class ClassroomDetail {
         if (!this._highlight) return;
         this._highlight = null;
         container
-          .querySelectorAll(
-            ".detail-schedule-block--highlight, .detail-schedule-block--highlight-secondary",
-          )
-          .forEach((el) =>
-            el.classList.remove(
-              "detail-schedule-block--highlight",
-              "detail-schedule-block--highlight-secondary",
-            ),
-          );
+          .querySelectorAll(".detail-schedule-block--highlight")
+          .forEach((el) => el.classList.remove("detail-schedule-block--highlight"));
       };
 
       container.addEventListener("pointerdown", clearHighlight, {

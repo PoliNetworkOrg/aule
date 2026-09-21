@@ -25,7 +25,6 @@ export interface OccupationGroup {
   isExam: boolean;
   sessions: OccupationSession[];
   sessionCount?: number;
-  matchedProfessors: string[];
 }
 
 interface OccupationRow extends OccupationSession {
@@ -206,10 +205,6 @@ export function tokenize(query: string): string[] {
   return query.trim().toLowerCase().split(/\s+/).filter(Boolean);
 }
 
-// Shorter tokens ("di", "e") match too many professor surnames to be useful
-// signal for "this query names a professor".
-const PROFESSOR_TOKEN_MIN_LEN = 3;
-
 function rowMatchesToken(row: OccupationRow, token: string): boolean {
   if (row.haystack.includes(token)) return true;
 
@@ -246,7 +241,6 @@ export function runOccupationSearch(query: string) {
         professors: r.professors,
         isExam: r.isExam,
         sessions: [],
-        matchedProfessors: [],
       };
       groups.set(key, g);
     }
@@ -265,22 +259,9 @@ export function runOccupationSearch(query: string) {
 
   const list = [...groups.values()];
 
-  // Professor mode only kicks in when every meaningful token names a
-  // professor — a mixed "course professor" query highlights just the clicked
-  // lesson instead of that professor's whole schedule.
-  const professorTokens = tokens.filter((tok) => tok.length >= PROFESSOR_TOKEN_MIN_LEN);
-
   for (const g of list) {
     g.sessions.sort((a, b) => (a.date + a.inizio).localeCompare(b.date + b.inizio));
     g.sessionCount = g.sessions.length;
-
-    const isProfessorQuery =
-      professorTokens.length > 0 &&
-      professorTokens.every((tok) => g.professors.some((p) => p.toLowerCase().includes(tok)));
-
-    g.matchedProfessors = isProfessorQuery
-      ? g.professors.filter((p) => professorTokens.some((tok) => p.toLowerCase().includes(tok)))
-      : [];
   }
 
   list.sort((a, b) =>
