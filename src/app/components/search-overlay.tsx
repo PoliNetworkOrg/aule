@@ -37,6 +37,7 @@ function formatDate(value: string, formatter: Intl.DateTimeFormat) {
   return Number.isNaN(date.getTime()) ? value : formatter.format(date);
 }
 
+/** Renders a search result group's sessions, tagging each with the data needed to open and highlight it in the classroom detail view. */
 function EventCard({
   group: g,
   maxSessions,

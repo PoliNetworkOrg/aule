@@ -262,6 +262,7 @@ class ClassroomDetail {
     this._contentEvents.abort();
     flushSync(() => this._root?.render(null));
   }
+  /** Tears down all timers, listeners, and React roots owned by this instance. */
   destroy() {
     this._generation++;
     this._pendingTrigger = null;
@@ -292,7 +293,7 @@ class ClassroomDetail {
     });
   }
 
-  // Called by the React application lifecycle after the directory loads.
+  /** Called by the React application lifecycle after the directory loads. */
   init(staticData: Campus[]) {
     this._generation++;
     this._disposed = false;
@@ -524,6 +525,7 @@ class ClassroomDetail {
     }
   }
 
+  /** Closes the detail overlay without the close animation, e.g. when navigating to the info page. */
   _silentClose() {
     if (!this._overlay || this._overlay!.hidden) return;
     this._currentId = null;
@@ -540,6 +542,7 @@ class ClassroomDetail {
 
   // ---------- OPEN ----------
 
+  /** Opens the detail overlay for a classroom, carrying over any query context or search highlight from the trigger. */
   async _doOpen(id: number, pending: OpenTrigger | null) {
     const generation = this._generation;
 
@@ -717,6 +720,7 @@ class ClassroomDetail {
 
   // ---------- CLOSE ----------
 
+  /** Closes the detail overlay with its close animation, resetting the open/query/highlight state. */
   _doClose() {
     const generation = this._generation;
 
@@ -1028,6 +1032,11 @@ class ClassroomDetail {
 
   // ---------- RENDER: WEEKLY SCHEDULE ----------
 
+  /**
+   * Renders the weekly schedule tab for a classroom: day picker, timeline
+   * blocks, and the occupation popover, including auto-selecting and
+   * highlighting a searched day/lesson when one was carried over.
+   */
   _loadSchedule(classroomId: number) {
     this._scheduleRevision++;
     clearInterval(this._nowTimer);

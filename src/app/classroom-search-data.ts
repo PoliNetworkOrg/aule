@@ -199,22 +199,28 @@ function ensureOccIndex() {
   }
 }
 
-// Splits a query into lowercase words, order-independent — "rossi analisi"
-// and "analisi rossi" tokenize the same.
+/**
+ * Splits a query into lowercase words, order-independent — "rossi analisi"
+ * and "analisi rossi" tokenize the same.
+ */
 export function tokenize(query: string): string[] {
   return query.trim().toLowerCase().split(/\s+/).filter(Boolean);
 }
 
+/**
+ * Whether a single search token matches a row, also trying the token with
+ * leading zeros stripped (codes are stored as ints, so a leading zero the
+ * user typed — "061182" — is gone from the haystack, "61182").
+ */
 function rowMatchesToken(row: OccupationRow, token: string): boolean {
   if (row.haystack.includes(token)) return true;
 
-  // Codes are stored as ints, so a leading zero the user typed ("061182") is
-  // gone from the haystack ("61182") — match on both.
   const alt = token.replace(/^0+/, "");
 
   return alt !== "" && alt !== token && row.haystack.includes(alt);
 }
 
+/** Finds occupation rows matching every token of `query`, in any order, grouped by course/section. */
 export function runOccupationSearch(query: string) {
   ensureOccIndex();
   const tokens = tokenize(query);

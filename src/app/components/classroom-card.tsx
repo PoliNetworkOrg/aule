@@ -33,10 +33,12 @@ export function FilledStar() {
   );
 }
 
+/** Escapes regex-special characters so `text` can be embedded literally in a `RegExp`. */
 function escapeRegExp(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+/** Wraps every match of `query` (as a whole phrase or as individual tokens) in `<mark>`. */
 export function Highlight({ text, query = "" }: { text: string; query?: string }) {
   if (!query) return text;
   const fullPattern = escapeRegExp(query).replace(/ /g, "[\\s.]");
