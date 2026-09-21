@@ -25,6 +25,7 @@ export interface OccupationGroup {
   isExam: boolean;
   sessions: OccupationSession[];
   sessionCount?: number;
+  matchedProfessors: string[];
 }
 
 interface OccupationRow extends OccupationSession {
@@ -199,20 +200,34 @@ function ensureOccIndex() {
   }
 }
 
-export function runOccupationSearch(query: string) {
-  ensureOccIndex();
-  const q = query.trim().toLowerCase();
+// Splits a query into lowercase words, order-independent — "rossi analisi"
+// and "analisi rossi" tokenize the same.
+export function tokenize(query: string): string[] {
+  return query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+}
 
-  if (!q || occIndex!.length === 0)
-    return { groups: [], total: 0, capped: false, maxSessions: OCC_MAX_SESSIONS };
+// Shorter tokens ("di", "e") match too many professor surnames to be useful
+// signal for "this query names a professor".
+const PROFESSOR_TOKEN_MIN_LEN = 3;
+
+function rowMatchesToken(row: OccupationRow, token: string): boolean {
+  if (row.haystack.includes(token)) return true;
 
   // Codes are stored as ints, so a leading zero the user typed ("061182") is
   // gone from the haystack ("61182") — match on both.
-  const qAlt = q.replace(/^0+/, "");
+  const alt = token.replace(/^0+/, "");
 
-  const matched = occIndex!.filter(
-    (r) => r.haystack.includes(q) || (qAlt && qAlt !== q && r.haystack.includes(qAlt)),
-  );
+  return alt !== "" && alt !== token && row.haystack.includes(alt);
+}
+
+export function runOccupationSearch(query: string) {
+  ensureOccIndex();
+  const tokens = tokenize(query);
+
+  if (!tokens.length || occIndex!.length === 0)
+    return { groups: [], total: 0, capped: false, maxSessions: OCC_MAX_SESSIONS };
+
+  const matched = occIndex!.filter((r) => tokens.every((tok) => rowMatchesToken(r, tok)));
 
   const groups = new Map<string, OccupationGroup>();
 
@@ -231,6 +246,7 @@ export function runOccupationSearch(query: string) {
         professors: r.professors,
         isExam: r.isExam,
         sessions: [],
+        matchedProfessors: [],
       };
       groups.set(key, g);
     }
@@ -249,9 +265,22 @@ export function runOccupationSearch(query: string) {
 
   const list = [...groups.values()];
 
+  // Professor mode only kicks in when every meaningful token names a
+  // professor — a mixed "course professor" query highlights just the clicked
+  // lesson instead of that professor's whole schedule.
+  const professorTokens = tokens.filter((tok) => tok.length >= PROFESSOR_TOKEN_MIN_LEN);
+
   for (const g of list) {
     g.sessions.sort((a, b) => (a.date + a.inizio).localeCompare(b.date + b.inizio));
     g.sessionCount = g.sessions.length;
+
+    const isProfessorQuery =
+      professorTokens.length > 0 &&
+      professorTokens.every((tok) => g.professors.some((p) => p.toLowerCase().includes(tok)));
+
+    g.matchedProfessors = isProfessorQuery
+      ? g.professors.filter((p) => professorTokens.some((tok) => p.toLowerCase().includes(tok)))
+      : [];
   }
 
   list.sort((a, b) =>

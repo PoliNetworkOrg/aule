@@ -9,6 +9,7 @@ import {
 import { onTranslationChange, getTranslationVersion, t } from "../i18n";
 import { fetchPhotoUrl, photoUrlCache } from "../utils/photo";
 import { isFavourite } from "../utils/favourites";
+import { tokenize } from "../classroom-search-data";
 import type { Building, Classroom, ClassroomStatus } from "../types";
 
 export function subscribeFavourites(listener: () => void) {
@@ -32,9 +33,15 @@ export function FilledStar() {
   );
 }
 
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 export function Highlight({ text, query = "" }: { text: string; query?: string }) {
   if (!query) return text;
-  const pattern = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/ /g, "[\\s.]");
+  const fullPattern = escapeRegExp(query).replace(/ /g, "[\\s.]");
+  const tokenPatterns = tokenize(query).map(escapeRegExp);
+  const pattern = [fullPattern, ...tokenPatterns].sort((a, b) => b.length - a.length).join("|");
 
   return text
     .split(new RegExp(`(${pattern})`, "gi"))
