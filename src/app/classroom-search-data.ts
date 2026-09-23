@@ -79,11 +79,13 @@ export function runClassroomSearch(query: string) {
   if (!searchIndex) searchIndex = buildSearchIndex();
   const q = query.trim().toLowerCase();
   const qDotted = q.replace(/\s+/g, ".");
+  const qCompact = compactName(q);
 
   const results = searchIndex.filter(
     (room) =>
       room.name.toLowerCase().includes(q) ||
       room.name.toLowerCase().includes(qDotted) ||
+      (qCompact !== "" && compactName(room.name).includes(qCompact)) ||
       room.buildingName.toLowerCase().includes(q) ||
       (room.buildingAltName && room.buildingAltName.toLowerCase().includes(q)) ||
       room.campusName.toLowerCase().includes(q),
@@ -96,6 +98,14 @@ export function runClassroomSearch(query: string) {
     total: results.length,
     capped,
   };
+}
+
+/** Separators ignored when matching room names, so "T11" finds "T.1.1". */
+export const ROOM_NAME_SEPARATORS = /[\s._\-/]+/g;
+
+/** Lowercases `name` and drops its separators — "T.1.1" and "t 1-1" both become "t11". */
+export function compactName(name: string): string {
+  return name.toLowerCase().replace(ROOM_NAME_SEPARATORS, "");
 }
 
 function buildSearchIndex() {
@@ -199,20 +209,36 @@ function ensureOccIndex() {
   }
 }
 
+/**
+ * Splits a query into lowercase words, order-independent — "rossi analisi"
+ * and "analisi rossi" tokenize the same.
+ */
+export function tokenize(query: string): string[] {
+  return query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+}
+
+/**
+ * Whether a single search token matches a row, also trying the token with
+ * leading zeros stripped (codes are stored as ints, so a leading zero the
+ * user typed — "061182" — is gone from the haystack, "61182").
+ */
+function rowMatchesToken(row: OccupationRow, token: string): boolean {
+  if (row.haystack.includes(token)) return true;
+
+  const alt = token.replace(/^0+/, "");
+
+  return alt !== "" && alt !== token && row.haystack.includes(alt);
+}
+
+/** Finds occupation rows matching every token of `query`, in any order, grouped by course/section. */
 export function runOccupationSearch(query: string) {
   ensureOccIndex();
-  const q = query.trim().toLowerCase();
+  const tokens = tokenize(query);
 
-  if (!q || occIndex!.length === 0)
+  if (!tokens.length || occIndex!.length === 0)
     return { groups: [], total: 0, capped: false, maxSessions: OCC_MAX_SESSIONS };
 
-  // Codes are stored as ints, so a leading zero the user typed ("061182") is
-  // gone from the haystack ("61182") — match on both.
-  const qAlt = q.replace(/^0+/, "");
-
-  const matched = occIndex!.filter(
-    (r) => r.haystack.includes(q) || (qAlt && qAlt !== q && r.haystack.includes(qAlt)),
-  );
+  const matched = occIndex!.filter((r) => tokens.every((tok) => rowMatchesToken(r, tok)));
 
   const groups = new Map<string, OccupationGroup>();
 

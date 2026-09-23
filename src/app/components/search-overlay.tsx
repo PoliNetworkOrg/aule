@@ -37,6 +37,7 @@ function formatDate(value: string, formatter: Intl.DateTimeFormat) {
   return Number.isNaN(date.getTime()) ? value : formatter.format(date);
 }
 
+/** Renders a search result group's sessions, tagging each with the data needed to open and highlight it in the classroom detail view. */
 function EventCard({
   group: g,
   maxSessions,
@@ -85,6 +86,9 @@ function EventCard({
             type="button"
             className="search-event-session liquid-glass"
             data-open-classroom={s.roomId}
+            data-highlight-date={s.date}
+            data-highlight-from={s.inizio}
+            data-highlight-to={s.fine}
           >
             <span className="ses-when">
               {formatDate(s.date, dateFmt)} · {formatTime(s.inizio, timeFmt)}–
