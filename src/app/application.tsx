@@ -651,6 +651,18 @@ export function mountApplication() {
     toPicker.min = formatMins(minToMins);
   }
 
+  // The per-date merge in fetchClassroomsData() can leave entries with
+  // different generated_at values (some days refreshed, others kept from a
+  // previous run after a partial fetch failure). Using classroomsData[0]
+  // alone would show "fresh" while older days are stale, or vice versa, so
+  // freshness is judged from the oldest entry across all days.
+  function oldestGeneratedAt(): string {
+    return classroomsData.reduce(
+      (oldest, entry) => (entry.generated_at < oldest ? entry.generated_at : oldest),
+      classroomsData[0].generated_at,
+    );
+  }
+
   function setupDataFetchIndicator() {
     const indicator = document.getElementById("data-fetch-indicator")!;
 
@@ -665,7 +677,7 @@ export function mountApplication() {
     // Deriving them from the browser's local clock instead would misjudge
     // freshness by a day for anyone not in Italy's timezone.
     const todayKey = formatRomeYYYYMMDD(new Date());
-    const generationKey = formatRomeYYYYMMDD(new Date(classroomsData[0].generated_at + "Z"));
+    const generationKey = formatRomeYYYYMMDD(new Date(oldestGeneratedAt() + "Z"));
 
     const hasFutureData = classroomsData.some((entry) => entry.date > todayKey);
 
@@ -690,9 +702,7 @@ export function mountApplication() {
     const status =
       (["green", "yellow", "red"] as const).find((s) => indicator.classList.contains(s)) ?? "red";
 
-    const generationDate = classroomsData[0]
-      ? new Date(classroomsData[0].generated_at + "Z")
-      : null;
+    const generationDate = classroomsData.length ? new Date(oldestGeneratedAt() + "Z") : null;
 
     renderDataFetchStatus(status, generationDate, reloadOccupancyData, animate);
   }

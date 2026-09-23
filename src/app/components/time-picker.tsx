@@ -21,6 +21,7 @@ export interface TimeCard extends HTMLButtonElement {
 
 import { t, onLanguageSwitch, animateI18nElement } from "../i18n.ts";
 import { createTimeFormatter } from "../utils/time-format.ts";
+import { getRomeNow } from "../available-rooms-script.ts";
 import { snapGeometry, morphGeometry, hideInnerBoxInstantly, unhideInnerBox } from "vitrium";
 
 const TRANSITION_DURATION = 420; // ms — must match CSS
@@ -483,7 +484,7 @@ export function TimePicker({ input }: { input: HTMLInputElement }) {
     popup.querySelector<HTMLElement>(".tp-quick-now")?.addEventListener(
       "click",
       () => {
-        const now = new Date();
+        const now = getRomeNow();
         applyPreset(now.getHours(), now.getMinutes());
       },
       { signal },
@@ -492,7 +493,7 @@ export function TimePicker({ input }: { input: HTMLInputElement }) {
     popup.querySelector<HTMLElement>(".tp-quick-preset")!.addEventListener(
       "click",
       () => {
-        const now = new Date();
+        const now = getRomeNow();
 
         if (isFrom) {
           // Clamp instead of wrapping past midnight — in the last 15 minutes
@@ -546,7 +547,7 @@ export function TimePicker({ input }: { input: HTMLInputElement }) {
 
     function updateQuickLabel() {
       if (isFrom) {
-        const now = new Date();
+        const now = getRomeNow();
         const h = now.getMinutes() >= 45 ? Math.min(now.getHours() + 1, 23) : now.getHours();
 
         const maxVal = popupInput.max || "20:15";

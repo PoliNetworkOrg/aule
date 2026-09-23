@@ -324,6 +324,11 @@ function SettingsPopup() {
     if (!popup.current || !overlay.current || !trigger) return;
 
     const motion = bindSettingsMotion(popup.current, trigger, overlay.current, () => {
+      // The results list's "partial" filter button (available-results.tsx)
+      // writes SHOW_PARTIAL_KEY directly to localStorage without going
+      // through this popup, which only reads it once on mount — resync here
+      // on every open so the two stay in agreement.
+      setShowPartial(storedToggle(SHOW_PARTIAL_KEY, true));
       controls.current.forEach((control) => control.refresh({ snap: true }));
       refreshCampus.current?.();
     });
