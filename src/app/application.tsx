@@ -58,9 +58,12 @@ export function mountApplication() {
 
   // initOccupancyData() and startApplication()'s own setupTimePickers() call
   // race each other — both start from an unawaited fire-and-forget branch.
-  // If occupancy resolves first, an auto-search submit would fire with the
+  // If occupancy resolves first, the date picker would pick its initial day
+  // before preferInitialDate is set (missing the after-20:15 "tomorrow"
+  // switch), and an auto-search submit would fire with the
   // #from-time-picker/#to-time-picker inputs still empty (no HTML default
-  // value). Gate the auto-search on this instead of assuming ordering.
+  // value). Gate the occupancy-dependent setup on this instead of assuming
+  // ordering.
   let resolveTimePickersReady: () => void;
 
   const timePickersReady = new Promise<void>((resolve) => {
@@ -471,6 +474,12 @@ export function mountApplication() {
 
       if (disposed) return;
 
+      // Wait for setupTimePickers() so preferInitialDate is set before the
+      // date picker picks its initial day — see timePickersReady above.
+      await timePickersReady;
+
+      if (disposed) return;
+
       // Use the fetched data to set the only valid dates into the date picker
       setupDatePicker(() => preferInitialDate);
       document.getElementById("available-classrooms-form")!.removeAttribute("data-loading");
@@ -487,12 +496,6 @@ export function mountApplication() {
       const autoSearchEnabled = localStorage.getItem(AUTO_SEARCH_KEY) !== "false";
 
       if (autoSearchEnabled) {
-        // Wait for setupTimePickers() so #from-time-picker/#to-time-picker
-        // are actually populated before submitting — see
-        // timePickersReady above.
-        await timePickersReady;
-
-        if (disposed) return;
         document
           .getElementById("available-classrooms-form")!
           .dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
