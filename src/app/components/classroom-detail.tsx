@@ -27,9 +27,16 @@ interface QueryContext {
   to: string;
 }
 
+interface ScheduleHighlight {
+  date: string;
+  from: string;
+  to: string;
+}
+
 interface OpenTrigger {
   cardEl: HTMLElement;
   queryContext: QueryContext | null;
+  highlight: ScheduleHighlight | null;
 }
 
 interface PhotoState {
@@ -132,29 +139,29 @@ function timeToMinutes(time: string) {
   return h * 60 + m;
 }
 
-// A short accessible name for a schedule block — the full detail (course
-// code, professors, ...) is in the popover (OccupationPopover), which isn't
-// wired to the block through ARIA, so screen-reader users need at least this
-// much just from tabbing to the block itself.
-function slotAriaLabel(slot: Occupation) {
-  const title = slot.course ?? slot.name ?? slot.raw ?? t("detail.occupied");
-  const timeRange = `${minutesToTimeDisplay(timeToMinutes(slot.inizio))} – ${minutesToTimeDisplay(timeToMinutes(slot.fine))}`;
+/** Name of an occupancy slot: the parsed course/exam title when there is one, the raw scraped text otherwise. */
+function occupationTitle(slot: Occupation) {
+  return (
+    (slot.category === "COURSE" || slot.category === "EXAM" ? slot.course : slot.raw) ??
+    slot.name ??
+    t("detail.occupied")
+  );
+}
 
-  return `${title}, ${timeRange}`;
+/** Time range of an occupancy slot, as shown in the popover and read out by screen readers. */
+function occupationTimeRange(slot: Occupation) {
+  return `${minutesToTimeDisplay(timeToMinutes(slot.inizio))} – ${minutesToTimeDisplay(timeToMinutes(slot.fine))}`;
 }
 
 // Builds the popover body for a single occupancy slot. Course/exam slots carry
 // structured fields (course, code, professors, section); anything the scrape
 // couldn't parse only has `raw`; very old cached data may only have `name`.
 function OccupationPopover({ slot }: { slot: Occupation }) {
-  const timeRange = `${minutesToTimeDisplay(timeToMinutes(slot.inizio))} – ${minutesToTimeDisplay(timeToMinutes(slot.fine))}`;
-
-  let titleText;
+  const timeRange = occupationTimeRange(slot);
+  const titleText = occupationTitle(slot);
   const metaLines: ReactNode[] = [];
 
   if (slot.category === "COURSE" || slot.category === "EXAM") {
-    titleText = slot.course ?? slot.name ?? t("detail.occupied");
-
     if (slot.category === "EXAM") {
       metaLines.push(
         <>
@@ -184,8 +191,6 @@ function OccupationPopover({ slot }: { slot: Occupation }) {
         </>,
       );
     }
-  } else {
-    titleText = slot.raw ?? slot.name ?? t("detail.occupied");
   }
 
   return (
@@ -217,6 +222,8 @@ class ClassroomDetail {
   _currentId: number | null = null;
   _savedScrollPos = 0;
   _queryContext: QueryContext | null = null;
+  _highlight: ScheduleHighlight | null = null;
+  _highlightConsumed = false;
   _nowTimer: number | undefined;
   _timelinePopoverCleanup: (() => void) | null = null;
   _root: Root | null = null;
@@ -266,11 +273,13 @@ class ClassroomDetail {
     this._contentEvents.abort();
     flushSync(() => this._root?.render(null));
   }
+  /** Tears down all timers, listeners, and React roots owned by this instance. */
   destroy() {
     this._generation++;
     this._pendingTrigger = null;
     this._openTrigger = null;
     this._queryContext = null;
+    this._highlight = null;
     this._openedViaPushState = false;
     this._disposed = true;
     this._events.abort();
@@ -295,7 +304,7 @@ class ClassroomDetail {
     });
   }
 
-  // Called by the React application lifecycle after the directory loads.
+  /** Called by the React application lifecycle after the directory loads. */
   init(staticData: Campus[]) {
     this._generation++;
     this._disposed = false;
@@ -431,7 +440,16 @@ class ClassroomDetail {
             ? { date: queryDate, from: queryFrom, to: queryTo }
             : null;
 
-        this._pendingTrigger = { queryContext, cardEl: card };
+        const highlightDate = card.dataset.highlightDate ?? null;
+        const highlightFrom = card.dataset.highlightFrom ?? null;
+        const highlightTo = card.dataset.highlightTo ?? null;
+
+        const highlight =
+          highlightDate && highlightFrom && highlightTo
+            ? { date: highlightDate, from: highlightFrom, to: highlightTo }
+            : null;
+
+        this._pendingTrigger = { queryContext, highlight, cardEl: card };
         this._openedViaPushState = true;
         this._buildFlatIndex();
         const _entry = this._flatIndex?.get(id);
@@ -518,6 +536,7 @@ class ClassroomDetail {
     }
   }
 
+  /** Closes the detail overlay without the close animation, e.g. when navigating to the info page. */
   _silentClose() {
     if (!this._overlay || this._overlay!.hidden) return;
     this._currentId = null;
@@ -529,10 +548,12 @@ class ClassroomDetail {
     this._clearContent();
     this._openTrigger = null;
     this._queryContext = null;
+    this._highlight = null;
   }
 
   // ---------- OPEN ----------
 
+  /** Opens the detail overlay for a classroom, carrying over any query context or search highlight from the trigger. */
   async _doOpen(id: number, pending: OpenTrigger | null) {
     const generation = this._generation;
 
@@ -546,6 +567,8 @@ class ClassroomDetail {
     this._currentId = id;
     this._openTrigger = pending ?? null;
     this._queryContext = pending?.queryContext ?? null;
+    this._highlight = pending?.highlight ?? null;
+    this._highlightConsumed = false;
 
     // Save scroll position for when we return
     this._savedScrollPos = window.scrollY;
@@ -708,6 +731,7 @@ class ClassroomDetail {
 
   // ---------- CLOSE ----------
 
+  /** Closes the detail overlay with its close animation, resetting the open/query/highlight state. */
   _doClose() {
     const generation = this._generation;
 
@@ -724,6 +748,7 @@ class ClassroomDetail {
       this._clearContent();
       this._openTrigger = null;
       this._queryContext = null;
+      this._highlight = null;
       this._overlay!.style.viewTransitionName = "";
 
       if (headerEl) headerEl.style.viewTransitionName = "";
@@ -1030,6 +1055,11 @@ class ClassroomDetail {
 
   // ---------- RENDER: WEEKLY SCHEDULE ----------
 
+  /**
+   * Renders the weekly schedule tab for a classroom: day picker, timeline
+   * blocks, and the occupation popover, including auto-selecting and
+   * highlighting a searched day/lesson when one was carried over.
+   */
   _loadSchedule(classroomId: number) {
     this._scheduleRevision++;
     clearInterval(this._nowTimer);
@@ -1116,6 +1146,7 @@ class ClassroomDetail {
 
       // Query context: from/to range carried over from the Available Tab
       const queryDateKey = this._queryContext?.date?.replace(/-/g, "") ?? null;
+      const highlightDateKey = this._highlight?.date?.replace(/-/g, "") ?? null;
 
       let queryFromPct = null,
         queryToPct = null,
@@ -1199,14 +1230,23 @@ class ClassroomDetail {
           const width = (((e - s) / total) * 100).toFixed(2);
           const slotIdx = scheduleSlots.push(slot) - 1;
 
+          const isPrimaryHighlight =
+            highlightDateKey !== null &&
+            dayData.date === highlightDateKey &&
+            slot.inizio === this._highlight?.from &&
+            slot.fine === this._highlight?.to;
+
           return (
             <>
               <div
-                className={"detail-schedule-block"}
+                className={
+                  "detail-schedule-block" +
+                  (isPrimaryHighlight ? " detail-schedule-block--highlight" : "")
+                }
                 data-slot-idx={slotIdx}
                 tabIndex={0}
                 role={"button"}
-                aria-label={slotAriaLabel(slot)}
+                aria-label={`${occupationTimeRange(slot)} ${occupationTitle(slot)}`}
                 style={cssVars({
                   "--block-start": left + "%",
                   "--block-size": width + "%",
@@ -1493,6 +1533,23 @@ class ClassroomDetail {
       const gridEl = container.querySelector<HTMLElement>(".detail-schedule-bars");
       const rowEls = gridEl!.querySelectorAll<HTMLElement>(".detail-schedule-row");
 
+      // The highlight is a one-shot cue for the lesson the user just searched
+      // for — the first tap, keypress or day change inside the schedule drops it.
+      const clearHighlight = () => {
+        if (!this._highlight) return;
+        this._highlight = null;
+        container
+          .querySelectorAll(".detail-schedule-block--highlight")
+          .forEach((el) => el.classList.remove("detail-schedule-block--highlight"));
+      };
+
+      container.addEventListener("pointerdown", clearHighlight, {
+        signal: this._scheduleEvents.signal,
+      });
+      container.addEventListener("keydown", clearHighlight, {
+        signal: this._scheduleEvents.signal,
+      });
+
       let selectedDayIndex = 0;
 
       const daySelector = createPillSelector(pickerContainer!, {
@@ -1521,17 +1578,19 @@ class ClassroomDetail {
         if (chip) daySelector.selectElement(chip, opts);
       }
 
-      // Auto-select: prefer the queried day when coming from the Available Tab,
-      // otherwise today, or next available day if after 20:15, or first available
+      // Auto-select: prefer the queried or highlighted day when coming from the
+      // Available Tab or search overlay, otherwise today, or next available day
+      // if after 20:15, or first available
       const todayDayIndex = days.findIndex((d) => d.dayData?.date === todayKey);
       const nowMins = romeMinutesOfDay();
+      const preferredDateKey = queryDateKey ?? highlightDateKey;
       let initialDayIndex;
 
-      if (queryDateKey) {
-        const queryDayIndex = days.findIndex((d) => d.dayData?.date === queryDateKey);
+      if (preferredDateKey) {
+        const preferredDayIndex = days.findIndex((d) => d.dayData?.date === preferredDateKey);
         initialDayIndex =
-          queryDayIndex >= 0
-            ? queryDayIndex
+          preferredDayIndex >= 0
+            ? preferredDayIndex
             : todayDayIndex >= 0
               ? todayDayIndex
               : days.findIndex((d) => d.dayData !== null);
@@ -1730,6 +1789,10 @@ class ClassroomDetail {
 
       const popoverRoot = createRoot(timelinePopoverBody);
       let _popoverBlock: HTMLElement | null = null;
+      // Suppresses the close-on-scroll handler below while the auto-scroll
+      // to a searched lesson is still animating, so it doesn't dismiss the
+      // popover it just opened.
+      let _autoScrolling = false;
 
       const showOccupationPopover = (blockEl: HTMLElement) => {
         const slot = scheduleSlots[Number(blockEl.dataset.slotIdx)];
@@ -1744,6 +1807,46 @@ class ClassroomDetail {
         _popoverBlock = null;
         timelinePopover.hide();
       };
+
+      // Scroll to and open the popover on the searched lesson — once per open,
+      // so a later re-render (language switch, refreshOccupancy) doesn't jump
+      // the page back or re-pop it after the user has moved on.
+      if (this._highlight && !this._highlightConsumed) {
+        this._highlightConsumed = true;
+
+        const primaryBlock = container.querySelector<HTMLElement>(
+          ".detail-schedule-block--highlight",
+        );
+
+        if (primaryBlock) {
+          const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+          showOccupationPopover(primaryBlock);
+          // Keyboard/screen-reader users land on the searched lesson itself, so
+          // its aria-label gets read out, instead of on a page with no clue
+          // which block was the match. Scrolling is handled just below.
+          primaryBlock.focus({ preventScroll: true });
+
+          if (reduceMotion) {
+            primaryBlock.scrollIntoView({ block: "center", behavior: "auto" });
+          } else {
+            const stopAutoScroll = () => {
+              _autoScrolling = false;
+            };
+
+            _autoScrolling = true;
+            primaryBlock.scrollIntoView({ block: "center", behavior: "smooth" });
+            window.addEventListener("scrollend", stopAutoScroll, {
+              once: true,
+              signal: this._scheduleEvents.signal,
+            });
+            // scrollend never fires if the block was already in view (no scroll
+            // happens at all), which would leave the flag stuck and disable
+            // close-on-scroll for the rest of this render.
+            setTimeout(stopAutoScroll, 1000);
+          }
+        }
+      }
 
       {
         // Desktop hover
@@ -1871,7 +1974,11 @@ class ClassroomDetail {
         // On desktop this already happens implicitly (scrolling moves the hovered
         // block out from under a stationary cursor, firing pointerout), but a tap
         // on mobile leaves the popover open with no such gesture to close it.
-        const onScroll = () => hideOccupationPopover();
+        const onScroll = () => {
+          if (_autoScrolling) return;
+          hideOccupationPopover();
+        };
+
         window.addEventListener("scroll", onScroll, {
           capture: true,
           passive: true,
