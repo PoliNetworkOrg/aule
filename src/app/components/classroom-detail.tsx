@@ -1800,15 +1800,20 @@ class ClassroomDetail {
           if (reduceMotion) {
             primaryBlock.scrollIntoView({ block: "center", behavior: "auto" });
           } else {
+            const stopAutoScroll = () => {
+              _autoScrolling = false;
+            };
+
             _autoScrolling = true;
             primaryBlock.scrollIntoView({ block: "center", behavior: "smooth" });
-            window.addEventListener(
-              "scrollend",
-              () => {
-                _autoScrolling = false;
-              },
-              { once: true, signal: this._scheduleEvents.signal },
-            );
+            window.addEventListener("scrollend", stopAutoScroll, {
+              once: true,
+              signal: this._scheduleEvents.signal,
+            });
+            // scrollend never fires if the block was already in view (no scroll
+            // happens at all), which would leave the flag stuck and disable
+            // close-on-scroll for the rest of this render.
+            setTimeout(stopAutoScroll, 1000);
           }
         }
       }
