@@ -137,18 +137,29 @@ function timeToMinutes(time: string) {
   return h * 60 + m;
 }
 
+/** Name of an occupancy slot: the parsed course/exam title when there is one, the raw scraped text otherwise. */
+function occupationTitle(slot: Occupation) {
+  return (
+    (slot.category === "COURSE" || slot.category === "EXAM" ? slot.course : slot.raw) ??
+    slot.name ??
+    t("detail.occupied")
+  );
+}
+
+/** Time range of an occupancy slot, as shown in the popover and read out by screen readers. */
+function occupationTimeRange(slot: Occupation) {
+  return `${minutesToTimeDisplay(timeToMinutes(slot.inizio))} – ${minutesToTimeDisplay(timeToMinutes(slot.fine))}`;
+}
+
 // Builds the popover body for a single occupancy slot. Course/exam slots carry
 // structured fields (course, code, professors, section); anything the scrape
 // couldn't parse only has `raw`; very old cached data may only have `name`.
 function OccupationPopover({ slot }: { slot: Occupation }) {
-  const timeRange = `${minutesToTimeDisplay(timeToMinutes(slot.inizio))} – ${minutesToTimeDisplay(timeToMinutes(slot.fine))}`;
-
-  let titleText;
+  const timeRange = occupationTimeRange(slot);
+  const titleText = occupationTitle(slot);
   const metaLines: ReactNode[] = [];
 
   if (slot.category === "COURSE" || slot.category === "EXAM") {
-    titleText = slot.course ?? slot.name ?? t("detail.occupied");
-
     if (slot.category === "EXAM") {
       metaLines.push(
         <>
@@ -178,8 +189,6 @@ function OccupationPopover({ slot }: { slot: Occupation }) {
         </>,
       );
     }
-  } else {
-    titleText = slot.raw ?? slot.name ?? t("detail.occupied");
   }
 
   return (
@@ -1221,6 +1230,7 @@ class ClassroomDetail {
                 data-slot-idx={slotIdx}
                 tabIndex={0}
                 role={"button"}
+                aria-label={`${occupationTimeRange(slot)} ${occupationTitle(slot)}`}
                 style={cssVars({
                   "--block-start": left + "%",
                   "--block-size": width + "%",
@@ -1796,6 +1806,10 @@ class ClassroomDetail {
           const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
           showOccupationPopover(primaryBlock);
+          // Keyboard/screen-reader users land on the searched lesson itself, so
+          // its aria-label gets read out, instead of on a page with no clue
+          // which block was the match. Scrolling is handled just below.
+          primaryBlock.focus({ preventScroll: true });
 
           if (reduceMotion) {
             primaryBlock.scrollIntoView({ block: "center", behavior: "auto" });
