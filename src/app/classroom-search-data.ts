@@ -79,11 +79,13 @@ export function runClassroomSearch(query: string) {
   if (!searchIndex) searchIndex = buildSearchIndex();
   const q = query.trim().toLowerCase();
   const qDotted = q.replace(/\s+/g, ".");
+  const qCompact = compactName(q);
 
   const results = searchIndex.filter(
     (room) =>
       room.name.toLowerCase().includes(q) ||
       room.name.toLowerCase().includes(qDotted) ||
+      (qCompact !== "" && compactName(room.name).includes(qCompact)) ||
       room.buildingName.toLowerCase().includes(q) ||
       (room.buildingAltName && room.buildingAltName.toLowerCase().includes(q)) ||
       room.campusName.toLowerCase().includes(q),
@@ -96,6 +98,14 @@ export function runClassroomSearch(query: string) {
     total: results.length,
     capped,
   };
+}
+
+/** Separators ignored when matching room names, so "T11" finds "T.1.1". */
+export const ROOM_NAME_SEPARATORS = /[\s._\-/]+/g;
+
+/** Lowercases `name` and drops its separators — "T.1.1" and "t 1-1" both become "t11". */
+export function compactName(name: string): string {
+  return name.toLowerCase().replace(ROOM_NAME_SEPARATORS, "");
 }
 
 function buildSearchIndex() {
