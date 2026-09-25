@@ -1687,84 +1687,108 @@ class ClassroomDetail {
       );
 
       // ---------- TIMELINE HOVER ----------
-      const cursorRoots = new Map<HTMLElement, Root>();
+      // Coalesced to one update per frame: mousemove fires faster than the
+      // display refreshes, and each sample used to read the bar's rect (a
+      // forced layout, since the previous sample had just written styles) and
+      // then flushSync a React render for the time label. Now the latest
+      // sample is stored and applied once in the next animation frame, when
+      // layout is already clean, and the label is plain text.
+      const mobileVerticalMQ = window.matchMedia("(max-width: 599px)");
       let _activeBar: HTMLElement | null = null;
+      let hoverFrame = 0;
+      let hoverBar: HTMLElement | null = null;
+      let hoverX = 0;
+      let hoverY = 0;
+
+      const hideHover = (bar: HTMLElement) => {
+        const prevCursor = bar
+          .closest<HTMLElement>(".detail-schedule-bar-wrapper")
+          ?.querySelector<HTMLElement>(".timeline-hover-cursor");
+
+        if (prevCursor) prevCursor.hidden = true;
+        const prevLine = bar.querySelector<HTMLElement>(".timeline-hover-line");
+
+        if (prevLine) prevLine.hidden = true;
+      };
+
+      const applyHover = () => {
+        hoverFrame = 0;
+        const bar = hoverBar;
+
+        if (_activeBar && _activeBar !== bar) {
+          hideHover(_activeBar);
+          _activeBar = null;
+        }
+
+        if (!bar) return;
+        _activeBar = bar;
+
+        const wrapper = bar.closest<HTMLElement>(".detail-schedule-bar-wrapper");
+        const cursor = wrapper?.querySelector<HTMLElement>(".timeline-hover-cursor");
+        const line = bar.querySelector<HTMLElement>(".timeline-hover-line");
+
+        if (!cursor || !line) return;
+
+        const rect = bar.getBoundingClientRect();
+        const isMobileVertical = mobileVerticalMQ.matches;
+
+        const fraction = isMobileVertical
+          ? Math.max(0, Math.min(1, (hoverY - rect.top) / rect.height))
+          : Math.max(0, Math.min(1, (hoverX - rect.left) / rect.width));
+
+        const minutes = Math.round(DAY_START + fraction * total);
+        const pct = `${(fraction * 100).toFixed(2)}%`;
+
+        if (isMobileVertical) {
+          cursor.style.top = pct;
+          cursor.style.left = "";
+          line.style.top = pct;
+          line.style.left = "";
+        } else {
+          cursor.style.left = pct;
+          cursor.style.top = "";
+          line.style.left = pct;
+          line.style.top = "";
+        }
+
+        const label = minutesToTimeDisplay(minutes);
+
+        if (cursor.textContent !== label) cursor.textContent = label;
+        cursor.hidden = false;
+        line.hidden = false;
+      };
+
+      this._scheduleEvents.signal.addEventListener("abort", () => {
+        if (hoverFrame) cancelAnimationFrame(hoverFrame);
+        hoverFrame = 0;
+      });
+
       container.addEventListener(
         "mousemove",
         (e) => {
-          const bar =
+          hoverBar =
             e.target instanceof Element
               ? e.target.closest<HTMLElement>(".detail-schedule-bar")
               : null;
+          hoverX = e.clientX;
+          hoverY = e.clientY;
 
-          if (_activeBar && _activeBar !== bar) {
-            const prevCursor = _activeBar
-              .closest<HTMLElement>(".detail-schedule-bar-wrapper")
-              ?.querySelector<HTMLElement>(".timeline-hover-cursor");
-
-            if (prevCursor) prevCursor.hidden = true;
-            const prevLine = _activeBar.querySelector<HTMLElement>(".timeline-hover-line");
-
-            if (prevLine) prevLine.hidden = true;
-            _activeBar = null;
-          }
-
-          if (!bar) return;
-          _activeBar = bar;
-
-          const wrapper = bar.closest<HTMLElement>(".detail-schedule-bar-wrapper");
-          const cursor = wrapper?.querySelector<HTMLElement>(".timeline-hover-cursor");
-          const line = bar.querySelector<HTMLElement>(".timeline-hover-line");
-
-          if (!cursor || !line) return;
-
-          const rect = bar.getBoundingClientRect();
-          const isMobileVertical = window.matchMedia("(max-width: 599px)").matches;
-
-          const fraction = isMobileVertical
-            ? Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height))
-            : Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-
-          const minutes = Math.round(DAY_START + fraction * total);
-          const pct = `${(fraction * 100).toFixed(2)}%`;
-
-          if (isMobileVertical) {
-            cursor.style.top = pct;
-            cursor.style.left = "";
-            line.style.top = pct;
-            line.style.left = "";
-          } else {
-            cursor.style.left = pct;
-            cursor.style.top = "";
-            line.style.left = pct;
-            line.style.top = "";
-          }
-
-          let cursorRoot = cursorRoots.get(cursor);
-
-          if (!cursorRoot) {
-            cursorRoot = createRoot(cursor);
-            cursorRoots.set(cursor, cursorRoot);
-          }
-
-          flushSync(() => cursorRoot.render(minutesToTimeDisplay(minutes)));
-          cursor.hidden = false;
-          line.hidden = false;
+          if (!hoverFrame) hoverFrame = requestAnimationFrame(applyHover);
         },
-        { signal: this._scheduleEvents.signal },
+        { signal: this._scheduleEvents.signal, passive: true },
       );
       container.addEventListener(
         "mouseleave",
         () => {
+          hoverBar = null;
+
+          if (hoverFrame) {
+            cancelAnimationFrame(hoverFrame);
+            hoverFrame = 0;
+          }
+
           if (_activeBar) {
-            const prevCursor = _activeBar
-              .closest<HTMLElement>(".detail-schedule-bar-wrapper")
-              ?.querySelector<HTMLElement>(".timeline-hover-cursor");
-
-            if (prevCursor) prevCursor.hidden = true;
-            const prevLine = _activeBar.querySelector<HTMLElement>(".timeline-hover-line");
-
-            if (prevLine) prevLine.hidden = true;
+            hideHover(_activeBar);
             _activeBar = null;
           }
         },
@@ -1990,7 +2014,6 @@ class ClassroomDetail {
         daySelector.destroy();
         timelinePopover.destroy();
         popoverRoot.unmount();
-        cursorRoots.forEach((root) => root.unmount());
       };
     } catch (err) {
       console.error("ClassroomDetail: Error rendering schedule:", err);

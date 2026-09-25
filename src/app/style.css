@@ -1040,16 +1040,19 @@ body.info-open .header-nav-row {
   animation: appear 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/* opacity + transform only. These run on the *whole* tab (hundreds of photo
+   cards on Available) and on the search overlay; a `filter: blur()` keyframe
+   here re-rasterizes that entire subtree through a blur every frame, which
+   was dropping most of the 0.3s to 50-60ms frames on the tab switch.
+   Compositor-only properties keep it at a steady frame rate. */
 @keyframes appear {
   from {
     opacity: 0;
-    filter: blur(8px);
     transform: scale(0.95, 1);
   }
 
   to {
     opacity: 1;
-    filter: blur(0);
     transform: scale(1, 1);
   }
 }
@@ -1057,13 +1060,11 @@ body.info-open .header-nav-row {
 @keyframes disappear {
   from {
     opacity: 1;
-    filter: blur(0);
     transform: scale(1);
   }
 
   to {
     opacity: 0;
-    filter: blur(8px);
     transform: scale(0.95);
   }
 }

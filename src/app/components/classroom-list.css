@@ -271,21 +271,25 @@
   animation: none !important;
 }
 
-/* Also disable the parent tab-content animation if it has appeared once */
-:has(> .list-outer-container.appeared) {
+/* Also disable the tab-content animation once the list has appeared. The
+   list isn't a direct child of .tab-content (.available-classrooms-container
+   sits between them), so a `>` combinator here silently matched nothing and
+   the whole-tab animation re-ran on every tab switch. */
+.tab-content:has(.list-outer-container.appeared) {
   animation: none !important;
 }
 
+/* opacity + transform only: 100+ cards animate this at once on first load,
+   and a per-card `filter: blur()` keyframe made each one a filtered layer
+   re-rasterized every frame. */
 @keyframes card-appear {
   from {
     opacity: 0;
     transform: translateY(12px);
-    filter: blur(4px);
   }
   to {
     opacity: 1;
     transform: translateY(0);
-    filter: blur(0);
   }
 }
 
