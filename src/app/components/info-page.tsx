@@ -27,7 +27,6 @@ interface GithubStats {
   commits?: number | null;
   langs?: Record<string, number> | null;
   contributors?: GithubContributor[] | null;
-  stargazers?: GithubUser[] | null;
 }
 
 interface StatsCache {
@@ -38,9 +37,13 @@ interface StatsCache {
 import { openPage, closePage, goBack } from "../../lib/navigation";
 import { queryClient } from "../../lib/query";
 import { onLanguageSwitch, t } from "../i18n.ts";
-import { safeUrl } from "../utils/html.ts";
+import { safeUrl, appendSafeUrlParam } from "../utils/html.ts";
 
-const GITHUB_REPO = "SummaCristian/poliaule";
+// This app now lives at PoliNetworkOrg/aule (the SummaCristian/PoliAule
+// upstream it was ported from is being retired) — point stats/links here.
+const GITHUB_REPO = "PoliNetworkOrg/aule";
+
+const GITHUB_REPO_URL = `https://github.com/${GITHUB_REPO}`;
 
 const STATS_CACHE_KEY = "poliaule_github_stats";
 
@@ -106,23 +109,6 @@ class InfoPage {
     this._logoEl = document.querySelector<HTMLElement>(".header-logo");
     this._titleEl = document.querySelector<HTMLElement>(".header-title");
     this._badgeEl = document.getElementById("env-badge");
-
-    // Haptics for interactive GitHub elements
-    this._overlay?.addEventListener(
-      "click",
-      (e) => {
-        if (!(e.target instanceof Element)) return;
-
-        if (
-          e.target.closest(".github-stat-card") ||
-          e.target.closest(".contributor-item") ||
-          e.target.closest(".github-repo-chip") ||
-          e.target.closest(".create-issue-btn")
-        ) {
-        }
-      },
-      { signal: this._events.signal },
-    );
 
     document.getElementById("info-trigger")?.addEventListener(
       "click",
@@ -568,7 +554,7 @@ class InfoPage {
     }
 
     try {
-      const { repo, commits, langs, contributors, stargazers } = await queryClient.fetchQuery({
+      const { repo, commits, langs, contributors } = await queryClient.fetchQuery({
         queryKey: ["github-stats", GITHUB_REPO],
         // The complete in-memory/localStorage caches above own freshness.
         // Partial responses must retry on the next render, as upstream does.
@@ -577,12 +563,11 @@ class InfoPage {
           const base = `https://api.github.com/repos/${GITHUB_REPO}`;
           const hdrs = { headers: { Accept: "application/vnd.github+json" } };
 
-          const [repoRes, commitsRes, langsRes, contribRes, stargazersRes] = await Promise.all([
+          const [repoRes, commitsRes, langsRes, contribRes] = await Promise.all([
             fetch(base, hdrs),
             fetch(`${base}/commits?per_page=1`, hdrs),
             fetch(`${base}/languages`, hdrs),
             fetch(`${base}/contributors?per_page=10`, hdrs),
-            fetch(`${base}/stargazers?per_page=3`, hdrs),
           ]);
 
           if (!repoRes.ok) throw new Error(`GitHub API ${repoRes.status}`);
@@ -602,11 +587,7 @@ class InfoPage {
             ? await contribRes.json()
             : null;
 
-          const stargazers: GithubUser[] | null = stargazersRes.ok
-            ? await stargazersRes.json()
-            : null;
-
-          return { repo, commits, langs, contributors, stargazers };
+          return { repo, commits, langs, contributors };
         },
       });
 
@@ -617,8 +598,6 @@ class InfoPage {
       if (langs) this._cachedStats.langs = langs;
 
       if (contributors?.length) this._cachedStats.contributors = contributors;
-
-      if (stargazers?.length) this._cachedStats.stargazers = stargazers;
 
       this._applyGithubStats(this._cachedStats);
       this._persistStatsCache();
@@ -966,7 +945,7 @@ function InfoContent({
                   <RichText text={t("info.github.title")} />
                 </h2>
                 <a
-                  href={"https://github.com/SummaCristian/poliaule"}
+                  href={GITHUB_REPO_URL}
                   target={"_blank"}
                   rel={"noopener"}
                   className={"github-repo-chip"}
@@ -983,14 +962,12 @@ function InfoContent({
               </div>
               <div className={"github-stats-grid"}>
                 <a
-                  href={"https://github.com/SummaCristian/poliaule/stargazers"}
+                  href={`${GITHUB_REPO_URL}/stargazers`}
                   target={"_blank"}
                   rel={"noopener"}
                   className={"github-stat-card"}
                 >
-                  <div className="star-avatars" data-github="stargazers">
-                    <Stargazers stargazers={stats?.stargazers} />
-                  </div>
+                  <i className="hgi-stroke hgi-star github-stat-icon" aria-hidden="true" />
                   <span className={"github-stat-number"} data-stat={"stars"}>
                     {stats?.repo?.stargazers_count.toLocaleString() ?? "—"}
                   </span>
@@ -999,7 +976,7 @@ function InfoContent({
                   </span>
                 </a>
                 <a
-                  href={"https://github.com/SummaCristian/poliaule/commits/main"}
+                  href={`${GITHUB_REPO_URL}/commits/main`}
                   target={"_blank"}
                   rel={"noopener"}
                   className={"github-stat-card"}
@@ -1016,7 +993,7 @@ function InfoContent({
                   </span>
                 </a>
                 <a
-                  href={"https://github.com/SummaCristian/poliaule/issues"}
+                  href={`${GITHUB_REPO_URL}/issues`}
                   target={"_blank"}
                   rel={"noopener"}
                   className={"github-stat-card"}
@@ -1030,7 +1007,7 @@ function InfoContent({
                   </span>
                 </a>
                 <a
-                  href={"https://github.com/SummaCristian/poliaule/blob/main/LICENSE"}
+                  href={`${GITHUB_REPO_URL}/blob/main/LICENSE`}
                   target={"_blank"}
                   rel={"noopener"}
                   className={"github-stat-card"}
@@ -1048,7 +1025,7 @@ function InfoContent({
                 </a>
               </div>
               <a
-                href={"https://github.com/SummaCristian/poliaule/issues/new"}
+                href={`${GITHUB_REPO_URL}/issues/new`}
                 target={"_blank"}
                 rel={"noopener"}
                 className={"create-issue-btn"}
@@ -1125,26 +1102,6 @@ function LanguageBar({ langs }: { langs?: Record<string, number> | null }) {
   );
 }
 
-function Stargazers({ stargazers }: { stargazers?: GithubUser[] | null }) {
-  if (!stargazers?.length)
-    return <i className="hgi-stroke hgi-star github-stat-icon" aria-hidden="true" />;
-
-  return (
-    <div className="star-avatar-stack">
-      {stargazers.slice(0, 3).map((user, index) => (
-        <span
-          key={user.login}
-          className="star-avatar"
-          data-login={user.login}
-          style={{ zIndex: 3 - index }}
-        >
-          <img src={`${safeUrl(user.avatar_url)}&s=48`} alt={user.login} loading="lazy" />
-        </span>
-      ))}
-    </div>
-  );
-}
-
 function Contributors({ contributors }: { contributors?: GithubContributor[] | null }) {
   if (!contributors?.length) return <div className="github-skeleton" style={{ height: "3rem" }} />;
 
@@ -1160,7 +1117,7 @@ function Contributors({ contributors }: { contributors?: GithubContributor[] | n
           title={user.login}
         >
           <img
-            src={`${safeUrl(user.avatar_url)}&s=64`}
+            src={appendSafeUrlParam(safeUrl(user.avatar_url), "s", "64")}
             alt={user.login}
             className="contributor-avatar"
             loading="lazy"

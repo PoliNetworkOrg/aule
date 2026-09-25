@@ -1,5 +1,5 @@
 import { flushSync } from "react-dom";
-import { classroomsData } from "../available-rooms-script";
+import { classroomsData, getRomeNow } from "../available-rooms-script";
 import { getLocale } from "../i18n";
 
 export interface PickerDay {
@@ -56,7 +56,11 @@ export function setupDatePicker(getPreferInitialDate: () => string | null = () =
     formatter.format(new Date(2000, 0, 2 + index)),
   );
 
-  const today = new Date();
+  // Rome's "today", not the browser's: the available dates these cells are
+  // built from are the API's Rome calendar days, and date-picker.tsx anchors
+  // its today-indicator the same way. Using the local clock would shift the
+  // generated range (and which cell counts as today) for viewers abroad.
+  const today = getRomeNow();
   today.setHours(0, 0, 0, 0);
   const start = parseDateKey(availableDates[0]);
   const end = parseDateKey(availableDates[availableDates.length - 1]);
@@ -68,13 +72,16 @@ export function setupDatePicker(getPreferInitialDate: () => string | null = () =
 
   while (cursor <= end) {
     const date = formatLocalDate(cursor);
-    const parsed = new Date(date);
+    // Read weekday/day-of-month straight off `cursor` (local Date, not yet
+    // advanced) instead of re-parsing the formatted string: `new Date(date)`
+    // parses a "YYYY-MM-DD" string as UTC midnight, which local getters then
+    // read back a day early for any viewer behind UTC.
     const skipped = !availableDates.includes(date.replace(/-/g, ""));
     days.push({
       date,
-      weekday: dayNames[parsed.getDay()],
-      day: parsed.getDate(),
-      sunday: parsed.getDay() === 0,
+      weekday: dayNames[cursor.getDay()],
+      day: cursor.getDate(),
+      sunday: cursor.getDay() === 0,
       skipped,
     });
 

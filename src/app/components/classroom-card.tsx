@@ -160,6 +160,15 @@ export function ClassroomCard({
       tabIndex={0}
       aria-label={`View details for ${classroom.name}`}
       style={style}
+      onKeyDown={(e) => {
+        // Browsers only synthesize a `click` event from Enter/Space for
+        // real <button>/<a> elements, not for role="button" divs — without
+        // this, the delegated `click` listener that opens the classroom
+        // detail page (classroom-detail.tsx) is unreachable by keyboard.
+        if (e.key !== "Enter" && e.key !== " ") return;
+        e.preventDefault();
+        e.currentTarget.click();
+      }}
     >
       <div className="classroom-card-clip">
         {classroom.idfoto ? (

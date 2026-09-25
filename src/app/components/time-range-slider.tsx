@@ -6,6 +6,7 @@ import { observeInputProperty } from "./time-input";
 
 import { openPicker, getPickerCards } from "./time-picker";
 import { createTimeFormatter } from "../utils/time-format.ts";
+import { romeMinutesOfDay } from "../available-rooms-script.ts";
 import { t } from "../i18n.ts";
 
 const SNAP = 60; // one-hour grid — snaps only to HH:15 marks
@@ -178,7 +179,7 @@ export function TimeRangeSlider({
     }
 
     function updateNowPosition() {
-      const n = new Date().getHours() * 60 + new Date().getMinutes();
+      const n = romeMinutesOfDay();
       const inRange = n > MIN && n < MAX;
       nowBadge.style.display = inRange ? "" : "none";
       nowLine.style.display = inRange ? "" : "none";
@@ -195,7 +196,7 @@ export function TimeRangeSlider({
     nowBadge.addEventListener(
       "click",
       () => {
-        const currentNow = new Date().getHours() * 60 + new Date().getMinutes();
+        const currentNow = romeMinutesOfDay();
         const duration = toMin - fromMin;
         let newFrom = Math.max(MIN, Math.min(snapTo(currentNow), MAX));
         let newTo = newFrom + duration;
@@ -307,8 +308,16 @@ export function TimeRangeSlider({
       let vTo = toMin;
 
       if (dragMode === "from") {
+        // vFrom (unsnapped, clamped) drives the smooth "follow the pointer"
+        // render below; fromMin (the committed value synced to the input) is
+        // computed separately by snapping *then* clamping — snapping the raw
+        // position first and clamping second can overshoot the clamp by up
+        // to SNAP/2 (e.g. when the other handle sits off the :15 grid after
+        // being set via the typed-entry popup), which could otherwise leave
+        // the two handles momentarily closer together than the intended
+        // 1-hour gap.
         vFrom = Math.max(MIN, Math.min(rawM, toMin - SNAP));
-        const snapped = snapTo(vFrom);
+        const snapped = Math.max(MIN, Math.min(snapTo(rawM), toMin - SNAP));
 
         if (snapped !== fromMin) {
           fromMin = snapped;
@@ -316,7 +325,7 @@ export function TimeRangeSlider({
         }
       } else if (dragMode === "to") {
         vTo = Math.max(fromMin + SNAP, Math.min(rawM, MAX));
-        const snapped = snapTo(vTo);
+        const snapped = Math.max(fromMin + SNAP, Math.min(snapTo(rawM), MAX));
 
         if (snapped !== toMin) {
           toMin = snapped;

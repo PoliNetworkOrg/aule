@@ -4,6 +4,8 @@ import {
   classroomsData,
   findAvailableClassrooms,
   fetchClassroomsData,
+  formatRomeYYYYMMDD,
+  getRomeNow,
   SKIP_DAYS,
 } from "./available-rooms-script.ts";
 import {
@@ -53,6 +55,20 @@ export function mountApplication() {
   const cleanups: (() => void)[] = [];
   const timers = new Set<number>();
   let disposed = false;
+
+  // initOccupancyData() and startApplication()'s own setupTimePickers() call
+  // race each other — both start from an unawaited fire-and-forget branch.
+  // If occupancy resolves first, the date picker would pick its initial day
+  // before preferInitialDate is set (missing the after-20:15 "tomorrow"
+  // switch), and an auto-search submit would fire with the
+  // #from-time-picker/#to-time-picker inputs still empty (no HTML default
+  // value). Gate the occupancy-dependent setup on this instead of assuming
+  // ordering.
+  let resolveTimePickersReady: () => void;
+
+  const timePickersReady = new Promise<void>((resolve) => {
+    resolveTimePickersReady = resolve;
+  });
 
   function later(callback: () => void, delay: number) {
     const id = window.setTimeout(() => {
@@ -392,6 +408,7 @@ export function mountApplication() {
       // Setup the time pickers to ensure valid time ranges
       // (these don't depend on occupancy data)
       setupTimePickers();
+      resolveTimePickersReady();
       initTimeControls();
 
       // Decide pill vs. inline-expanded pickers based on the form column's width
@@ -452,29 +469,43 @@ export function mountApplication() {
   // Fetches occupancy data in the background (independent of the splash
   // screen) and populates everything that depends on it once it's ready.
   async function initOccupancyData() {
-    await fetchClassroomsData();
+    try {
+      await fetchClassroomsData();
 
-    if (disposed) return;
+      if (disposed) return;
 
-    // Use the fetched data to set the only valid dates into the date picker
-    setupDatePicker(() => preferInitialDate);
-    document.getElementById("available-classrooms-form")!.removeAttribute("data-loading");
-    document.querySelector<HTMLElement>("date-chip-picker")?.removeAttribute("data-loading");
+      // Wait for setupTimePickers() so preferInitialDate is set before the
+      // date picker picks its initial day — see timePickersReady above.
+      await timePickersReady;
 
-    setupDataFetchIndicator();
-    setupLiveSearch();
+      if (disposed) return;
 
-    // If a classroom detail page was opened before occupancy data arrived
-    // (e.g. a direct link), fill in its status badge and timeline now.
-    classroomDetail.refreshOccupancy();
-    renderFavourites();
+      // Use the fetched data to set the only valid dates into the date picker
+      setupDatePicker(() => preferInitialDate);
+      document.getElementById("available-classrooms-form")!.removeAttribute("data-loading");
+      document.querySelector<HTMLElement>("date-chip-picker")?.removeAttribute("data-loading");
 
-    const autoSearchEnabled = localStorage.getItem(AUTO_SEARCH_KEY) !== "false";
+      setupDataFetchIndicator();
+      setupLiveSearch();
 
-    if (autoSearchEnabled) {
-      document
-        .getElementById("available-classrooms-form")!
-        .dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+      // If a classroom detail page was opened before occupancy data arrived
+      // (e.g. a direct link), fill in its status badge and timeline now.
+      classroomDetail.refreshOccupancy();
+      renderFavourites();
+
+      const autoSearchEnabled = localStorage.getItem(AUTO_SEARCH_KEY) !== "false";
+
+      if (autoSearchEnabled) {
+        document
+          .getElementById("available-classrooms-form")!
+          .dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+      }
+    } catch (error) {
+      // Everything after the first `await` above ran with no surrounding
+      // try/catch before this change, so any exception here (e.g. a missing
+      // DOM node) became an unhandled promise rejection instead of a
+      // visible/loggable failure — this function is called fire-and-forget.
+      console.error("Error initializing occupancy data:", error);
     }
   }
 
@@ -575,7 +606,11 @@ export function mountApplication() {
 
     // Set initial values
     const intervalHours = parseInt(localStorage.getItem(INTERVAL_HOURS_KEY) ?? "", 10) || 2;
-    const now = new Date();
+    // Occupancy hours (07:15–20:15) are Europe/Rome wall-clock time; use
+    // Rome's "now" here too, not the browser's local time, so a visitor
+    // abroad gets the right default search window instead of one shifted by
+    // their device's own timezone offset.
+    const now = getRomeNow();
 
     // Snap to next :15 slot
     const snapped = new Date(now);
@@ -619,6 +654,18 @@ export function mountApplication() {
     toPicker.min = formatMins(minToMins);
   }
 
+  // The per-date merge in fetchClassroomsData() can leave entries with
+  // different generated_at values (some days refreshed, others kept from a
+  // previous run after a partial fetch failure). Using classroomsData[0]
+  // alone would show "fresh" while older days are stale, or vice versa, so
+  // freshness is judged from the oldest entry across all days.
+  function oldestGeneratedAt(): string {
+    return classroomsData.reduce(
+      (oldest, entry) => (entry.generated_at < oldest ? entry.generated_at : oldest),
+      classroomsData[0].generated_at,
+    );
+  }
+
   function setupDataFetchIndicator() {
     const indicator = document.getElementById("data-fetch-indicator")!;
 
@@ -628,21 +675,12 @@ export function mountApplication() {
       return;
     }
 
-    const today = new Date();
-
-    const todayKey = [
-      today.getFullYear(),
-      String(today.getMonth() + 1).padStart(2, "0"),
-      String(today.getDate()).padStart(2, "0"),
-    ].join("");
-
-    const generationDate = new Date(classroomsData[0].generated_at + "Z");
-
-    const generationKey = [
-      generationDate.getFullYear(),
-      String(generationDate.getMonth() + 1).padStart(2, "0"),
-      String(generationDate.getDate()).padStart(2, "0"),
-    ].join("");
+    // Both keys are compared against each other and, via hasFutureData
+    // below, against entry.date — which the API emits as Rome calendar days.
+    // Deriving them from the browser's local clock instead would misjudge
+    // freshness by a day for anyone not in Italy's timezone.
+    const todayKey = formatRomeYYYYMMDD(new Date());
+    const generationKey = formatRomeYYYYMMDD(new Date(oldestGeneratedAt() + "Z"));
 
     const hasFutureData = classroomsData.some((entry) => entry.date > todayKey);
 
@@ -667,9 +705,7 @@ export function mountApplication() {
     const status =
       (["green", "yellow", "red"] as const).find((s) => indicator.classList.contains(s)) ?? "red";
 
-    const generationDate = classroomsData[0]
-      ? new Date(classroomsData[0].generated_at + "Z")
-      : null;
+    const generationDate = classroomsData.length ? new Date(oldestGeneratedAt() + "Z") : null;
 
     renderDataFetchStatus(status, generationDate, reloadOccupancyData, animate);
   }

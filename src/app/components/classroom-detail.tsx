@@ -102,6 +102,8 @@ import {
   classroomsData as occupancyData,
   SKIP_DAYS,
   getClassroomStatusNow,
+  getRomeNow,
+  romeMinutesOfDay,
 } from "../available-rooms-script.ts";
 import { t, getLocale, onLanguageSwitch } from "../i18n.ts";
 import { createTimeFormatter } from "../utils/time-format.ts";
@@ -992,12 +994,24 @@ class ClassroomDetail {
     }
 
     // Title click -> manual refresh of photo and schedule
-    this._overlay!.querySelector<HTMLElement>(".detail-title")?.addEventListener(
-      "click",
-      () => {
-        this._loadSchedule(classroom.id);
+    const refreshOnActivate = () => {
+      this._loadSchedule(classroom.id);
 
-        if (classroom.idfoto) this._loadPhoto(classroom.id);
+      if (classroom.idfoto) this._loadPhoto(classroom.id);
+    };
+
+    const titleEl = this._overlay!.querySelector<HTMLElement>(".detail-title");
+
+    titleEl?.addEventListener("click", refreshOnActivate, { signal: this._contentEvents.signal });
+    // role="button" on a non-native element gets no automatic Enter/Space ->
+    // click synthesis from the browser — without this, the refresh action is
+    // unreachable by keyboard.
+    titleEl?.addEventListener(
+      "keydown",
+      (e) => {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        e.preventDefault();
+        refreshOnActivate();
       },
       { signal: this._contentEvents.signal },
     );
@@ -1076,7 +1090,9 @@ class ClassroomDetail {
     }
 
     try {
-      const today = new Date();
+      // Rome's calendar date, not the browser's: the day keys these are
+      // matched against (dayData.date) come from the API in Rome time.
+      const today = getRomeNow();
 
       const todayKey = [
         today.getFullYear(),
@@ -1121,7 +1137,7 @@ class ClassroomDetail {
         prevDate = curr;
       }
 
-      const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+      const nowMin = romeMinutesOfDay();
 
       const nowPct =
         nowMin >= DAY_START && nowMin <= DAY_END
@@ -1489,7 +1505,7 @@ class ClassroomDetail {
       }
 
       this._nowTimer = window.setInterval(() => {
-        const n = new Date().getHours() * 60 + new Date().getMinutes();
+        const n = romeMinutesOfDay();
 
         const pctVal =
           n >= DAY_START && n <= DAY_END
@@ -1566,7 +1582,7 @@ class ClassroomDetail {
       // Available Tab or search overlay, otherwise today, or next available day
       // if after 20:15, or first available
       const todayDayIndex = days.findIndex((d) => d.dayData?.date === todayKey);
-      const nowMins = new Date().getHours() * 60 + new Date().getMinutes();
+      const nowMins = romeMinutesOfDay();
       const preferredDateKey = queryDateKey ?? highlightDateKey;
       let initialDayIndex;
 
@@ -1912,6 +1928,34 @@ class ClassroomDetail {
             e.stopPropagation();
 
             if (_popoverBlock === block) hideOccupationPopover();
+            else showOccupationPopover(block);
+          },
+          { signal: this._scheduleEvents.signal },
+        );
+
+        // Keyboard activation for the blocks, which are role="button" divs and
+        // so get no native Enter/Space handling. Deliberately *not* a toggle
+        // like the click handler above: focusin already shows the popover for
+        // the focused block, so toggling would fight it (that interference is
+        // also why the first click on an unfocused block opens and then
+        // immediately closes it). Enter/Space re-show idempotently and Escape
+        // dismisses, which is the behaviour a keyboard user expects anyway.
+        // preventDefault matters on its own: without it Space scrolls the page.
+        container.addEventListener(
+          "keydown",
+          (e) => {
+            if (e.key !== "Enter" && e.key !== " " && e.key !== "Escape") return;
+
+            const block =
+              e.target instanceof Element
+                ? e.target.closest<HTMLElement>(".detail-schedule-block")
+                : null;
+
+            if (!block) return;
+            e.preventDefault();
+            e.stopPropagation();
+
+            if (e.key === "Escape") hideOccupationPopover();
             else showOccupationPopover(block);
           },
           { signal: this._scheduleEvents.signal },

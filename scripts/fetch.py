@@ -401,7 +401,7 @@ def write_run_log(log: dict) -> None:
 
 
 def write_github_output(status: str, message: str):
-    """Append a `status` and multi-line `message` output for the GitHub Actions step, if running in CI."""
+    """Append `status` and `message` outputs for the GitHub Actions step, if running in CI."""
     output_path = os.environ.get("GITHUB_OUTPUT")
     if not output_path:
         return

@@ -1,0 +1,34 @@
+name: Frontend CI
+
+# deploy-pages.yml only builds (and only on push to main, after merge) — there
+# was no workflow validating a PR before merge, and even that build never ran
+# `pnpm lint` (oxlint/oxfmt + the custom anti-slop rules).
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # This job runs repo-controlled install/lint/build scripts on
+          # pull_request; don't leave the checkout token in .git/config
+          # where they could read it. Nothing here pushes back to the repo.
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm build
