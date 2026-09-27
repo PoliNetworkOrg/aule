@@ -104,6 +104,11 @@ declare module "vitrium" {
     onClick?: (event: MouseEvent) => void;
   }): HTMLButtonElement;
 
+  export function createBackButton(options?: {
+    label?: string;
+    onClick?: (event: MouseEvent) => void;
+  }): HTMLButtonElement;
+
   export interface SegmentedControl {
     value: string | undefined;
     select(value: string, options?: { animate?: boolean; silent?: boolean }): void;

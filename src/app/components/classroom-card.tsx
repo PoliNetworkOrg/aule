@@ -9,6 +9,7 @@ import {
 import { onTranslationChange, getTranslationVersion, t } from "../i18n";
 import { fetchPhotoUrl, photoUrlCache } from "../utils/photo";
 import { isFavourite } from "../utils/favourites";
+import { highlightRegExp } from "../utils/html";
 import type { Building, Classroom, ClassroomStatus } from "../types";
 
 export function subscribeFavourites(listener: () => void) {
@@ -32,12 +33,21 @@ export function FilledStar() {
   );
 }
 
-export function Highlight({ text, query = "" }: { text: string; query?: string }) {
-  if (!query) return text;
-  const pattern = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/ /g, "[\\s.]");
+export function Highlight({
+  text,
+  query = "",
+  extraTerms,
+}: {
+  text: string;
+  query?: string;
+  extraTerms?: string[];
+}) {
+  const pattern = highlightRegExp(query, extraTerms);
+
+  if (!pattern) return text;
 
   return text
-    .split(new RegExp(`(${pattern})`, "gi"))
+    .split(pattern)
     .map((part, index) =>
       index % 2 ? <mark key={index}>{part}</mark> : <Fragment key={index}>{part}</Fragment>,
     );
