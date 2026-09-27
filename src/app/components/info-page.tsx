@@ -1,10 +1,9 @@
-import type { CSSProperties } from "react";
-
-const PWA_TABS_STYLE: CSSProperties & { "--tabs": number } = { "--tabs": 3 };
-
 import { createRoot, type Root } from "react-dom/client";
 import { flushSync } from "react-dom";
+import { useState } from "react";
+import { createPopover, type Popover } from "vitrium";
 import { RichText } from "./rich-text";
+import { SegmentedControl } from "./segmented-control";
 
 interface GithubRepository {
   stargazers_count: number;
@@ -60,6 +59,57 @@ const LANG_COLORS = new Map(
   }),
 );
 
+const APPLE_ICON = (
+  <svg viewBox="0 0 24 24" aria-hidden="true" className="info-platform-icon">
+    <path
+      d={
+        "M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"
+      }
+    />
+  </svg>
+);
+
+const ANDROID_ICON = (
+  <svg viewBox="0 0 24 24" aria-hidden="true" className="info-platform-icon">
+    <path
+      d={
+        "M6 18c0 .55.45 1 1 1h1v3.5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5V19h2v3.5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5V19h1c.55 0 1-.45 1-1V8H6v10zm-2.5-10C2.67 8 2 8.67 2 9.5v7c0 .83.67 1.5 1.5 1.5S5 17.33 5 16.5v-7C5 8.67 4.33 8 3.5 8zm17 0c-.83 0-1.5.67-1.5 1.5v7c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5v-7c0-.83-.67-1.5-1.5-1.5zm-4.97-5.84 1.3-1.3c.2-.2.2-.51 0-.71-.2-.2-.51-.2-.71 0l-1.48 1.48A6.934 6.934 0 0 0 12 1c-1.1 0-2.15.23-3.09.63L7.43.15c-.2-.2-.51-.2-.71 0-.2.2-.2.51 0 .71l1.3 1.3C6.01 3.07 4.86 5.19 4.86 7.5h14.29c0-2.31-1.15-4.43-3.12-5.84zM10 5H9V4h1v1zm5 0h-1V4h1v1z"
+      }
+    />
+  </svg>
+);
+
+const GITHUB_ICON = (
+  <svg viewBox="0 0 16 16" aria-hidden="true">
+    <path
+      d={
+        "M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z"
+      }
+    />
+  </svg>
+);
+
+// The app icon, right-sized: the 2048px icon.png masters are megabytes, and
+// the page never shows the icon above 120 CSS px. `size` is the CSS width.
+const ICON_WIDTHS = [128, 256, 384];
+
+type IconVariant = "main" | "beta";
+
+const iconSrcset = (variant: IconVariant) =>
+  ICON_WIDTHS.map((w) => `/favicons/${variant}/icon-${w}.webp ${w}w`).join(", ");
+
+// Which install instructions to open on: the device's own platform.
+function detectPlatform(): "ios" | "android" | "desktop" {
+  const ua = navigator.userAgent;
+
+  if (/iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1))
+    return "ios";
+
+  if (/Android/.test(ua)) return "android";
+
+  return "desktop";
+}
+
 class InfoPage {
   _overlay: HTMLElement | null = null;
   _tabbar: HTMLElement | null = null;
@@ -79,6 +129,8 @@ class InfoPage {
   _events = new AbortController();
   _contentEvents = new AbortController();
   _observers: IntersectionObserver[] = [];
+  _reflowObserver: ResizeObserver | null = null;
+  _starPopover: Popover | null = null;
   _stopLanguage: (() => void) | null = null;
   _timers = new Set<number>();
   _disposed = false;
@@ -106,23 +158,6 @@ class InfoPage {
     this._logoEl = document.querySelector<HTMLElement>(".header-logo");
     this._titleEl = document.querySelector<HTMLElement>(".header-title");
     this._badgeEl = document.getElementById("env-badge");
-
-    // Haptics for interactive GitHub elements
-    this._overlay?.addEventListener(
-      "click",
-      (e) => {
-        if (!(e.target instanceof Element)) return;
-
-        if (
-          e.target.closest(".github-stat-card") ||
-          e.target.closest(".contributor-item") ||
-          e.target.closest(".github-repo-chip") ||
-          e.target.closest(".create-issue-btn")
-        ) {
-        }
-      },
-      { signal: this._events.signal },
-    );
 
     document.getElementById("info-trigger")?.addEventListener(
       "click",
@@ -154,6 +189,40 @@ class InfoPage {
     this._stopLanguage = onLanguageSwitch(() => {
       if (this._isOpen) this._renderContent(this._showBadge);
     });
+
+    this._warmIcons();
+  }
+
+  // Fetches and decodes the icons in idle time after start-up, so opening the
+  // page (usually well after) finds them in the image cache, ready to paint.
+  _warmIcons() {
+    // Both variants (hero and badges) at both sizes: the browser picks the
+    // same srcset candidate here as it will on the page.
+    const warm = () => {
+      for (const variant of ["main", "beta"] as const) {
+        for (const size of [120, 56]) {
+          const img = new Image();
+
+          img.sizes = `${size}px`;
+          img.srcset = iconSrcset(variant);
+          img.decode().catch(() => {});
+        }
+      }
+    };
+
+    if ("requestIdleCallback" in window) requestIdleCallback(warm, { timeout: 3000 });
+    else this._later(warm, 1500);
+  }
+
+  // Resolves when the hero icon can paint, or after `cap` ms at most so a slow
+  // network never holds the transition up.
+  _heroReady(img: HTMLImageElement | null, cap = 200) {
+    if (!img || (img.complete && img.naturalWidth)) return Promise.resolve();
+
+    return Promise.race([
+      img.decode().catch(() => {}),
+      new Promise((resolve) => this._later(() => resolve(undefined), cap)),
+    ]);
   }
 
   openRoute() {
@@ -250,7 +319,7 @@ class InfoPage {
         // Reset scroll for the new view
         window.scrollTo(0, 0);
 
-        const heroIcon = this._overlay!.querySelector<HTMLElement>(".info-hero-icon");
+        const heroIcon = this._overlay!.querySelector<HTMLImageElement>(".info-hero-icon");
         const heroTitle = this._overlay!.querySelector<HTMLElement>(".info-hero-title");
         const heroBadge = this._overlay!.querySelector<HTMLElement>(".info-hero-badge");
 
@@ -259,6 +328,11 @@ class InfoPage {
         if (heroTitle) heroTitle.style.viewTransitionName = "info-title";
 
         if (heroBadge) heroBadge.style.viewTransitionName = "info-badge";
+
+        // The new state is snapshotted once this resolves: give the icon a
+        // moment to decode, so the logo morphs into it rather than into an
+        // empty box.
+        return this._heroReady(heroIcon);
       });
 
       // A second VT firing before this one settles rejects .ready/.finished with
@@ -442,103 +516,160 @@ class InfoPage {
     this._displayStats = null;
     this._renderView();
 
-    // Trigger animations when the about-me section becomes visible
+    // Normally the icon is already decoded (see _warmIcons / _heroReady). If it
+    // isn't — a cold cache on a slow network — it fades in over its
+    // placeholder instead of popping in.
+    const heroIcon = this._overlay!.querySelector<HTMLImageElement>(".info-hero-icon");
+
+    if (heroIcon && !heroIcon.complete) {
+      const wrap = heroIcon.parentElement;
+
+      wrap?.classList.add("is-loading");
+      const done = () => wrap?.classList.remove("is-loading");
+
+      heroIcon.addEventListener("load", done, { once: true, signal: this._contentEvents.signal });
+      heroIcon.addEventListener("error", done, { once: true, signal: this._contentEvents.signal });
+    }
+
+    // The chat bubbles grow into place one at a time, so reserve their final
+    // height up front — otherwise every card below would shift as they arrive.
     const aboutMeSection = this._overlay!.querySelector<HTMLElement>(".about-me-section");
     const bubblesContainer = this._overlay!.querySelector<HTMLElement>(".about-me-container");
 
     if (aboutMeSection && bubblesContainer) {
-      // 1. Measure final height to reserve space
-      // We temporarily "force" the final state to measure it
       const bubbles = bubblesContainer.querySelector<HTMLElement>(".about-me-bubbles")!;
-      const allBubbles = bubbles.querySelectorAll<HTMLElement>(".message-bubble");
 
-      // Save current styles
+      const allBubbles = bubbles.querySelectorAll<HTMLElement>(
+        ".message-bubble:not(.typing-indicator)",
+      );
 
-      // Apply final state styles for measurement
       allBubbles.forEach((b) => {
         b.style.maxHeight = "500px";
-        b.style.paddingTop = "0.8rem";
-        b.style.paddingBottom = "0.8rem";
-        b.style.opacity = "1";
+        b.style.paddingTop = "0.7rem";
+        b.style.paddingBottom = "0.7rem";
       });
 
       const finalHeight = aboutMeSection.offsetHeight;
 
-      // Restore initial state and set the reserved height
       allBubbles.forEach((b) => (b.style.cssText = ""));
       aboutMeSection.style.minHeight = `${finalHeight}px`;
-
-      // 2. Setup observer
-      const observer = new IntersectionObserver(
-        (entries) => {
-          entries.forEach((entry) => {
-            if (entry.isIntersecting) {
-              entry.target.classList.add("is-visible");
-              observer.unobserve(entry.target);
-            }
-          });
-        },
-        { threshold: 0.1 },
-      );
-
-      this._observers.push(observer);
-      observer.observe(aboutMeSection);
     }
 
-    const observe = (selector: string, threshold = 0.1) => {
-      const el = this._overlay!.querySelector<HTMLElement>(selector);
+    // Each card rises in as it scrolls into view (the ones already on screen
+    // right away, in order); the about-me card's chat plays from the same class.
+    const sections = [...this._overlay!.querySelectorAll<HTMLElement>(".info-section")];
 
-      if (!el) return;
+    const revealObserver = new IntersectionObserver(
+      (entries) => {
+        let order = 0;
 
-      const obs = new IntersectionObserver(
-        (entries) => {
-          entries.forEach((entry) => {
-            if (entry.isIntersecting) {
-              entry.target.classList.add("is-visible");
-              obs.unobserve(entry.target);
-            }
-          });
-        },
-        { threshold },
-      );
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting || !(entry.target instanceof HTMLElement)) return;
+          entry.target.style.setProperty("--reveal-i", String(order++));
+          entry.target.classList.add("is-visible");
+          revealObserver.unobserve(entry.target);
+        });
+      },
+      { threshold: 0.05 },
+    );
 
-      this._observers.push(obs);
-      obs.observe(el);
-    };
+    sections.forEach((s) => revealObserver.observe(s));
+    this._observers.push(revealObserver);
 
-    observe(".info-pwa-section", 0.05);
+    // Stargazer names: one glass tooltip, re-anchored to whichever avatar is hovered.
+    this._starPopover = createPopover({ placement: "top", role: "tooltip", dismissable: false });
+    const starTip = document.createElement("span");
 
-    // PWA tab switching (mobile only — CSS hides the tabbar on wider screens)
-    const pwaTabbar = this._overlay!.querySelector<HTMLElement>(".pwa-tabbar");
-    const pwaIndicator = this._overlay!.querySelector<HTMLElement>(".pwa-tab-indicator");
+    starTip.className = "info-star-tip";
+    this._starPopover.setContent(starTip);
+    const statsGrid = this._overlay!.querySelector<HTMLElement>(".github-stats-grid");
 
-    if (pwaTabbar && pwaIndicator) {
-      const tabs = [...pwaTabbar.querySelectorAll<HTMLElement>(".pwa-tab")];
-      pwaTabbar.addEventListener(
-        "click",
-        (e) => {
-          const btn =
-            e.target instanceof Element ? e.target.closest<HTMLElement>(".pwa-tab") : null;
+    statsGrid?.addEventListener(
+      "pointerover",
+      (e) => {
+        if (!(e instanceof PointerEvent) || e.pointerType !== "mouse") return;
 
-          if (!btn || btn.classList.contains("active")) return;
-          const idx = tabs.indexOf(btn);
-          tabs.forEach((t, i) => {
-            t.classList.toggle("active", i === idx);
-            t.setAttribute("aria-selected", i === idx ? "true" : "false");
-          });
-          pwaIndicator.style.transform = `translateX(${idx * 100}%)`;
-          const platform = btn.dataset.pwaTab;
-          this._overlay!.querySelectorAll<HTMLElement>(".info-pwa-card").forEach((card) => {
-            card.classList.toggle("active", card.dataset.pwaPlatform === platform);
-          });
-        },
-        { signal: this._contentEvents.signal },
-      );
-    }
+        const target = e.target instanceof Element ? e.target : null;
+        const avatar = target?.closest<HTMLElement>(".star-avatar");
 
-    observe(".github-stats-section");
-    observe(".github-extended", 0.05);
+        if (!avatar) return;
+        starTip.textContent = avatar.dataset.login ?? "";
+        this._starPopover?.show(avatar);
+      },
+      { signal: this._contentEvents.signal },
+    );
+    statsGrid?.addEventListener(
+      "pointerout",
+      (e) => {
+        const target = e.target instanceof Element ? e.target : null;
+        const avatar = target?.closest<HTMLElement>(".star-avatar");
+
+        if (!avatar) return;
+
+        const related = e.relatedTarget instanceof Element ? e.relatedTarget : null;
+
+        if (related?.closest(".star-avatar") === avatar) return;
+        this._starPopover?.hide();
+      },
+      { signal: this._contentEvents.signal },
+    );
+
+    this._animateMasonry(this._overlay!.querySelector<HTMLElement>(".info-content"));
     this._fetchGithubStats();
+  }
+
+  /**
+   * FLIP-animates the masonry cards when a resize moves them to the other
+   * column (same technique as classroom-detail.tsx _animateReflow): each
+   * ResizeObserver tick slides every card from where it visually was to its
+   * new spot.
+   */
+  _animateMasonry(container: HTMLElement | null) {
+    if (!container || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    const items = [...container.querySelectorAll<HTMLElement>(":scope > .info-section")];
+
+    const measure = (): Map<HTMLElement, { x: number; y: number; tx: number; ty: number }> =>
+      new Map(
+        items.map((el) => {
+          const r = el.getBoundingClientRect();
+          const m = new DOMMatrix(getComputedStyle(el).transform);
+
+          return [el, { x: r.left - m.e, y: r.top - m.f, tx: m.e, ty: m.f }];
+        }),
+      );
+
+    let prev: Map<HTMLElement, { x: number; y: number; tx: number; ty: number }> | null = null;
+
+    this._reflowObserver = new ResizeObserver(() => {
+      const cur = measure();
+
+      if (prev) {
+        for (const el of items) {
+          const a = prev.get(el);
+          const b = cur.get(el);
+
+          if (!a || !b) continue;
+          const dx = a.x + b.tx - b.x;
+          const dy = a.y + b.ty - b.y;
+
+          if (Math.abs(dx - b.tx) < 1 && Math.abs(dy - b.ty) < 1) continue;
+          el.getAnimations()
+            .filter((an) => an.id === "reflow")
+            .forEach((an) => an.cancel());
+
+          const anim = el.animate(
+            [{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "none" }],
+            { duration: 350, easing: "cubic-bezier(0.22, 1, 0.36, 1)" },
+          );
+
+          anim.id = "reflow";
+        }
+      }
+
+      prev = measure();
+    });
+    this._reflowObserver.observe(container);
   }
 
   async _fetchGithubStats() {
@@ -659,11 +790,15 @@ class InfoPage {
   _clearObservers() {
     this._observers.forEach((observer) => observer.disconnect());
     this._observers = [];
+    this._reflowObserver?.disconnect();
+    this._reflowObserver = null;
   }
   _clearContent() {
     this._clearObservers();
     this._contentEvents.abort();
     this._contentMounted = false;
+    this._starPopover?.destroy();
+    this._starPopover = null;
     flushSync(() => this._root?.render(null));
   }
   destroy() {
@@ -675,10 +810,13 @@ class InfoPage {
     this._contentEvents.abort();
     this._stopLanguage?.();
     this._clearObservers();
+    this._starPopover?.destroy();
+    this._starPopover = null;
     this._contentMounted = false;
     this._timers.forEach(clearTimeout);
     this._timers.clear();
     const root = this._root;
+
     this._root = null;
     queueMicrotask(() => root?.unmount());
   }
@@ -693,400 +831,342 @@ function InfoContent({
   badgeText: string;
   stats: GithubStats | null;
 }) {
+  const [platform, setPlatform] = useState(detectPlatform);
+  const variant: IconVariant = showBadge ? "beta" : "main";
+
   return (
-    <>
-      <div className={"info-page"}>
-        <div className={"info-hero"}>
+    <div className={`info-page${showBadge ? " info-page--beta" : ""}`}>
+      <div className="info-backdrop" aria-hidden="true" />
+
+      <div className="info-hero">
+        <div className="info-hero-icon-wrap">
           <img
-            src={"/favicons/" + (showBadge ? "beta" : "main") + "/icon.png"}
-            className={"info-hero-icon"}
-            draggable={"false"}
-            alt={""}
+            className="info-hero-glow"
+            aria-hidden="true"
+            draggable={false}
+            alt=""
+            src={`/favicons/${variant}/icon-256.webp`}
+            srcSet={iconSrcset(variant)}
+            sizes="120px"
+            width={120}
+            height={120}
           />
-          <h1 className={"info-hero-title"}>{"PoliAule"}</h1>
-          {showBadge ? (
-            <>
-              <h4 className={"info-hero-badge secondary"}>{badgeText}</h4>
-            </>
-          ) : (
-            ""
-          )}
+          <img
+            className="info-hero-icon"
+            fetchPriority="high"
+            draggable={false}
+            alt=""
+            src={`/favicons/${variant}/icon-256.webp`}
+            srcSet={iconSrcset(variant)}
+            sizes="120px"
+            width={120}
+            height={120}
+          />
         </div>
-        <div className={"info-body"}>
-          <div className={"info-intro"}>
-            <div className={"info-section-text"}>
-              <p>
-                <RichText text={t("info.body.intro")} />
-              </p>
-              <p>
-                <RichText text={t("info.body.parag1")} />
-              </p>
-            </div>
-            <div className={"info-meta"}>
-              <a
-                href={"https://polinetwork.org/it/projects/"}
-                target={"_blank"}
-                rel={"noopener"}
-                className={"polinetwork-chip"}
-              >
-                <img
-                  src={"https://polinetwork.org/favicon.ico"}
-                  alt={"PoliNetwork"}
-                  draggable={"false"}
-                />
-                <span>
-                  <RichText text={t("info.polinetwork")} />
-                </span>
-              </a>
-              <p className={"info-disclaimer"}>
-                <RichText text={t("footer.disclaimer5")} />
-              </p>
-            </div>
-            <div className={"badge-container"}>
-              <a
-                href={"https://poliaule.com"}
-                target={"_blank"}
-                rel={"noopener"}
-                className={"info-badge info-badge--stable"}
-              >
-                <img src={"/favicons/main/icon.png"} alt={""} draggable={"false"} />
-                <div className={"badge-text"}>
-                  <span className={"top-text"}>{"poliaule.com"}</span>
-                  <span className={"bottom-text"}>
-                    <RichText text={t("info.aboutMe.website")} />
-                  </span>
-                  <span className={"badge-description"}>
-                    <RichText
-                      text={t("info.badge.stableDesc") || "The production version of PoliAule"}
-                    />
-                  </span>
-                </div>
-              </a>
-              <a
-                href={"https://beta.poliaule.com"}
-                target={"_blank"}
-                rel={"noopener"}
-                className={"info-badge info-badge--beta"}
-              >
-                <img src={"/favicons/beta/icon.png"} alt={""} draggable={"false"} />
-                <div className={"badge-text"}>
-                  <span className={"top-text"}>{"beta.poliaule.com"}</span>
-                  <span className={"bottom-text"}>
-                    <RichText text={t("info.aboutMe.beta")} />
-                  </span>
-                  <span className={"badge-description"}>
-                    <RichText text={t("info.badge.betaDesc") || "The beta version of PoliAule"} />
-                  </span>
-                  <span className={"badge-label"}>{"BETA"}</span>
-                </div>
-              </a>
-            </div>
-          </div>
-          <div className={"info-pwa-section"}>
-            <div className={"info-pwa-header"}>
-              <div className={"info-pwa-title-row"}>
-                <i className={"hgi-stroke hgi-screen-add-to-home"} aria-hidden={"true"}></i>
-                <h2>
-                  <RichText text={t("info.pwa.title")} />
-                </h2>
-              </div>
-              <p className={"info-pwa-subtitle"}>
-                <RichText text={t("info.pwa.subtitle")} />
-              </p>
-            </div>
-            <div className={"pwa-tabbar"} style={PWA_TABS_STYLE} role={"tablist"}>
-              <div className={"pwa-tab-indicator"}></div>
-              <button
-                className={"pwa-tab active"}
-                data-pwa-tab={"ios"}
-                role={"tab"}
-                aria-selected={"true"}
-              >
-                <svg
-                  viewBox={"0 0 24 24"}
-                  aria-hidden={"true"}
-                  className={"info-pwa-platform-icon"}
-                >
-                  <path
-                    d={
-                      "M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"
-                    }
-                  ></path>
-                </svg>
-                <span>{"iPhone"}</span>
-              </button>
-              <button
-                className={"pwa-tab"}
-                data-pwa-tab={"android"}
-                role={"tab"}
-                aria-selected={"false"}
-              >
-                <svg
-                  viewBox={"0 0 24 24"}
-                  aria-hidden={"true"}
-                  className={"info-pwa-platform-icon"}
-                >
-                  <path
-                    d={
-                      "M6 18c0 .55.45 1 1 1h1v3.5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5V19h2v3.5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5V19h1c.55 0 1-.45 1-1V8H6v10zm-2.5-10C2.67 8 2 8.67 2 9.5v7c0 .83.67 1.5 1.5 1.5S5 17.33 5 16.5v-7C5 8.67 4.33 8 3.5 8zm17 0c-.83 0-1.5.67-1.5 1.5v7c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5v-7c0-.83-.67-1.5-1.5-1.5zm-4.97-5.84 1.3-1.3c.2-.2.2-.51 0-.71-.2-.2-.51-.2-.71 0l-1.48 1.48A6.934 6.934 0 0 0 12 1c-1.1 0-2.15.23-3.09.63L7.43.15c-.2-.2-.51-.2-.71 0-.2.2-.2.51 0 .71l1.3 1.3C6.01 3.07 4.86 5.19 4.86 7.5h14.29c0-2.31-1.15-4.43-3.12-5.84zM10 5H9V4h1v1zm5 0h-1V4h1v1z"
-                    }
-                  ></path>
-                </svg>
-                <span>{"Android"}</span>
-              </button>
-              <button
-                className={"pwa-tab"}
-                data-pwa-tab={"desktop"}
-                role={"tab"}
-                aria-selected={"false"}
-              >
-                <i className={"hgi-stroke hgi-computer"} aria-hidden={"true"}></i>
-                <span>{"Desktop"}</span>
-              </button>
-            </div>
-            <div className={"info-pwa-cards"}>
-              <div className={"info-pwa-card active"} data-pwa-platform={"ios"}>
-                <div className={"info-pwa-card-title"}>
-                  <svg
-                    viewBox={"0 0 24 24"}
-                    aria-hidden={"true"}
-                    className={"info-pwa-platform-icon"}
-                  >
-                    <path
-                      d={
-                        "M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"
-                      }
-                    ></path>
-                  </svg>
-                  <span>
-                    <RichText text={t("info.pwa.ios.title")} />
-                  </span>
-                </div>
-                <ol className={"info-pwa-steps"}>
-                  <li>
-                    <RichText text={t("info.pwa.ios.step1")} />
-                  </li>
-                  <li>
-                    <RichText text={t("info.pwa.ios.step2")} />
-                  </li>
-                  <li>
-                    <RichText text={t("info.pwa.ios.step3")} />
-                  </li>
-                  <li>
-                    <RichText text={t("info.pwa.ios.step4")} />
-                  </li>
-                </ol>
-              </div>
-              <div className={"info-pwa-card"} data-pwa-platform={"android"}>
-                <div className={"info-pwa-card-title"}>
-                  <svg
-                    viewBox={"0 0 24 24"}
-                    aria-hidden={"true"}
-                    className={"info-pwa-platform-icon"}
-                  >
-                    <path
-                      d={
-                        "M6 18c0 .55.45 1 1 1h1v3.5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5V19h2v3.5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5V19h1c.55 0 1-.45 1-1V8H6v10zm-2.5-10C2.67 8 2 8.67 2 9.5v7c0 .83.67 1.5 1.5 1.5S5 17.33 5 16.5v-7C5 8.67 4.33 8 3.5 8zm17 0c-.83 0-1.5.67-1.5 1.5v7c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5v-7c0-.83-.67-1.5-1.5-1.5zm-4.97-5.84 1.3-1.3c.2-.2.2-.51 0-.71-.2-.2-.51-.2-.71 0l-1.48 1.48A6.934 6.934 0 0 0 12 1c-1.1 0-2.15.23-3.09.63L7.43.15c-.2-.2-.51-.2-.71 0-.2.2-.2.51 0 .71l1.3 1.3C6.01 3.07 4.86 5.19 4.86 7.5h14.29c0-2.31-1.15-4.43-3.12-5.84zM10 5H9V4h1v1zm5 0h-1V4h1v1z"
-                      }
-                    ></path>
-                  </svg>
-                  <span>
-                    <RichText text={t("info.pwa.android.title")} />
-                  </span>
-                </div>
-                <ol className={"info-pwa-steps"}>
-                  <li>
-                    <RichText text={t("info.pwa.android.step1")} />
-                  </li>
-                  <li>
-                    <RichText text={t("info.pwa.android.step2")} />
-                  </li>
-                  <li>
-                    <RichText text={t("info.pwa.android.step3")} />
-                  </li>
-                  <li>
-                    <RichText text={t("info.pwa.android.step4")} />
-                  </li>
-                </ol>
-              </div>
-              <div className={"info-pwa-card"} data-pwa-platform={"desktop"}>
-                <div className={"info-pwa-card-title"}>
-                  <i className={"hgi-stroke hgi-computer"} aria-hidden={"true"}></i>
-                  <span>
-                    <RichText text={t("info.pwa.desktop.title")} />
-                  </span>
-                </div>
-                <ol className={"info-pwa-steps"}>
-                  <li>
-                    <RichText text={t("info.pwa.desktop.step1")} />
-                  </li>
-                  <li>
-                    <RichText text={t("info.pwa.desktop.step2")} />
-                  </li>
-                  <li>
-                    <RichText text={t("info.pwa.desktop.step3")} />
-                  </li>
-                </ol>
-              </div>
-            </div>
-          </div>
-          <div className={"info-two-col"}>
-            <div className={"about-me-section"}>
-              <h2>
-                <RichText text={t("info.aboutMe.title")} />
-              </h2>
-              <div className={"about-me-container"}>
-                <img
-                  src={"/assets/profile.jpg"}
-                  alt={"Profile picture of Cristian Summa"}
-                  className={"about-me-photo"}
-                  draggable={"false"}
-                />
-                <div className={"about-me-bubbles"}>
-                  <p className={"message-bubble"}>
-                    <RichText text={t("info.aboutMe.parag1")} />
-                  </p>
-                  <p className={"message-bubble"}>
-                    <RichText text={t("info.aboutMe.parag2")} />
-                  </p>
-                  <p className={"message-bubble"}>
-                    <RichText text={t("info.aboutMe.parag3")} />
-                  </p>
-                  <div className={"typing-indicator message-bubble"}>
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className={"github-stats-section"}>
-              <div className={"github-section-head"}>
-                <h2>
-                  <RichText text={t("info.github.title")} />
-                </h2>
-                <a
-                  href={"https://github.com/SummaCristian/poliaule"}
-                  target={"_blank"}
-                  rel={"noopener"}
-                  className={"github-repo-chip"}
-                >
-                  <svg viewBox={"0 0 16 16"} aria-hidden={"true"}>
-                    <path
-                      d={
-                        "M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z"
-                      }
-                    ></path>
-                  </svg>
-                  <span>{"GitHub"}</span>
-                </a>
-              </div>
-              <div className={"github-stats-grid"}>
-                <a
-                  href={"https://github.com/SummaCristian/poliaule/stargazers"}
-                  target={"_blank"}
-                  rel={"noopener"}
-                  className={"github-stat-card"}
-                >
-                  <div className="star-avatars" data-github="stargazers">
-                    <Stargazers stargazers={stats?.stargazers} />
-                  </div>
-                  <span className={"github-stat-number"} data-stat={"stars"}>
-                    {stats?.repo?.stargazers_count.toLocaleString() ?? "—"}
-                  </span>
-                  <span className={"github-stat-label"}>
-                    <RichText text={t("info.github.stars")} />
-                  </span>
-                </a>
-                <a
-                  href={"https://github.com/SummaCristian/poliaule/commits/main"}
-                  target={"_blank"}
-                  rel={"noopener"}
-                  className={"github-stat-card"}
-                >
-                  <i
-                    className={"hgi-stroke hgi-git-commit github-stat-icon"}
-                    aria-hidden={"true"}
-                  ></i>
-                  <span className={"github-stat-number"} data-stat={"commits"}>
-                    {stats?.commits?.toLocaleString() ?? "—"}
-                  </span>
-                  <span className={"github-stat-label"}>
-                    <RichText text={t("info.github.commits")} />
-                  </span>
-                </a>
-                <a
-                  href={"https://github.com/SummaCristian/poliaule/issues"}
-                  target={"_blank"}
-                  rel={"noopener"}
-                  className={"github-stat-card"}
-                >
-                  <i className={"hgi-stroke hgi-bug-01 github-stat-icon"} aria-hidden={"true"}></i>
-                  <span className={"github-stat-number"} data-stat={"issues"}>
-                    {stats?.repo?.open_issues_count.toLocaleString() ?? "—"}
-                  </span>
-                  <span className={"github-stat-label"}>
-                    <RichText text={t("info.github.issues")} />
-                  </span>
-                </a>
-                <a
-                  href={"https://github.com/SummaCristian/poliaule/blob/main/LICENSE"}
-                  target={"_blank"}
-                  rel={"noopener"}
-                  className={"github-stat-card"}
-                >
-                  <i
-                    className={"hgi-stroke hgi-balance-scale github-stat-icon"}
-                    aria-hidden={"true"}
-                  ></i>
-                  <span className={"github-stat-number"} data-stat={"license"}>
-                    {stats?.repo?.license?.spdx_id ?? "—"}
-                  </span>
-                  <span className={"github-stat-label"}>
-                    <RichText text={t("info.github.license")} />
-                  </span>
-                </a>
-              </div>
-              <a
-                href={"https://github.com/SummaCristian/poliaule/issues/new"}
-                target={"_blank"}
-                rel={"noopener"}
-                className={"create-issue-btn"}
-              >
-                <i className={"hgi-stroke hgi-bug-01"} aria-hidden={"true"}></i>
-                <span>
-                  <RichText text={t("info.github.createIssue")} />
-                </span>
-              </a>
-              <div className={"github-extended"}>
-                <div className={"github-subsection"}>
-                  <div className={"github-subsection-header"}>
-                    <i className={"hgi-stroke hgi-code"} aria-hidden={"true"}></i>
-                    <span>
-                      <RichText text={t("info.github.languages")} />
-                    </span>
-                  </div>
-                  <div data-github="lang-bar">
-                    <LanguageBar langs={stats?.langs} />
-                  </div>
-                </div>
-                <div className={"github-subsection"}>
-                  <div className={"github-subsection-header"}>
-                    <i className={"hgi-stroke hgi-user-group"} aria-hidden={"true"}></i>
-                    <span>
-                      <RichText text={t("info.github.contributors")} />
-                    </span>
-                  </div>
-                  <div data-github="contributors">
-                    <Contributors contributors={stats?.contributors} />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <h1 className="info-hero-title">PoliAule</h1>
+        {showBadge ? <h4 className="info-hero-badge secondary">{badgeText}</h4> : null}
       </div>
-    </>
+
+      <div className="badge-container">
+        <a
+          href="https://poliaule.com"
+          target="_blank"
+          rel="noopener"
+          className="info-badge info-badge--stable liquid-glass"
+        >
+          <img
+            src="/favicons/main/icon-256.webp"
+            srcSet={iconSrcset("main")}
+            sizes="56px"
+            width={56}
+            height={56}
+            alt=""
+            draggable={false}
+          />
+          <span className="badge-text">
+            <span className="top-text">poliaule.com</span>
+            <span className="bottom-text">
+              <RichText text={t("info.aboutMe.website")} />
+            </span>
+            <span className="badge-description">
+              <RichText text={t("info.badge.stableDesc")} />
+            </span>
+          </span>
+        </a>
+        <a
+          href="https://beta.poliaule.com"
+          target="_blank"
+          rel="noopener"
+          className="info-badge info-badge--beta liquid-glass"
+        >
+          <img
+            src="/favicons/beta/icon-256.webp"
+            srcSet={iconSrcset("beta")}
+            sizes="56px"
+            width={56}
+            height={56}
+            alt=""
+            draggable={false}
+          />
+          <span className="badge-text">
+            <span className="top-text">beta.poliaule.com</span>
+            <span className="bottom-text">
+              <RichText text={t("info.aboutMe.beta")} />
+            </span>
+            <span className="badge-description">
+              <RichText text={t("info.badge.betaDesc")} />
+            </span>
+          </span>
+          <span className="badge-label">BETA</span>
+        </a>
+      </div>
+
+      <div className="info-content">
+        <section className="info-section info-intro">
+          <h2 className="info-section-title">
+            <RichText text={t("info.about.title")} />
+          </h2>
+          <div className="info-prose">
+            <p>
+              <RichText text={t("info.body.intro")} />
+            </p>
+            <p>
+              <RichText text={t("info.body.parag1")} />
+            </p>
+          </div>
+          <div className="info-meta">
+            <a
+              href="https://polinetwork.org/it/projects/"
+              target="_blank"
+              rel="noopener"
+              className="info-pill info-pill--polinetwork lg-glass liquid-glass"
+            >
+              <img src="https://polinetwork.org/favicon.ico" alt="" draggable={false} />
+              <span>
+                <RichText text={t("info.polinetwork")} />
+              </span>
+            </a>
+            <p className="info-disclaimer">
+              <RichText text={t("footer.disclaimer5")} />
+            </p>
+          </div>
+        </section>
+
+        <section className="info-section info-pwa">
+          <h2 className="info-section-title">
+            <RichText text={t("info.pwa.title")} />
+          </h2>
+          <p className="info-section-subtitle">
+            <RichText text={t("info.pwa.subtitle")} />
+          </p>
+          <SegmentedControl
+            className="info-pwa-switch"
+            value={platform}
+            // SAFETY: onSelect only ever fires with a value from the options list below.
+            onSelect={(value) => setPlatform(value as "ios" | "android" | "desktop")}
+            options={[
+              {
+                value: "ios",
+                label: (
+                  <>
+                    {APPLE_ICON}
+                    <span>iPhone</span>
+                  </>
+                ),
+              },
+              {
+                value: "android",
+                label: (
+                  <>
+                    {ANDROID_ICON}
+                    <span>Android</span>
+                  </>
+                ),
+              },
+              {
+                value: "desktop",
+                label: (
+                  <>
+                    <i className="hgi-stroke hgi-computer" aria-hidden="true" />
+                    <span>Desktop</span>
+                  </>
+                ),
+              },
+            ]}
+          />
+          <div className="info-pwa-panels">
+            <PwaPanel platform="ios" active={platform === "ios"} stepCount={4} />
+            <PwaPanel platform="android" active={platform === "android"} stepCount={4} />
+            <PwaPanel platform="desktop" active={platform === "desktop"} stepCount={3} />
+          </div>
+        </section>
+
+        <section className="info-section about-me-section">
+          <h2 className="info-section-title">
+            <RichText text={t("info.aboutMe.title")} />
+          </h2>
+          <div className="about-me-container">
+            <img
+              src="/assets/profile.jpg"
+              alt="Profile picture of Cristian Summa"
+              className="about-me-photo"
+              draggable={false}
+            />
+            <div className="about-me-bubbles">
+              <p className="message-bubble">
+                <RichText text={t("info.aboutMe.parag1")} />
+              </p>
+              <p className="message-bubble">
+                <RichText text={t("info.aboutMe.parag2")} />
+              </p>
+              <p className="message-bubble">
+                <RichText text={t("info.aboutMe.parag3")} />
+              </p>
+              <div className="typing-indicator message-bubble">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="info-section github-stats-section">
+          <div className="info-section-header">
+            <h2 className="info-section-title">
+              <RichText text={t("info.github.title")} />
+            </h2>
+            <a
+              href={`https://github.com/${GITHUB_REPO}`}
+              target="_blank"
+              rel="noopener"
+              className="info-pill lg-glass liquid-glass"
+            >
+              {GITHUB_ICON}
+              <span>GitHub</span>
+            </a>
+          </div>
+          <div className="github-stats-grid">
+            <a
+              href={`https://github.com/${GITHUB_REPO}/stargazers`}
+              target="_blank"
+              rel="noopener"
+              className="github-stat-card lg-glass liquid-glass"
+            >
+              <span className="star-avatars" data-github="stargazers">
+                <Stargazers stargazers={stats?.stargazers} />
+              </span>
+              <span className="github-stat-number" data-stat="stars">
+                {stats?.repo?.stargazers_count.toLocaleString() ?? "—"}
+              </span>
+              <span className="github-stat-label">
+                <RichText text={t("info.github.stars")} />
+              </span>
+            </a>
+            <a
+              href={`https://github.com/${GITHUB_REPO}/commits/main`}
+              target="_blank"
+              rel="noopener"
+              className="github-stat-card lg-glass liquid-glass"
+            >
+              <i className="hgi-stroke hgi-git-commit github-stat-icon" aria-hidden="true" />
+              <span className="github-stat-number" data-stat="commits">
+                {stats?.commits?.toLocaleString() ?? "—"}
+              </span>
+              <span className="github-stat-label">
+                <RichText text={t("info.github.commits")} />
+              </span>
+            </a>
+            <a
+              href={`https://github.com/${GITHUB_REPO}/issues`}
+              target="_blank"
+              rel="noopener"
+              className="github-stat-card lg-glass liquid-glass"
+            >
+              <i className="hgi-stroke hgi-bug-01 github-stat-icon" aria-hidden="true" />
+              <span className="github-stat-number" data-stat="issues">
+                {stats?.repo?.open_issues_count.toLocaleString() ?? "—"}
+              </span>
+              <span className="github-stat-label">
+                <RichText text={t("info.github.issues")} />
+              </span>
+            </a>
+            <a
+              href={`https://github.com/${GITHUB_REPO}/blob/main/LICENSE`}
+              target="_blank"
+              rel="noopener"
+              className="github-stat-card lg-glass liquid-glass"
+            >
+              <i className="hgi-stroke hgi-balance-scale github-stat-icon" aria-hidden="true" />
+              <span className="github-stat-number" data-stat="license">
+                {stats?.repo?.license?.spdx_id ?? "—"}
+              </span>
+              <span className="github-stat-label">
+                <RichText text={t("info.github.license")} />
+              </span>
+            </a>
+          </div>
+
+          <div className="github-subsection">
+            <h3 className="github-subsection-title">
+              <RichText text={t("info.github.languages")} />
+            </h3>
+            <div data-github="lang-bar">
+              <LanguageBar langs={stats?.langs} />
+            </div>
+          </div>
+          <div className="github-subsection">
+            <h3 className="github-subsection-title">
+              <RichText text={t("info.github.contributors")} />
+            </h3>
+            <div data-github="contributors">
+              <Contributors contributors={stats?.contributors} />
+            </div>
+          </div>
+
+          <a
+            href={`https://github.com/${GITHUB_REPO}/issues/new`}
+            target="_blank"
+            rel="noopener"
+            className="info-pill info-pill--issue lg-glass liquid-glass"
+          >
+            <i className="hgi-stroke hgi-bug-01" aria-hidden="true" />
+            <span>
+              <RichText text={t("info.github.createIssue")} />
+            </span>
+          </a>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+function PwaPanel({
+  platform,
+  active,
+  stepCount,
+}: {
+  platform: "ios" | "android" | "desktop";
+  active: boolean;
+  stepCount: number;
+}) {
+  return (
+    <div
+      className={`info-pwa-panel${active ? " active" : ""}`}
+      data-pwa-platform={platform}
+      inert={!active}
+    >
+      <p className="info-pwa-panel-title">
+        <RichText text={t(`info.pwa.${platform}.title`)} />
+      </p>
+      <ol className="info-steps">
+        {Array.from({ length: stepCount }, (_, i) => (
+          <li key={i}>
+            <RichText text={t(`info.pwa.${platform}.step${i + 1}`)} />
+          </li>
+        ))}
+      </ol>
+    </div>
   );
 }
 
@@ -1146,7 +1226,8 @@ function Stargazers({ stargazers }: { stargazers?: GithubUser[] | null }) {
 }
 
 function Contributors({ contributors }: { contributors?: GithubContributor[] | null }) {
-  if (!contributors?.length) return <div className="github-skeleton" style={{ height: "3rem" }} />;
+  if (!contributors?.length)
+    return <div className="github-skeleton" style={{ height: "2.75rem" }} />;
 
   return (
     <div className="contributors-list">
@@ -1156,7 +1237,7 @@ function Contributors({ contributors }: { contributors?: GithubContributor[] | n
           href={safeUrl(user.html_url)}
           target="_blank"
           rel="noopener"
-          className="contributor-item"
+          className="contributor-item lg-glass liquid-glass"
           title={user.login}
         >
           <img
