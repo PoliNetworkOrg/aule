@@ -10,6 +10,11 @@
 //
 // The motion itself is pure CSS (--vt-spring); all this has to do is write the
 // starting geometry into custom properties for the keyframes to read.
+//
+// They go on <html>, registered as not inherited (see classroom-detail.css,
+// which hands them down the transition's pseudo-elements): inherited, every
+// change to one restyled every element in the page (~20ms on an older phone),
+// in the frame the transition captures the old state in.
 
 const VARS = [
   "--zoom-x",
@@ -20,7 +25,16 @@ const VARS = [
   "--zoom-card-radius",
   "--arc-x",
   "--arc-y",
-];
+] as const;
+
+function writeVars(vars: Partial<Record<(typeof VARS)[number], string>> | null) {
+  const style = document.documentElement.style;
+
+  for (const v of VARS) {
+    if (vars) style.setProperty(v, vars[v] ?? null);
+    else style.removeProperty(v);
+  }
+}
 
 // Peak of each half of the arc, as a fraction of that axis's own distance: the
 // horizontal running ahead of the spring, the vertical dragging behind it.
@@ -49,37 +63,36 @@ export function setZoomOrigin(rect: DOMRect | null | undefined, radius = 16): bo
   // One scale for both axes, taken from the width: the hero photo is as wide as
   // the page, so matching widths is what aligns it with the card.
   const scale = rect.width / vw;
-  const style = document.documentElement.style;
-  style.setProperty("--zoom-x", `${rect.left}px`);
-  style.setProperty("--zoom-y", `${rect.top}px`);
-  style.setProperty("--zoom-scale", `${scale}`);
-  // clip-path applies in the snapshot's own coordinates, i.e. before the scale,
-  // so the card's height has to be divided back out. The left/right insets stay
-  // 0 at every point of the animation (the scale comes from the width), which
-  // is why only the bottom one is variable.
-  style.setProperty("--zoom-clip", `${Math.max(0, vh - rect.height / scale)}px`);
-  style.setProperty("--zoom-radius", `${radius / scale}px`);
-  // The same radius in screen px, for the hero's own corners to morph along
-  // with the page's clip instead of guessing at the card's shape.
-  style.setProperty("--zoom-card-radius", `${radius}px`);
 
-  // The arc's two peak offsets. The page travels from the card's top left
-  // corner to the viewport's, so its distance is just the card's offset,
-  // negated: x runs ahead of that (further left, sooner), y falls behind it
-  // (still low, later) — which is what bows the path downwards rather than
-  // over the top. Both are written the same way for open and close: the close
-  // uses its own keyframes to retrace this same curve, rather than mirroring
-  // it, so the two directions follow one path.
-  style.setProperty("--arc-x", `${-ARC_LEAD * rect.left}px`);
-  style.setProperty("--arc-y", `${ARC_DRAG * rect.top}px`);
+  writeVars({
+    "--zoom-x": `${rect.left}px`,
+    "--zoom-y": `${rect.top}px`,
+    "--zoom-scale": `${scale}`,
+    // The snapshot's height and corner radius are in its own coordinates, i.e.
+    // before the scale, so the card's height has to be divided back out. Its
+    // width stays whole at every point of the animation (the scale comes from
+    // the width), which is why only the bottom edge is variable.
+    "--zoom-clip": `${Math.max(0, vh - rect.height / scale)}px`,
+    "--zoom-radius": `${radius / scale}px`,
+    // The same radius in screen px, for the hero's own corners to morph along
+    // with the page's clip instead of guessing at the card's shape.
+    "--zoom-card-radius": `${radius}px`,
+    // The arc's two peak offsets. The page travels from the card's top left
+    // corner to the viewport's, so its distance is just the card's offset,
+    // negated: x runs ahead of that (further left, sooner), y falls behind it
+    // (still low, later) — which is what bows the path downwards rather than
+    // over the top. Both are written the same way for open and close: the
+    // close uses its own keyframes to retrace this same curve, rather than
+    // mirroring it, so the two directions follow one path.
+    "--arc-x": `${-ARC_LEAD * rect.left}px`,
+    "--arc-y": `${ARC_DRAG * rect.top}px`,
+  });
 
   return true;
 }
 
 export function clearZoomOrigin(): void {
-  const style = document.documentElement.style;
-
-  for (const v of VARS) style.removeProperty(v);
+  writeVars(null);
 }
 
 /** The card's corner radius as a number of px, from its computed style. */

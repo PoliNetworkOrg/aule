@@ -94,13 +94,17 @@ body.detail-open {
     var(--detail-tint, var(--background-color)) 35%,
     var(--background-color)
   );
-  /* The header's top strip, safe-area rectangle and fade gradient (style.css)
-     take the same color, so the top of the screen follows the page instead of
-     staying the plain theme background. */
+  transition: background-color 0.6s ease;
+}
+
+/* The header's top strip, safe-area rectangle and fade gradient (style.css)
+   take the same color, so the top of the screen follows the page instead of
+   staying the plain theme background. Set on the two elements that read it,
+   not on body: it's inherited, so a change on body restyled every element in
+   the page (the close's hold below, in the frame its old state is captured
+   in). */
+body.detail-open :is(.header, .header-top-strip) {
   --header-bg: var(--detail-page-bg);
-  transition:
-    background-color 0.6s ease,
-    --header-bg 0.35s ease;
 }
 
 /* Registered so it can transition (a gradient can't, but the color stops that
@@ -128,11 +132,21 @@ body {
     var(--detail-tint, var(--background-color)) 35%,
     var(--background-color)
   );
+}
+
+:is(.header, .header-top-strip) {
   transition: --header-bg 0.35s ease;
 }
 
-.header-ctl-vt body {
+/* :root for the specificity: this has to outrank body.detail-open's rule above
+   ((0,3,0) against (0,2,1)), or the top strip, which is live in the page's
+   snapshot, takes the tint the moment the page opens while the header's
+   frozen one only shows it at the end. And it snaps rather than transitions,
+   so the close's old snapshot, taken the frame the hold starts, already has
+   the plain color. */
+:root.header-ctl-vt :is(.header, .header-top-strip) {
   --header-bg: var(--background-color);
+  transition: none;
 }
 
 /* Hide tab contents and footer while the detail panel is open */
@@ -439,9 +453,30 @@ body.detail-open .tab-content * {
   height: calc(var(--photo-h) + var(--bd-bleed) * 2);
   padding: var(--bd-bleed);
   box-sizing: border-box;
-  background: var(--backdrop-img) center / cover repeat;
+  /* Read back by classroom-detail.tsx (_measureBackdrop) to pre-render the
+     same thing: the blur resolved to px here, where cqw means the backdrop. */
+  --bd-blur-px: var(--bd-blur);
+  --bd-repeat: repeat;
+  background: var(--backdrop-img) center / cover var(--bd-repeat);
   background-origin: content-box;
   filter: blur(var(--bd-blur)) saturate(1.25);
+}
+
+@property --bd-blur-px {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+/* Pre-rendered (utils/photo.ts blurredBackdrop): --backdrop-img is already
+   this whole box, tiles, blur and saturation included, so it is stretched
+   over it with no filter left for the GPU to redo on every frame the page
+   moves (all of the zoom). */
+.detail-photo-backdrop.prerendered::before,
+.detail-photo-backdrop.prerendered::after {
+  background: var(--backdrop-img) 0 0 / 100% 100% no-repeat;
+  background-origin: border-box;
+  filter: none;
 }
 
 .detail-photo-backdrop::after {
@@ -460,7 +495,7 @@ body.detail-open .tab-content * {
   }
 
   .detail-photo-backdrop::before {
-    background-repeat: repeat-x;
+    --bd-repeat: repeat-x;
   }
 }
 
@@ -479,6 +514,18 @@ body.detail-open .tab-content * {
   .detail-photo-backdrop::before,
   .detail-photo-backdrop::after {
     filter: blur(var(--bd-blur)) saturate(1.25) brightness(var(--photo-dim, 1));
+  }
+
+  /* brightness() without a filter: black over the image at 1 - the factor
+     is the same multiplication. */
+  .detail-photo-backdrop.prerendered::before,
+  .detail-photo-backdrop.prerendered::after {
+    --bd-shade: rgb(0 0 0 / calc(1 - var(--photo-dim, 1)));
+    background:
+      linear-gradient(var(--bd-shade), var(--bd-shade)),
+      var(--backdrop-img) 0 0 / 100% 100% no-repeat;
+    background-origin: border-box;
+    filter: none;
   }
 }
 
@@ -1080,8 +1127,16 @@ body.detail-open .tab-content * {
   transition: color 0.6s ease;
 }
 
-/* Desktop: sections flow as a masonry grid of cards (CSS multi-column, so
-   each card lands in the shortest column and keeps its natural height). */
+/* The cards are split into two .detail-column wrappers (features + schedule,
+   hours + map). Narrow: the wrappers dissolve and the cards stack. Desktop:
+   the wrappers sit side by side, each card keeping its natural height. Not
+   CSS multi-column: WebKit doesn't paint backdrop-filtered cards in a
+   multicol's second column (the opening-hours card was invisible, though
+   still selectable, on iPad). */
+.detail-column {
+  display: contents;
+}
+
 @media (min-width: 1000px) {
   .detail-header {
     max-width: 1100px;
@@ -1089,14 +1144,15 @@ body.detail-open .tab-content * {
 
   .detail-content {
     max-width: 1100px;
-    column-count: 2;
-    column-gap: 1rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
   }
 
-  .detail-content > .detail-section {
-    break-inside: avoid;
-    display: inline-block; /* keeps backdrop-filter cards unsplit in WebKit */
-    width: 100%;
+  .detail-column {
+    display: block;
+    flex: 1 1 0;
+    min-width: 0;
   }
 }
 
@@ -2328,6 +2384,64 @@ body.detail-open .tab-content * {
   -webkit-backdrop-filter: none;
 }
 
+/* Hold the page still for the length of an open/close transition (toggled by
+   classroom-detail.tsx). The page's snapshot is live, so anything moving on
+   the page repaints that whole layer — blurred backdrop, masks, glass — on
+   every frame of the zoom, and that repaint is what the slower engines can't
+   keep up with. So, for those ~0.4s:
+   - entrance animations are held at their first frame and let go when the
+     zoom lands (the photo's scroll-driven shrink is left alone: it sits at 0
+     anyway, and pausing a scroll timeline is asking for trouble);
+   - transitions snap, so the snapshot shows the settled state;
+   - glass loses its backdrop-filter but keeps its tint. Over the page's
+     near-flat background the blur shows almost nothing, and Safari composites
+     backdrop-filter live even inside a snapshot, at the snapshot's original
+     size, ignoring the zoom (the same bug as .header-ctl-vt above). */
+#classroom-detail-overlay.detail-vt-freeze *:not(.detail-photo-container.loaded) {
+  animation-play-state: paused !important;
+}
+
+#classroom-detail-overlay.detail-vt-freeze * {
+  transition: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+/* Outside the page, two more things kept the snapshots repainting: the
+   container's padding-bottom easing to 0 as the tab bar leaves (a layout
+   animation of the whole document, on every frame), and the header's data
+   status dot, which pulses forever. The header only ever shows its old,
+   still snapshot during the transition, so pausing it changes nothing on
+   screen. */
+/* Its own class, not .detail-vt-freeze: see _freezeTargets() in
+   classroom-detail.tsx. */
+.body-container.detail-vt-snap {
+  transition: none !important;
+}
+
+.header.detail-vt-freeze *,
+.header.detail-vt-freeze *::before,
+.header.detail-vt-freeze *::after {
+  animation-play-state: paused !important;
+}
+
+/* Measurement switches for ?vtdebug (utils/vt-debug.ts): each takes one piece
+   of the transition away, to see what a given browser is paying for. They
+   look wrong on purpose. */
+:root.vtd-slow {
+  --vt-duration: 2s;
+}
+
+.vtd-noblur .detail-photo-backdrop {
+  display: none !important;
+}
+
+/* The list's cards without their photos (full 1500x1125 JPEGs, ~6.7 MB each
+   decoded), to see what bringing the list back costs on close. */
+.vtd-noimg .classroom-card-photo {
+  display: none !important;
+}
+
 @keyframes header-ctl-scale-in {
   from {
     opacity: 0;
@@ -2471,15 +2585,30 @@ body.detail-open .tab-content * {
     animation:
       detail-zoom-in var(--vt-duration) var(--vt-spring) both,
       detail-zoom-arc var(--vt-duration) linear both;
-    transform-origin: 0 0;
   }
 
   :root.detail-vt-close::view-transition-old(root) {
     animation:
       detail-zoom-out var(--vt-duration) var(--vt-spring) both,
       detail-zoom-arc-back var(--vt-duration) linear both;
-    transform-origin: 0 0;
     z-index: 1; /* the shrinking page rides above the list it shrinks into */
+  }
+
+  /* The trim to the card's box is the snapshot's own height, shortened from
+     the bottom and cropped (not squashed) by `cover` from the top, and its
+     corners are its border-radius. That was one `clip-path: inset(... round
+     ...)` before, which Chrome can't animate without repainting a mask the
+     size of the screen on every frame: on an older phone at a high pixel
+     ratio, that re-raster was what the GPU spent the open on. The clip is
+     on the snapshot itself (Chrome doesn't clip a view-transition image to
+     its box otherwise), not on the image pair the hero uses it on: this
+     pair also holds the list's snapshot, which stays whole. */
+  :root.detail-vt-open::view-transition-new(root),
+  :root.detail-vt-close::view-transition-old(root) {
+    transform-origin: 0 0;
+    object-fit: cover;
+    object-position: top;
+    overflow: clip;
   }
 
   /* ---- The shared element (card <-> hero photo) ------------------------ */
@@ -2572,6 +2701,21 @@ body.detail-open .tab-content * {
     overflow: hidden;
   }
 
+  /* ?vtdebug=noclip / noarc (see the switches in utils/vt-debug.ts). !important
+     declarations outrank animations, so these switch the animated value off
+     outright. */
+  :root.vtd-noclip::view-transition-new(root),
+  :root.vtd-noclip::view-transition-old(root) {
+    height: 100% !important;
+    border-radius: 0 !important;
+  }
+
+  :root.vtd-noarc::view-transition-new(root),
+  :root.vtd-noarc::view-transition-old(root),
+  :root.vtd-noarc::view-transition-image-pair(detail-hero) {
+    translate: none !important;
+  }
+
   /* ---- Header ---------------------------------------------------------- */
 
   /* The header is a constant translucent/blurred overlay, not changing
@@ -2656,28 +2800,85 @@ body.detail-open .tab-content * {
   }
 }
 
-/* The page grows out of / shrinks into the card's rounded box. --zoom-* are
-   written by utils/vt-motion.js right before the transition starts; the
-   fallbacks make these a plain no-op if they ever aren't. */
+/* The zoom's geometry, written onto <html> by utils/vt-motion.ts right before a
+   transition starts. Registered as not inherited, and handed down the
+   transition's pseudo-element tree by hand: only those pseudo-elements read
+   it, and a custom property that is inherited reaches every element of the
+   page, so each change to one restyled all of them (~20ms on an older phone,
+   in the frame the transition captures its old state in). */
+@property --zoom-x {
+  syntax: "*";
+  inherits: false;
+}
+@property --zoom-y {
+  syntax: "*";
+  inherits: false;
+}
+@property --zoom-scale {
+  syntax: "*";
+  inherits: false;
+}
+@property --zoom-clip {
+  syntax: "*";
+  inherits: false;
+}
+@property --zoom-radius {
+  syntax: "*";
+  inherits: false;
+}
+@property --zoom-card-radius {
+  syntax: "*";
+  inherits: false;
+}
+@property --arc-x {
+  syntax: "*";
+  inherits: false;
+}
+@property --arc-y {
+  syntax: "*";
+  inherits: false;
+}
+
+::view-transition,
+::view-transition-group(*),
+::view-transition-image-pair(*),
+::view-transition-old(*),
+::view-transition-new(*) {
+  --zoom-x: inherit;
+  --zoom-y: inherit;
+  --zoom-scale: inherit;
+  --zoom-clip: inherit;
+  --zoom-radius: inherit;
+  --zoom-card-radius: inherit;
+  --arc-x: inherit;
+  --arc-y: inherit;
+}
+
+/* The page grows out of / shrinks into the card's rounded box. The fallbacks
+   make these a plain no-op if the geometry ever isn't there. */
 @keyframes detail-zoom-in {
   from {
     transform: translate(var(--zoom-x, 0px), var(--zoom-y, 0px)) scale(var(--zoom-scale, 1));
-    clip-path: inset(0 0 var(--zoom-clip, 0px) 0 round var(--zoom-radius, 0px));
+    height: calc(100% - var(--zoom-clip, 0px));
+    border-radius: var(--zoom-radius, 0px);
   }
   to {
     transform: none;
-    clip-path: inset(0 0 0 0 round 0);
+    height: 100%;
+    border-radius: 0;
   }
 }
 
 @keyframes detail-zoom-out {
   from {
     transform: none;
-    clip-path: inset(0 0 0 0 round 0);
+    height: 100%;
+    border-radius: 0;
   }
   to {
     transform: translate(var(--zoom-x, 0px), var(--zoom-y, 0px)) scale(var(--zoom-scale, 1));
-    clip-path: inset(0 0 var(--zoom-clip, 0px) 0 round var(--zoom-radius, 0px));
+    height: calc(100% - var(--zoom-clip, 0px));
+    border-radius: var(--zoom-radius, 0px);
   }
 }
 

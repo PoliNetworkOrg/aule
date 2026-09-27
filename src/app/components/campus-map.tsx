@@ -786,8 +786,15 @@ async function boot(currentGeneration: number) {
   instance.on("moveend", updateShifted);
 
   // Keep the GL canvas glued to the panel through rotations / dynamic toolbars.
-  const resizeObserver = new ResizeObserver(() => {
-    if (map) instance.resize();
+  // Not down to nothing, though: hiding it (closing the detail page it's
+  // embedded in, opening one over the Campus tab) collapses it to 0x0, and
+  // Mapbox reallocating its canvas for that took 80-230ms of an older phone's
+  // main thread, right as the close transition started. A hidden map keeps its
+  // last size; this fires again, with a real one, once it's shown.
+  const resizeObserver = new ResizeObserver(([entry]) => {
+    const { width, height } = entry!.contentRect;
+
+    if (map && width && height) instance.resize();
   });
 
   observers.push(resizeObserver);
@@ -1336,6 +1343,11 @@ export function parkMap() {
   placeEl();
 }
 
+/** Whether the map's own tab (Campus) is the one on screen. */
+export function isMapTabShowing() {
+  return !!document.getElementById(CONTAINER_ID)?.classList.contains("visible");
+}
+
 /** Ends the preview: the map goes back to the Campus tab exactly as it was left. */
 export function releaseMap() {
   embedToken++;
@@ -1351,7 +1363,10 @@ export function releaseMap() {
   embedShownKey = null;
   setInteractive(true);
   placeEl();
-  map.resize();
+
+  // Back in a tab that's hidden unless it's Campus: see the ResizeObserver in
+  // boot(), which sizes it once the tab shows.
+  if (mapEl && mapEl.clientWidth && mapEl.clientHeight) map.resize();
 
   const view = savedView;
   savedView = null;

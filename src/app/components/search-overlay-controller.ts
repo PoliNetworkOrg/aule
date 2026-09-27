@@ -35,7 +35,7 @@
 import { t, getLocale, onLanguageSwitch } from "../i18n";
 import { escapeHtml, highlight } from "../utils/html";
 import { createTimeFormatter } from "../utils/time-format";
-import { fetchPhotoUrl, photoUrlCache } from "../utils/photo";
+import { fetchThumbUrl, thumbUrlCache, markPhotoBroken, isPhotoBroken } from "../utils/photo";
 import {
   runSearch,
   getProfessorSchedule,
@@ -229,8 +229,12 @@ const rowPhotoObserver = new IntersectionObserver(
       const roomId = Number(el.dataset.photoFor);
       const img = el.querySelector<HTMLImageElement>("img")!;
 
-      void fetchPhotoUrl(roomId).then((url) => {
-        img.onerror = () => el.classList.add("photo-failed");
+      void fetchThumbUrl(roomId).then((url) => {
+        img.onerror = () => {
+          markPhotoBroken(roomId);
+          el.classList.add("photo-failed");
+        };
+
         img.src = url;
         img
           .decode()
@@ -247,17 +251,18 @@ function buildPhotoLead(room: ClassroomSearchItem["room"], large: boolean) {
 
   lead.className = "search-row-lead" + (large ? " search-row-lead--lg" : "");
 
-  if (room.idfoto) {
+  if (room.idfoto && !isPhotoBroken(room.id)) {
     lead.classList.add("search-row-lead--photo");
     lead.dataset.photoFor = String(room.id);
-    const cachedUrl = photoUrlCache.get(room.id);
+    const cachedUrl = thumbUrlCache.get(room.id);
 
     lead.innerHTML = `<img class="search-row-photo${cachedUrl ? " loaded" : ""}" alt=""${cachedUrl ? ` src="${escapeHtml(cachedUrl)}"` : ""}>`;
 
     if (cachedUrl)
-      lead
-        .querySelector("img")!
-        .addEventListener("error", () => lead.classList.add("photo-failed"));
+      lead.querySelector("img")!.addEventListener("error", () => {
+        markPhotoBroken(room.id);
+        lead.classList.add("photo-failed");
+      });
     else rowPhotoObserver.observe(lead);
   } else {
     lead.classList.add("search-row-lead--icon");

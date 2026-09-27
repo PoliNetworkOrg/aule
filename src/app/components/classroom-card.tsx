@@ -7,7 +7,7 @@ import {
   type CSSProperties,
 } from "react";
 import { onTranslationChange, getTranslationVersion, t } from "../i18n";
-import { fetchPhotoUrl, photoUrlCache } from "../utils/photo";
+import { fetchThumbUrl, thumbUrlCache, markPhotoBroken, isPhotoBroken } from "../utils/photo";
 import { isFavourite } from "../utils/favourites";
 import { highlightRegExp } from "../utils/html";
 import type { Building, Classroom, ClassroomStatus } from "../types";
@@ -88,14 +88,16 @@ export function ClassroomCard({
   const cardRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
 
+  const hasPhoto = !!classroom.idfoto && !isPhotoBroken(classroom.id);
+
   const [photo, setPhoto] = useState(() => ({
-    url: photoUrlCache.get(classroom.id),
-    loaded: photoUrlCache.has(classroom.id),
+    url: thumbUrlCache.get(classroom.id),
+    loaded: thumbUrlCache.has(classroom.id),
     failed: false,
   }));
 
   useEffect(() => {
-    if (!classroom.idfoto || photo.url) return;
+    if (!hasPhoto || photo.url) return;
     let disposed = false;
 
     const observer = new IntersectionObserver(
@@ -103,7 +105,7 @@ export function ClassroomCard({
         for (const entry of entries) {
           if (!entry.isIntersecting) continue;
           observer.unobserve(entry.target);
-          void fetchPhotoUrl(classroom.id).then((url) => {
+          void fetchThumbUrl(classroom.id).then((url) => {
             if (!disposed) setPhoto({ url, loaded: false, failed: false });
           });
         }
@@ -117,7 +119,7 @@ export function ClassroomCard({
       disposed = true;
       observer.disconnect();
     };
-  }, [classroom.id, classroom.idfoto, photo.url]);
+  }, [classroom.id, hasPhoto, photo.url]);
   useEffect(() => {
     const img = imgRef.current;
 
@@ -142,7 +144,7 @@ export function ClassroomCard({
   return (
     <div
       ref={cardRef}
-      className={`classroom-card ${classroom.idfoto ? "classroom-card--photo" : "classroom-card--plain"}${showFavouriteStar && favourite ? " classroom-card--fav" : ""}${photo.failed ? " photo-failed" : ""}`}
+      className={`classroom-card ${hasPhoto ? "classroom-card--photo" : "classroom-card--plain"}${showFavouriteStar && favourite ? " classroom-card--fav" : ""}${photo.failed ? " photo-failed" : ""}`}
       data-open-classroom={classroom.id}
       data-query-from={fromTime || undefined}
       data-query-to={toTime || undefined}
@@ -155,14 +157,17 @@ export function ClassroomCard({
       style={style}
     >
       <div className="classroom-card-clip">
-        {classroom.idfoto ? (
+        {hasPhoto ? (
           <>
             <img
               ref={imgRef}
               className={`classroom-card-photo${photo.loaded ? " loaded" : ""}`}
               alt=""
               src={photo.url}
-              onError={() => setPhoto((current) => ({ ...current, failed: true }))}
+              onError={() => {
+                markPhotoBroken(classroom.id);
+                setPhoto((current) => ({ ...current, failed: true }));
+              }}
             />
             <div className="classroom-card-scrim" />
           </>

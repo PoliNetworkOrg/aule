@@ -3,6 +3,9 @@ import { getApiBase } from "../config.ts";
 // classroom id (number) → resolved URL string
 export const photoUrlCache = new Map<number, string>();
 
+// classroom id (number) → resolved thumbnail URL string
+export const thumbUrlCache = new Map<number, string>();
+
 export async function fetchPhotoUrl(classroomId: number) {
   if (photoUrlCache.has(classroomId)) return photoUrlCache.get(classroomId)!;
 
@@ -10,6 +13,39 @@ export async function fetchPhotoUrl(classroomId: number) {
   photoUrlCache.set(classroomId, url);
 
   return url;
+}
+
+/**
+ * The room's thumbnail URL, without marking it as loaded. It's 640px on its
+ * long side (scripts/fetch_photos.py writes it next to the full photo), where
+ * the full photo is 1500x1125, about 6.7 MB once decoded, for a card ~160 CSS
+ * px wide; a list of those was what made older phones stutter.
+ */
+export function thumbUrl(classroomId: number) {
+  return `${getApiBase()}/v1/photos/${classroomId}/thumb`;
+}
+
+/** fetchPhotoUrl for the thumbnail: what cards, search rows and the detail page's zoom show. */
+export async function fetchThumbUrl(classroomId: number) {
+  if (thumbUrlCache.has(classroomId)) return thumbUrlCache.get(classroomId)!;
+
+  const url = thumbUrl(classroomId);
+  thumbUrlCache.set(classroomId, url);
+
+  return url;
+}
+
+// classroom ids (number) whose photo failed to load this session
+const brokenPhotoIds = new Set<number>();
+
+/** Remembers that a room's photo failed to load, so the app stops treating it as having one. */
+export function markPhotoBroken(classroomId: number) {
+  brokenPhotoIds.add(classroomId);
+}
+
+/** Whether a room's photo is known to have failed to load this session. */
+export function isPhotoBroken(classroomId: number) {
+  return brokenPhotoIds.has(classroomId);
 }
 
 // photo URL → CSS color string, or null when it couldn't be read (canvas taint, decode error)
@@ -20,6 +56,12 @@ const photoLumCache = new Map<string, number>();
 
 // photo URL → average relative luminance of the whole photo (drives dark-mode dimming)
 const photoAvgLumCache = new Map<string, number>();
+
+// photo URL → the photo 96px wide, kept from extractPhotoColor's load for blurredBackdrop
+const photoSmallCache = new Map<string, HTMLCanvasElement>();
+
+// photo URL + box → data URL of its pre-blurred backdrop
+const backdropCache = new Map<string, string>();
 
 /** Synchronous read of the whole photo's average luminance (null if not extracted yet / unreadable). */
 export function getCachedPhotoAverageLuminance(url: string) {
@@ -100,6 +142,20 @@ export function extractPhotoColor(url: string): Promise<string | null> {
         }
 
         photoAvgLumCache.set(url, avg / (all.length / 4));
+
+        // Small enough to keep, and plenty for a copy blurred by tens of px.
+        const small = document.createElement("canvas");
+
+        small.width = 96;
+        small.height = Math.max(1, Math.round((96 * img.naturalHeight) / img.naturalWidth));
+        const sctx = small.getContext("2d", { willReadFrequently: true });
+
+        if (sctx) {
+          sctx.imageSmoothingQuality = "high";
+          sctx.drawImage(img, 0, 0, small.width, small.height);
+          photoSmallCache.set(url, small);
+        }
+
         done(rgbToTint(r / wSum, g / wSum, b / wSum));
       } catch {
         done(null);
@@ -108,6 +164,128 @@ export function extractPhotoColor(url: string): Promise<string | null> {
 
     img.src = url;
   });
+}
+
+export interface BackdropBox {
+  width: number;
+  height: number;
+  bleed: number;
+  blur: number;
+  repeatY: boolean;
+}
+
+/**
+ * The detail page's blurred photo backdrop, rendered once into a small bitmap:
+ * the same box its CSS draws (the photo `center / cover` in the content box,
+ * tiled into the bleed, blurred and saturated as one), for the CSS to stretch
+ * over that box instead of blurring it live. A live blur is redone by the GPU
+ * on every frame the page moves or scales, which is every frame of the zoom.
+ *
+ * `box` is the pseudo-element's border box in CSS px, with its bleed (the
+ * padding the tiles fill) and blur radius. Null when the photo hasn't been
+ * through extractPhotoColor yet, or a canvas can't blur here.
+ */
+export function blurredBackdrop(
+  url: string,
+  { width, height, bleed, blur, repeatY }: BackdropBox,
+): string | null {
+  const src = photoSmallCache.get(url);
+
+  if (!src || !(width > 0 && height > 0 && blur > 0) || !canvasCanBlur()) return null;
+  const key = `${url}|${Math.round(width)}x${Math.round(height)}|${bleed}|${blur}|${repeatY}`;
+  const cached = backdropCache.get(key);
+
+  if (cached) return cached;
+
+  // One canvas pixel per third of the blur radius: the blur leaves nothing
+  // finer than that, and the browser's smooth upscaling fills in between.
+  const W = Math.max(2, Math.ceil(width / (blur / 3)));
+  const H = Math.max(2, Math.ceil(height / (blur / 3)));
+
+  const sx = W / width,
+    sy = H / height;
+
+  // The tiles first, unfiltered: a canvas filter applies per draw call, and
+  // blurring each tile on its own would leave seams between them.
+  const tiles = document.createElement("canvas");
+
+  tiles.width = W;
+  tiles.height = H;
+  // CPU-backed (willReadFrequently), all three: a GPU canvas is slower to set
+  // up than a bitmap this size takes to draw, and has to be read back for
+  // toDataURL.
+  const t = tiles.getContext("2d", { willReadFrequently: true });
+
+  if (!t) return null;
+  t.imageSmoothingQuality = "high";
+
+  const cx = bleed * sx,
+    cy = bleed * sy;
+
+  const cw = W - 2 * cx,
+    ch = H - 2 * cy;
+
+  const scale = Math.max(cw / src.width, ch / src.height);
+
+  const iw = src.width * scale,
+    ih = src.height * scale;
+
+  const x0 = cx + (cw - iw) / 2,
+    y0 = cy + (ch - ih) / 2;
+
+  const first = (start: number, size: number) => start - Math.ceil(start / size) * size;
+
+  for (let x = first(x0, iw); x < W; x += iw) {
+    if (repeatY) {
+      for (let y = first(y0, ih); y < H; y += ih) t.drawImage(src, x, y, iw, ih);
+    } else {
+      t.drawImage(src, x, y0, iw, ih);
+    }
+  }
+
+  const out = document.createElement("canvas");
+
+  out.width = W;
+  out.height = H;
+  const o = out.getContext("2d", { willReadFrequently: true });
+
+  if (!o) return null;
+  o.filter = `blur(${blur * sx}px) saturate(1.25)`;
+  o.drawImage(tiles, 0, 0);
+  const data = out.toDataURL("image/png");
+
+  backdropCache.set(key, data);
+
+  return data;
+}
+
+// Whether a canvas can blur (ctx.filter): Safari only has it from 18.
+let canBlur: boolean | undefined;
+
+function canvasCanBlur() {
+  if (canBlur !== undefined) return canBlur;
+
+  try {
+    const c = document.createElement("canvas");
+
+    c.width = 5;
+    c.height = 1;
+    const ctx = c.getContext("2d", { willReadFrequently: true });
+
+    if (!ctx) {
+      canBlur = false;
+
+      return canBlur;
+    }
+
+    ctx.filter = "blur(1px)";
+    ctx.fillRect(2, 0, 1, 1);
+    canBlur = ctx.getImageData(0, 0, 1, 1).data[3]! > 0;
+  } catch {
+    canBlur = false;
+  }
+
+  return canBlur;
 }
 
 // WCAG relative luminance of an 8-bit sRGB pixel
