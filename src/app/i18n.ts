@@ -3,7 +3,7 @@ import { fetchJson } from "../lib/query";
 
 const SUPPORTED = ["en", "it"];
 
-const STORAGE_KEY = "poliAule_locale";
+export const STORAGE_KEY = "poliAule_locale";
 
 let translations: Record<string, string> = {};
 

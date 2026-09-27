@@ -16,6 +16,7 @@
   "dependencies": {
     "@tanstack/react-query": "^5.103.1",
     "@tanstack/react-router": "^1.170.38",
+    "qrcode-generator": "^2.0.4",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "vitrium": "^0.4.0",

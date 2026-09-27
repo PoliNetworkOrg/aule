@@ -208,6 +208,31 @@ declare module "vitrium" {
     setDetent(id: string): void;
     destroy(): void;
   }
+  export interface AlertAction {
+    id?: string;
+    label: string;
+    role?: "default" | "cancel" | "destructive";
+    onClick?: () => void;
+    dismiss?: boolean;
+  }
+  export interface Alert {
+    el: HTMLElement;
+    present(options?: { from?: HTMLElement }): Promise<string | null>;
+    dismiss(): void;
+    setTransition(mode: "pop" | "morph"): void;
+    isOpen: boolean;
+    destroy(): void;
+  }
+  export function createAlert(options: {
+    title?: string;
+    message?: string;
+    content?: Node;
+    actions?: AlertAction[];
+    dismissible?: boolean;
+    transition?: "pop" | "morph";
+    zIndex?: number;
+  }): Alert;
+
   export function createSheet(options: {
     header: HTMLElement;
     content: HTMLElement;
