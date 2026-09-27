@@ -37,9 +37,13 @@ interface StatsCache {
 import { openPage, closePage, goBack } from "../../lib/navigation";
 import { queryClient } from "../../lib/query";
 import { onLanguageSwitch, t } from "../i18n.ts";
-import { safeUrl } from "../utils/html.ts";
+import { safeUrl, appendSafeUrlParam } from "../utils/html.ts";
 
-const GITHUB_REPO = "SummaCristian/poliaule";
+// This app now lives at PoliNetworkOrg/aule (the SummaCristian/PoliAule
+// upstream it was ported from is being retired) — point stats/links here.
+const GITHUB_REPO = "PoliNetworkOrg/aule";
+
+const GITHUB_REPO_URL = `https://github.com/${GITHUB_REPO}`;
 
 const STATS_CACHE_KEY = "poliaule_github_stats";
 
@@ -1037,7 +1041,7 @@ function InfoContent({
               <RichText text={t("info.github.title")} />
             </h2>
             <a
-              href={`https://github.com/${GITHUB_REPO}`}
+              href={GITHUB_REPO_URL}
               target="_blank"
               rel="noopener"
               className="info-pill lg-glass liquid-glass"
@@ -1048,7 +1052,7 @@ function InfoContent({
           </div>
           <div className="github-stats-grid">
             <a
-              href={`https://github.com/${GITHUB_REPO}/stargazers`}
+              href={`${GITHUB_REPO_URL}/stargazers`}
               target="_blank"
               rel="noopener"
               className="github-stat-card lg-glass liquid-glass"
@@ -1064,7 +1068,7 @@ function InfoContent({
               </span>
             </a>
             <a
-              href={`https://github.com/${GITHUB_REPO}/commits/main`}
+              href={`${GITHUB_REPO_URL}/commits/main`}
               target="_blank"
               rel="noopener"
               className="github-stat-card lg-glass liquid-glass"
@@ -1078,7 +1082,7 @@ function InfoContent({
               </span>
             </a>
             <a
-              href={`https://github.com/${GITHUB_REPO}/issues`}
+              href={`${GITHUB_REPO_URL}/issues`}
               target="_blank"
               rel="noopener"
               className="github-stat-card lg-glass liquid-glass"
@@ -1092,7 +1096,7 @@ function InfoContent({
               </span>
             </a>
             <a
-              href={`https://github.com/${GITHUB_REPO}/blob/main/LICENSE`}
+              href={`${GITHUB_REPO_URL}/blob/main/LICENSE`}
               target="_blank"
               rel="noopener"
               className="github-stat-card lg-glass liquid-glass"
@@ -1125,7 +1129,7 @@ function InfoContent({
           </div>
 
           <a
-            href={`https://github.com/${GITHUB_REPO}/issues/new`}
+            href={`${GITHUB_REPO_URL}/issues/new`}
             target="_blank"
             rel="noopener"
             className="info-pill info-pill--issue lg-glass liquid-glass"
@@ -1241,7 +1245,7 @@ function Contributors({ contributors }: { contributors?: GithubContributor[] | n
           title={user.login}
         >
           <img
-            src={`${safeUrl(user.avatar_url)}&s=64`}
+            src={appendSafeUrlParam(safeUrl(user.avatar_url), "s", "64")}
             alt={user.login}
             className="contributor-avatar"
             loading="lazy"

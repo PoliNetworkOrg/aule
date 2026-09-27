@@ -1,5 +1,8 @@
 # PoliAule - Frontend
 
+> [!NOTE]
+> Historical: this describes the pre-migration vanilla-JS/Cloudflare Pages frontend (SummaCristian/PoliAule). See the root `README.md` and `docs/migration.md` for this repo's current React/TanStack architecture and GitHub Pages deployment.
+
 The frontend is plain HTML + vanilla ES modules, no framework. Cloudflare Pages builds it with Vite (`npm run build`), which bundles and minifies the JS/CSS graph reachable from `index.html` into hashed files under `dist/assets/`. Static files referenced by absolute path at runtime rather than imported (`public/favicons/`, `public/fonts/`, `public/locales/`, `public/assets/`) are copied through unprocessed via Vite's `public/` convention. See the "Development Commands" section of the root `CLAUDE.md` for the exact build commands.
 
 ---

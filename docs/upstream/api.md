@@ -1,5 +1,8 @@
 # PoliAule - Public Data API
 
+> [!NOTE]
+> Historical: this describes the pre-migration vanilla-JS/Cloudflare Pages frontend (SummaCristian/PoliAule). See the root `README.md` and `docs/migration.md` for this repo's current React/TanStack architecture and GitHub Pages deployment.
+
 PoliAule pre-fetches classroom occupancy data from Politecnico di Milano every morning and hourly during the day, and serves it through a small versioned REST API backed by Cloudflare Workers + R2. These endpoints are publicly accessible. If you want to build something on top of PoliMi classroom data, you can use them directly instead of scraping Politecnico yourself.
 
 > [!IMPORTANT]

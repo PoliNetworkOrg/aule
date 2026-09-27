@@ -255,7 +255,8 @@ function updateShifted() {
 function attachCampusMap() {
   const container = document.getElementById(CONTAINER_ID);
 
-  if (!container) return;
+  if (!container) return () => {};
+
   events = new AbortController();
   campusContainer = container;
 
@@ -742,6 +743,10 @@ async function boot(currentGeneration: number) {
   darkScheme.addEventListener("change", applyLightPreset, { signal: events.signal });
 
   instance.on("load", () => {
+    // If the tab was switched away (unmounting CampusMap → map.remove())
+    // while the style/tiles were still loading, this "load" event can still
+    // fire against the now-destroyed instance — bail before touching it.
+    if (currentGeneration !== generation) return;
     el.classList.add("campus-map--ready"); // belt: a style that loaded without firing style.load
     instance.resize();
 

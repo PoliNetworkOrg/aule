@@ -27,9 +27,16 @@ interface QueryContext {
   to: string;
 }
 
+interface ScheduleHighlight {
+  date: string;
+  from: string;
+  to: string;
+}
+
 interface OpenTrigger {
   cardEl: HTMLElement;
   queryContext: QueryContext | null;
+  highlight: ScheduleHighlight | null;
 }
 
 type HeaderHeightMode = "list" | "detail";
@@ -134,6 +141,8 @@ import {
   SKIP_DAYS,
   getClassroomStatusNow,
   getBuildingOpening,
+  getRomeNow,
+  romeMinutesOfDay,
 } from "../available-rooms-script.ts";
 import { t, getLocale, onLanguageSwitch } from "../i18n.ts";
 import { createTimeFormatter } from "../utils/time-format.ts";
@@ -203,18 +212,29 @@ function timeToMinutes(time: string) {
   return h * 60 + m;
 }
 
+/** Name of an occupancy slot: the parsed course/exam title when there is one, the raw scraped text otherwise. */
+function occupationTitle(slot: Occupation) {
+  return (
+    (slot.category === "COURSE" || slot.category === "EXAM" ? slot.course : slot.raw) ??
+    slot.name ??
+    t("detail.occupied")
+  );
+}
+
+/** Time range of an occupancy slot, as shown in the popover and read out by screen readers. */
+function occupationTimeRange(slot: Occupation) {
+  return `${minutesToTimeDisplay(timeToMinutes(slot.inizio))} – ${minutesToTimeDisplay(timeToMinutes(slot.fine))}`;
+}
+
 // Builds the popover body for a single occupancy slot. Course/exam slots carry
 // structured fields (course, code, professors, section); anything the scrape
 // couldn't parse only has `raw`; very old cached data may only have `name`.
 function OccupationPopover({ slot }: { slot: Occupation }) {
-  const timeRange = `${minutesToTimeDisplay(timeToMinutes(slot.inizio))} – ${minutesToTimeDisplay(timeToMinutes(slot.fine))}`;
-
-  let titleText;
+  const timeRange = occupationTimeRange(slot);
+  const titleText = occupationTitle(slot);
   const metaLines: ReactNode[] = [];
 
   if (slot.category === "COURSE" || slot.category === "EXAM") {
-    titleText = slot.course ?? slot.name ?? t("detail.occupied");
-
     if (slot.category === "EXAM") {
       metaLines.push(
         <>
@@ -244,8 +264,6 @@ function OccupationPopover({ slot }: { slot: Occupation }) {
         </>,
       );
     }
-  } else {
-    titleText = slot.raw ?? slot.name ?? t("detail.occupied");
   }
 
   return (
@@ -278,6 +296,8 @@ class ClassroomDetail {
   _enteredId: number | null = null;
   _savedScrollPos = 0;
   _queryContext: QueryContext | null = null;
+  _highlight: ScheduleHighlight | null = null;
+  _highlightConsumed = false;
   _nowTimer: number | undefined;
   _timelinePopoverCleanup: (() => void) | null = null;
   _root: Root | null = null;
@@ -334,11 +354,13 @@ class ClassroomDetail {
     this._contentEvents.abort();
     flushSync(() => this._root?.render(null));
   }
+  /** Tears down all timers, listeners, and React roots owned by this instance. */
   destroy() {
     this._generation++;
     this._pendingTrigger = null;
     this._openTrigger = null;
     this._queryContext = null;
+    this._highlight = null;
     this._openedViaPushState = false;
     this._disposed = true;
     this._events.abort();
@@ -367,7 +389,7 @@ class ClassroomDetail {
     });
   }
 
-  // Called by the React application lifecycle after the directory loads.
+  /** Called by the React application lifecycle after the directory loads. */
   init(staticData: Campus[]) {
     this._generation++;
     this._disposed = false;
@@ -596,7 +618,16 @@ class ClassroomDetail {
             ? { date: queryDate, from: queryFrom, to: queryTo }
             : null;
 
-        this._pendingTrigger = { queryContext, cardEl: card };
+        const highlightDate = card.dataset.highlightDate ?? null;
+        const highlightFrom = card.dataset.highlightFrom ?? null;
+        const highlightTo = card.dataset.highlightTo ?? null;
+
+        const highlight =
+          highlightDate && highlightFrom && highlightTo
+            ? { date: highlightDate, from: highlightFrom, to: highlightTo }
+            : null;
+
+        this._pendingTrigger = { queryContext, highlight, cardEl: card };
         this._openedViaPushState = true;
         this._buildFlatIndex();
         const _entry = this._flatIndex?.get(id);
@@ -683,6 +714,7 @@ class ClassroomDetail {
     }
   }
 
+  /** Closes the detail overlay without the close animation, e.g. when navigating to the info page. */
   _silentClose() {
     if (!this._overlay || this._overlay!.hidden) return;
     this._currentId = null;
@@ -697,6 +729,7 @@ class ClassroomDetail {
     this._clearContent();
     this._openTrigger = null;
     this._queryContext = null;
+    this._highlight = null;
   }
 
   // ---------- TRANSITION PLUMBING ----------
@@ -954,6 +987,7 @@ class ClassroomDetail {
 
   // ---------- OPEN ----------
 
+  /** Opens the detail overlay for a classroom, carrying over any query context or search highlight from the trigger. */
   async _doOpen(id: number, pending: OpenTrigger | null) {
     const generation = this._generation;
 
@@ -968,6 +1002,8 @@ class ClassroomDetail {
     this._currentId = id;
     this._openTrigger = pending ?? null;
     this._queryContext = pending?.queryContext ?? null;
+    this._highlight = pending?.highlight ?? null;
+    this._highlightConsumed = false;
 
     // Save scroll position for when we return
     this._savedScrollPos = window.scrollY;
@@ -1213,6 +1249,7 @@ class ClassroomDetail {
 
   // ---------- CLOSE ----------
 
+  /** Closes the detail overlay with its close animation, resetting the open/query/highlight state. */
   _doClose() {
     const generation = this._generation;
 
@@ -1232,6 +1269,8 @@ class ClassroomDetail {
       this._clearContent();
       this._openTrigger = null;
       this._queryContext = null;
+      this._highlight = null;
+      this._overlay!.style.viewTransitionName = "";
 
       if (headerEl) headerEl.style.viewTransitionName = "";
       document.documentElement.classList.remove(
@@ -1693,12 +1732,24 @@ class ClassroomDetail {
     this._animateMasonry(this._overlay!.querySelector<HTMLElement>(".detail-content"));
 
     // Title click -> manual refresh of photo and schedule
-    this._overlay!.querySelector<HTMLElement>(".detail-title")?.addEventListener(
-      "click",
-      () => {
-        this._loadSchedule(classroom.id);
+    const refreshOnActivate = () => {
+      this._loadSchedule(classroom.id);
 
-        if (this._hasPhoto(classroom)) this._loadPhoto(classroom.id);
+      if (this._hasPhoto(classroom)) this._loadPhoto(classroom.id);
+    };
+
+    const titleEl = this._overlay!.querySelector<HTMLElement>(".detail-title");
+
+    titleEl?.addEventListener("click", refreshOnActivate, { signal: this._contentEvents.signal });
+    // role="button" on a non-native element gets no automatic Enter/Space ->
+    // click synthesis from the browser — without this, the refresh action is
+    // unreachable by keyboard.
+    titleEl?.addEventListener(
+      "keydown",
+      (e) => {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        e.preventDefault();
+        refreshOnActivate();
       },
       { signal: this._contentEvents.signal },
     );
@@ -1964,6 +2015,11 @@ class ClassroomDetail {
 
   // ---------- RENDER: WEEKLY SCHEDULE ----------
 
+  /**
+   * Renders the weekly schedule tab for a classroom: day picker, timeline
+   * blocks, and the occupation popover, including auto-selecting and
+   * highlighting a searched day/lesson when one was carried over.
+   */
   _loadSchedule(classroomId: number) {
     this._scheduleRevision++;
     clearInterval(this._nowTimer);
@@ -1994,7 +2050,9 @@ class ClassroomDetail {
     }
 
     try {
-      const today = new Date();
+      // Rome's calendar date, not the browser's: the day keys these are
+      // matched against (dayData.date) come from the API in Rome time.
+      const today = getRomeNow();
 
       const todayKey = [
         today.getFullYear(),
@@ -2039,7 +2097,7 @@ class ClassroomDetail {
         prevDate = curr;
       }
 
-      const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+      const nowMin = romeMinutesOfDay();
 
       const nowPct =
         nowMin >= DAY_START && nowMin <= DAY_END
@@ -2048,6 +2106,7 @@ class ClassroomDetail {
 
       // Query context: from/to range carried over from the Available Tab
       const queryDateKey = this._queryContext?.date?.replace(/-/g, "") ?? null;
+      const highlightDateKey = this._highlight?.date?.replace(/-/g, "") ?? null;
 
       let queryFromPct = null,
         queryToPct = null,
@@ -2175,13 +2234,23 @@ class ClassroomDetail {
           const width = (((e - s) / total) * 100).toFixed(2);
           const slotIdx = scheduleSlots.push(slot) - 1;
 
+          const isPrimaryHighlight =
+            highlightDateKey !== null &&
+            dayData.date === highlightDateKey &&
+            slot.inizio === this._highlight?.from &&
+            slot.fine === this._highlight?.to;
+
           return (
             <>
               <div
-                className={"detail-schedule-block"}
+                className={
+                  "detail-schedule-block" +
+                  (isPrimaryHighlight ? " detail-schedule-block--highlight" : "")
+                }
                 data-slot-idx={slotIdx}
                 tabIndex={0}
                 role={"button"}
+                aria-label={`${occupationTimeRange(slot)} ${occupationTitle(slot)}`}
                 style={cssVars({
                   "--block-start": left + "%",
                   "--block-size": width + "%",
@@ -2445,7 +2514,7 @@ class ClassroomDetail {
       }
 
       this._nowTimer = window.setInterval(() => {
-        const n = new Date().getHours() * 60 + new Date().getMinutes();
+        const n = romeMinutesOfDay();
 
         const pctVal =
           n >= DAY_START && n <= DAY_END
@@ -2472,6 +2541,23 @@ class ClassroomDetail {
       const todayIndicatorEl = container.querySelector<HTMLElement>(".detail-today-indicator");
       const gridEl = container.querySelector<HTMLElement>(".detail-schedule-bars");
       const rowEls = gridEl!.querySelectorAll<HTMLElement>(".detail-schedule-row");
+
+      // The highlight is a one-shot cue for the lesson the user just searched
+      // for — the first tap, keypress or day change inside the schedule drops it.
+      const clearHighlight = () => {
+        if (!this._highlight) return;
+        this._highlight = null;
+        container
+          .querySelectorAll(".detail-schedule-block--highlight")
+          .forEach((el) => el.classList.remove("detail-schedule-block--highlight"));
+      };
+
+      container.addEventListener("pointerdown", clearHighlight, {
+        signal: this._scheduleEvents.signal,
+      });
+      container.addEventListener("keydown", clearHighlight, {
+        signal: this._scheduleEvents.signal,
+      });
 
       let selectedDayIndex = 0;
 
@@ -2501,17 +2587,19 @@ class ClassroomDetail {
         if (chip) daySelector.selectElement(chip, opts);
       }
 
-      // Auto-select: prefer the queried day when coming from the Available Tab,
-      // otherwise today, or next available day if after 20:15, or first available
+      // Auto-select: prefer the queried or highlighted day when coming from the
+      // Available Tab or search overlay, otherwise today, or next available day
+      // if after 20:15, or first available
       const todayDayIndex = days.findIndex((d) => d.dayData?.date === todayKey);
-      const nowMins = new Date().getHours() * 60 + new Date().getMinutes();
+      const nowMins = romeMinutesOfDay();
+      const preferredDateKey = queryDateKey ?? highlightDateKey;
       let initialDayIndex;
 
-      if (queryDateKey) {
-        const queryDayIndex = days.findIndex((d) => d.dayData?.date === queryDateKey);
+      if (preferredDateKey) {
+        const preferredDayIndex = days.findIndex((d) => d.dayData?.date === preferredDateKey);
         initialDayIndex =
-          queryDayIndex >= 0
-            ? queryDayIndex
+          preferredDayIndex >= 0
+            ? preferredDayIndex
             : todayDayIndex >= 0
               ? todayDayIndex
               : days.findIndex((d) => d.dayData !== null);
@@ -2637,92 +2725,108 @@ class ClassroomDetail {
       }
 
       // ---------- TIMELINE HOVER ----------
-      const cursorRoots = new Map<HTMLElement, Root>();
+      // Coalesced to one update per frame: mousemove fires faster than the
+      // display refreshes, and each sample used to read the bar's rect (a
+      // forced layout, since the previous sample had just written styles) and
+      // then flushSync a React render for the time label. Now the latest
+      // sample is stored and applied once in the next animation frame, when
+      // layout is already clean, and the label is plain text.
+      const mobileVerticalMQ = window.matchMedia("(max-width: 599px)");
       let _activeBar: HTMLElement | null = null;
+      let hoverFrame = 0;
+      let hoverBar: HTMLElement | null = null;
+      let hoverX = 0;
+      let hoverY = 0;
+
+      const hideHover = (bar: HTMLElement) => {
+        const prevCursor = bar
+          .closest<HTMLElement>(".detail-schedule-bar-wrapper")
+          ?.querySelector<HTMLElement>(".timeline-hover-cursor");
+
+        if (prevCursor) prevCursor.hidden = true;
+        const prevLine = bar.querySelector<HTMLElement>(".timeline-hover-line");
+
+        if (prevLine) prevLine.hidden = true;
+      };
+
+      const applyHover = () => {
+        hoverFrame = 0;
+        const bar = hoverBar;
+
+        if (_activeBar && _activeBar !== bar) {
+          hideHover(_activeBar);
+          _activeBar = null;
+        }
+
+        if (!bar) return;
+        _activeBar = bar;
+
+        const wrapper = bar.closest<HTMLElement>(".detail-schedule-bar-wrapper");
+        const cursor = wrapper?.querySelector<HTMLElement>(".timeline-hover-cursor");
+        const line = bar.querySelector<HTMLElement>(".timeline-hover-line");
+
+        if (!cursor || !line) return;
+
+        const rect = bar.getBoundingClientRect();
+        const isMobileVertical = mobileVerticalMQ.matches;
+
+        const fraction = isMobileVertical
+          ? Math.max(0, Math.min(1, (hoverY - rect.top) / rect.height))
+          : Math.max(0, Math.min(1, (hoverX - rect.left) / rect.width));
+
+        const minutes = Math.round(DAY_START + fraction * total);
+        const pct = `${(fraction * 100).toFixed(2)}%`;
+
+        if (isMobileVertical) {
+          cursor.style.top = pct;
+          cursor.style.left = "";
+          line.style.top = pct;
+          line.style.left = "";
+        } else {
+          cursor.style.left = pct;
+          cursor.style.top = "";
+          line.style.left = pct;
+          line.style.top = "";
+        }
+
+        const label = minutesToTimeDisplay(minutes);
+
+        if (cursor.textContent !== label) cursor.textContent = label;
+        cursor.hidden = false;
+        line.hidden = false;
+      };
+
+      this._scheduleEvents.signal.addEventListener("abort", () => {
+        if (hoverFrame) cancelAnimationFrame(hoverFrame);
+        hoverFrame = 0;
+      });
+
       container.addEventListener(
         "mousemove",
         (e) => {
-          const bar =
+          hoverBar =
             e.target instanceof Element
               ? e.target.closest<HTMLElement>(".detail-schedule-bar")
               : null;
+          hoverX = e.clientX;
+          hoverY = e.clientY;
 
-          if (_activeBar && _activeBar !== bar) {
-            const prevCursor = _activeBar
-              .closest<HTMLElement>(".detail-schedule-bar-wrapper")
-              ?.querySelector<HTMLElement>(".timeline-hover-cursor");
-
-            if (prevCursor) prevCursor.hidden = true;
-            const prevLine = _activeBar.querySelector<HTMLElement>(".timeline-hover-line");
-
-            if (prevLine) prevLine.hidden = true;
-            _activeBar = null;
-          }
-
-          if (!bar) return;
-          _activeBar = bar;
-
-          const wrapper = bar.closest<HTMLElement>(".detail-schedule-bar-wrapper");
-          const cursor = wrapper?.querySelector<HTMLElement>(".timeline-hover-cursor");
-          const line = bar.querySelector<HTMLElement>(".timeline-hover-line");
-
-          if (!cursor || !line) return;
-
-          const rect = bar.getBoundingClientRect();
-          const isMobileVertical = window.matchMedia("(max-width: 599px)").matches;
-
-          const fraction = isMobileVertical
-            ? Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height))
-            : Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-
-          const minutes = Math.round(DAY_START + fraction * total);
-          const pct = `${(fraction * 100).toFixed(2)}%`;
-
-          if (isMobileVertical) {
-            cursor.style.top = pct;
-            cursor.style.left = "";
-            line.style.top = pct;
-            line.style.left = "";
-          } else {
-            cursor.style.left = pct;
-            cursor.style.top = "";
-            line.style.left = pct;
-            line.style.top = "";
-          }
-
-          let cursorRoot = cursorRoots.get(cursor);
-
-          if (!cursorRoot) {
-            cursorRoot = createRoot(cursor);
-            cursorRoots.set(cursor, cursorRoot);
-          }
-
-          const { openFrom, openTo } = bar.dataset;
-
-          const isClosedHere =
-            openFrom !== undefined && (minutes < Number(openFrom) || minutes >= Number(openTo));
-
-          const cursorText =
-            minutesToTimeDisplay(minutes) + (isClosedHere ? ` · ${t("detail.closed")}` : "");
-
-          flushSync(() => cursorRoot.render(cursorText));
-          cursor.hidden = false;
-          line.hidden = false;
+          if (!hoverFrame) hoverFrame = requestAnimationFrame(applyHover);
         },
-        { signal: this._scheduleEvents.signal },
+        { signal: this._scheduleEvents.signal, passive: true },
       );
       container.addEventListener(
         "mouseleave",
         () => {
+          hoverBar = null;
+
+          if (hoverFrame) {
+            cancelAnimationFrame(hoverFrame);
+            hoverFrame = 0;
+          }
+
           if (_activeBar) {
-            const prevCursor = _activeBar
-              .closest<HTMLElement>(".detail-schedule-bar-wrapper")
-              ?.querySelector<HTMLElement>(".timeline-hover-cursor");
-
-            if (prevCursor) prevCursor.hidden = true;
-            const prevLine = _activeBar.querySelector<HTMLElement>(".timeline-hover-line");
-
-            if (prevLine) prevLine.hidden = true;
+            hideHover(_activeBar);
             _activeBar = null;
           }
         },
@@ -2747,6 +2851,10 @@ class ClassroomDetail {
 
       const popoverRoot = createRoot(timelinePopoverBody);
       let _popoverBlock: HTMLElement | null = null;
+      // Suppresses the close-on-scroll handler below while the auto-scroll
+      // to a searched lesson is still animating, so it doesn't dismiss the
+      // popover it just opened.
+      let _autoScrolling = false;
 
       const showOccupationPopover = (blockEl: HTMLElement) => {
         const slot = scheduleSlots[Number(blockEl.dataset.slotIdx)];
@@ -2761,6 +2869,46 @@ class ClassroomDetail {
         _popoverBlock = null;
         timelinePopover.hide();
       };
+
+      // Scroll to and open the popover on the searched lesson — once per open,
+      // so a later re-render (language switch, refreshOccupancy) doesn't jump
+      // the page back or re-pop it after the user has moved on.
+      if (this._highlight && !this._highlightConsumed) {
+        this._highlightConsumed = true;
+
+        const primaryBlock = container.querySelector<HTMLElement>(
+          ".detail-schedule-block--highlight",
+        );
+
+        if (primaryBlock) {
+          const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+          showOccupationPopover(primaryBlock);
+          // Keyboard/screen-reader users land on the searched lesson itself, so
+          // its aria-label gets read out, instead of on a page with no clue
+          // which block was the match. Scrolling is handled just below.
+          primaryBlock.focus({ preventScroll: true });
+
+          if (reduceMotion) {
+            primaryBlock.scrollIntoView({ block: "center", behavior: "auto" });
+          } else {
+            const stopAutoScroll = () => {
+              _autoScrolling = false;
+            };
+
+            _autoScrolling = true;
+            primaryBlock.scrollIntoView({ block: "center", behavior: "smooth" });
+            window.addEventListener("scrollend", stopAutoScroll, {
+              once: true,
+              signal: this._scheduleEvents.signal,
+            });
+            // scrollend never fires if the block was already in view (no scroll
+            // happens at all), which would leave the flag stuck and disable
+            // close-on-scroll for the rest of this render.
+            setTimeout(stopAutoScroll, 1000);
+          }
+        }
+      }
 
       {
         // Desktop hover
@@ -2847,6 +2995,34 @@ class ClassroomDetail {
           { signal: this._scheduleEvents.signal },
         );
 
+        // Keyboard activation for the blocks, which are role="button" divs and
+        // so get no native Enter/Space handling. Deliberately *not* a toggle
+        // like the click handler above: focusin already shows the popover for
+        // the focused block, so toggling would fight it (that interference is
+        // also why the first click on an unfocused block opens and then
+        // immediately closes it). Enter/Space re-show idempotently and Escape
+        // dismisses, which is the behaviour a keyboard user expects anyway.
+        // preventDefault matters on its own: without it Space scrolls the page.
+        container.addEventListener(
+          "keydown",
+          (e) => {
+            if (e.key !== "Enter" && e.key !== " " && e.key !== "Escape") return;
+
+            const block =
+              e.target instanceof Element
+                ? e.target.closest<HTMLElement>(".detail-schedule-block")
+                : null;
+
+            if (!block) return;
+            e.preventDefault();
+            e.stopPropagation();
+
+            if (e.key === "Escape") hideOccupationPopover();
+            else showOccupationPopover(block);
+          },
+          { signal: this._scheduleEvents.signal },
+        );
+
         // Close on any interaction outside the schedule area (e.g. tapping the room title).
         const onDocClick = (e: MouseEvent) => {
           if (!(e.target instanceof Node) || !container.contains(e.target)) hideOccupationPopover();
@@ -2860,7 +3036,11 @@ class ClassroomDetail {
         // On desktop this already happens implicitly (scrolling moves the hovered
         // block out from under a stationary cursor, firing pointerout), but a tap
         // on mobile leaves the popover open with no such gesture to close it.
-        const onScroll = () => hideOccupationPopover();
+        const onScroll = () => {
+          if (_autoScrolling) return;
+          hideOccupationPopover();
+        };
+
         window.addEventListener("scroll", onScroll, {
           capture: true,
           passive: true,
@@ -2872,7 +3052,6 @@ class ClassroomDetail {
         daySelector.destroy();
         timelinePopover.destroy();
         popoverRoot.unmount();
-        cursorRoots.forEach((root) => root.unmount());
       };
     } catch (err) {
       console.error("ClassroomDetail: Error rendering schedule:", err);

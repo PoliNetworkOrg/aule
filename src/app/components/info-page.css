@@ -1145,6 +1145,24 @@ body.info-open .header-title-btn {
   white-space: nowrap;
 }
 
+@media (prefers-color-scheme: dark) {
+  .github-stat-card {
+    border-color: color-mix(in srgb, var(--text-color-primary) 12%, transparent);
+    box-shadow:
+      0 1px 3px rgba(0, 0, 0, 0.15),
+      0 4px 10px rgba(0, 0, 0, 0.2);
+  }
+}
+
+/* ── GitHub Extended Sections ───────────────────────────────────────── */
+
+.github-extended {
+  margin-top: 1.25rem;
+  @apply flex;
+  @apply flex-col;
+  gap: 1.5rem;
+}
+
 /* Languages, contributors */
 
 .github-subsection {

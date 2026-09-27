@@ -15,8 +15,12 @@ crons = [
 ]
 
 [vars]
-GITHUB_OWNER = "SummaCristian"
-GITHUB_REPO = "poliaule"
+# This worker's job is to dispatch *this* repo's fetch-occupancy.yml, not the
+# upstream project it was carried over from — pointing at the wrong repo
+# would silently dispatch runs that write to a different R2 bucket than the
+# one this app's API worker reads from, producing no data here at all.
+GITHUB_OWNER = "PoliNetworkOrg"
+GITHUB_REPO = "aule"
 GITHUB_REF = "main"
 WORKFLOW_FILE = "fetch-occupancy.yml"
 

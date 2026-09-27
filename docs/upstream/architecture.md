@@ -1,5 +1,8 @@
 # PoliAule - Architecture
 
+> [!NOTE]
+> Historical: this describes the pre-migration vanilla-JS/Cloudflare Pages frontend (SummaCristian/PoliAule). See the root `README.md` and `docs/migration.md` for this repo's current React/TanStack architecture and GitHub Pages deployment.
+
 PoliAule's frontend is a static site with no custom server of its own. GitHub Actions fetches occupancy and opening-hours data on a schedule, uploads it to Cloudflare R2, and a Cloudflare Worker (`workers/api`) serves it as a versioned REST API at `api.poliaule.com`. The frontend only ever talks to that API.
 
 ---

@@ -6,6 +6,7 @@ import { observeInputProperty } from "./time-input";
 
 import { openPicker, getPickerCards } from "./time-picker";
 import { createTimeFormatter } from "../utils/time-format.ts";
+import { romeMinutesOfDay } from "../available-rooms-script.ts";
 import { t } from "../i18n.ts";
 
 const SNAP = 60; // one-hour grid — snaps only to HH:15 marks
@@ -122,8 +123,18 @@ export function TimeRangeSlider({
       return `${(((m - MIN) / TOTAL) * 100).toFixed(2)}%`;
     }
 
+    // The bar's rect is measured once when a drag starts and reused for
+    // every pointermove of that gesture: the bar doesn't move while it's
+    // being dragged, and re-measuring it after each move's style writes
+    // forced a synchronous layout per pointer sample.
+    let gestureRect: DOMRect | null = null;
+
+    function barRect() {
+      return gestureRect ?? bar.getBoundingClientRect();
+    }
+
     function xToMinutes(clientX: number) {
-      const rect = bar.getBoundingClientRect();
+      const rect = barRect();
 
       if (!rect.width) return fromMin;
 
@@ -139,10 +150,24 @@ export function TimeRangeSlider({
       el.classList.add("trs-badge-text--changing");
     }
 
+    // The committed (snapped) values the text/ARIA side of the last render
+    // reflected. Mid-drag the visual positions change every pointer sample
+    // but these only change on a snap, so the label re-render and the four
+    // attribute writes are skipped on the frames in between.
+    let renderedFrom = NaN;
+    let renderedTo = NaN;
+
     function render(vFrom = fromMin, vTo = toMin) {
-      updateBadgeText(fromText, formatMinutes(fromMin));
+      const committedChanged = fromMin !== renderedFrom || toMin !== renderedTo;
+      const fromLabel = formatMinutes(fromMin);
+      const toLabel = formatMinutes(toMin);
+
+      if (committedChanged) {
+        updateBadgeText(fromText, fromLabel);
+        updateBadgeText(toText, toLabel);
+      }
+
       fromBadge.style.left = pct(vFrom);
-      updateBadgeText(toText, formatMinutes(toMin));
       toBadge.style.left = pct(vTo);
 
       const duration = toMin - fromMin;
@@ -151,34 +176,42 @@ export function TimeRangeSlider({
       range.style.width = `${rangePct.toFixed(2)}%`;
 
       // Show duration label only when the range is wide enough to fit it
-      const barWidth = bar.getBoundingClientRect().width;
+      const barWidth = barRect().width;
       const rangePixels = (rangePct / 100) * barWidth;
-      setLabels((current) => {
-        const next = {
-          from: formatMinutes(fromMin),
-          to: formatMinutes(toMin),
-          duration: formatDuration(duration),
-        };
 
-        return current.from === next.from &&
-          current.to === next.to &&
-          current.duration === next.duration
-          ? current
-          : next;
-      });
+      if (committedChanged) {
+        setLabels((current) => {
+          const next = {
+            from: fromLabel,
+            to: toLabel,
+            duration: formatDuration(duration),
+          };
+
+          return current.from === next.from &&
+            current.to === next.to &&
+            current.duration === next.duration
+            ? current
+            : next;
+        });
+      }
+
       durationEl.style.display = rangePixels > 48 ? "" : "none";
 
       fromHandle.style.left = pct(vFrom);
-      fromHandle.setAttribute("aria-valuenow", String(fromMin));
-      fromHandle.setAttribute("aria-valuetext", formatMinutes(fromMin));
-
       toHandle.style.left = pct(vTo);
-      toHandle.setAttribute("aria-valuenow", String(toMin));
-      toHandle.setAttribute("aria-valuetext", formatMinutes(toMin));
+
+      if (committedChanged) {
+        fromHandle.setAttribute("aria-valuenow", String(fromMin));
+        fromHandle.setAttribute("aria-valuetext", fromLabel);
+        toHandle.setAttribute("aria-valuenow", String(toMin));
+        toHandle.setAttribute("aria-valuetext", toLabel);
+        renderedFrom = fromMin;
+        renderedTo = toMin;
+      }
     }
 
     function updateNowPosition() {
-      const n = new Date().getHours() * 60 + new Date().getMinutes();
+      const n = romeMinutesOfDay();
       const inRange = n > MIN && n < MAX;
       nowBadge.style.display = inRange ? "" : "none";
       nowLine.style.display = inRange ? "" : "none";
@@ -195,7 +228,7 @@ export function TimeRangeSlider({
     nowBadge.addEventListener(
       "click",
       () => {
-        const currentNow = new Date().getHours() * 60 + new Date().getMinutes();
+        const currentNow = romeMinutesOfDay();
         const duration = toMin - fromMin;
         let newFrom = Math.max(MIN, Math.min(snapTo(currentNow), MAX));
         let newTo = newFrom + duration;
@@ -260,8 +293,9 @@ export function TimeRangeSlider({
       pointerDownX = e.clientX;
       didDrag = false;
 
+      gestureRect = bar.getBoundingClientRect();
+      const rect = gestureRect;
       const rawM = xToMinutes(e.clientX);
-      const rect = bar.getBoundingClientRect();
 
       const fromPx = ((fromMin - MIN) / TOTAL) * rect.width + rect.left;
       const toPx = ((toMin - MIN) / TOTAL) * rect.width + rect.left;
@@ -307,8 +341,16 @@ export function TimeRangeSlider({
       let vTo = toMin;
 
       if (dragMode === "from") {
+        // vFrom (unsnapped, clamped) drives the smooth "follow the pointer"
+        // render below; fromMin (the committed value synced to the input) is
+        // computed separately by snapping *then* clamping — snapping the raw
+        // position first and clamping second can overshoot the clamp by up
+        // to SNAP/2 (e.g. when the other handle sits off the :15 grid after
+        // being set via the typed-entry popup), which could otherwise leave
+        // the two handles momentarily closer together than the intended
+        // 1-hour gap.
         vFrom = Math.max(MIN, Math.min(rawM, toMin - SNAP));
-        const snapped = snapTo(vFrom);
+        const snapped = Math.max(MIN, Math.min(snapTo(rawM), toMin - SNAP));
 
         if (snapped !== fromMin) {
           fromMin = snapped;
@@ -316,14 +358,14 @@ export function TimeRangeSlider({
         }
       } else if (dragMode === "to") {
         vTo = Math.max(fromMin + SNAP, Math.min(rawM, MAX));
-        const snapped = snapTo(vTo);
+        const snapped = Math.max(fromMin + SNAP, Math.min(snapTo(rawM), MAX));
 
         if (snapped !== toMin) {
           toMin = snapped;
           syncInputs();
         }
       } else {
-        const rect = bar.getBoundingClientRect();
+        const rect = barRect();
         const deltaM = ((e.clientX - panAnchorX) / rect.width) * TOTAL;
         vFrom = panAnchorFrom + deltaM;
         vTo = panAnchorTo + deltaM;
@@ -352,6 +394,8 @@ export function TimeRangeSlider({
     }
 
     function onPointerUp() {
+      gestureRect = null;
+
       if (!dragMode) return;
       fromHandle.classList.remove("trs-handle--dragging");
       toHandle.classList.remove("trs-handle--dragging");
@@ -480,6 +524,9 @@ export function TimeRangeSlider({
       "timeformatchange",
       () => {
         setFormatRevision((revision) => revision + 1);
+        // Same values, new formatting — force the label/ARIA side to redo.
+        renderedFrom = NaN;
+        renderedTo = NaN;
         render();
       },
       { signal },
