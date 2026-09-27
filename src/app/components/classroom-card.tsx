@@ -49,6 +49,7 @@ const STATUS_KEYS: Record<ClassroomStatus, string> = {
   occupied: "status.occupied",
   "free-soon": "status.freeSoon",
   "occupied-soon": "status.occupiedSoon",
+  closed: "status.closed",
 };
 
 export interface ClassroomCardProps {

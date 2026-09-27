@@ -42,6 +42,7 @@
   "status.partiallyFree": "Parzialmente libera",
   "status.freeSoon": "Libera tra poco",
   "status.occupiedSoon": "Occupata tra poco",
+  "status.closed": "Chiusa",
   "search.title": "Cerca Aula",
   "search.subtitle": "Naviga tra campus ed edifici per trovare un'aula.",
   "search.inputPlaceholder": "Aula, corso, docente, codice…",

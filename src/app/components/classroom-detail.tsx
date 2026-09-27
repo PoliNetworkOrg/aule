@@ -11,7 +11,7 @@ import {
 } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { flushSync } from "react-dom";
-import type { Campus, ClassroomEntry, Occupation, OccupancyDay } from "../types";
+import type { Building, Campus, ClassroomEntry, Occupation, OccupancyDay } from "../types";
 import type { PillSelection } from "vitrium";
 import { FilledStar } from "./classroom-card";
 
@@ -102,6 +102,7 @@ import {
   classroomsData as occupancyData,
   SKIP_DAYS,
   getClassroomStatusNow,
+  getBuildingOpening,
 } from "../available-rooms-script.ts";
 import { t, getLocale, onLanguageSwitch } from "../i18n.ts";
 import { createTimeFormatter } from "../utils/time-format.ts";
@@ -1233,6 +1234,7 @@ class ClassroomDetail {
         occupied: "status.occupied",
         "free-soon": "status.freeSoon",
         "occupied-soon": "status.occupiedSoon",
+        closed: "status.closed",
       };
 
       statusHtml = (
@@ -1756,6 +1758,7 @@ class ClassroomDetail {
         }
 
         let occupancy: Occupation[] = [];
+        let roomBuilding: Building | null = null;
 
         outer: for (const c of dayData.campuses ?? []) {
           for (const b of c.buildings ?? []) {
@@ -1763,10 +1766,53 @@ class ClassroomDetail {
 
             if (room) {
               occupancy = room.occupancy ?? [];
+              roomBuilding = b;
               break outer;
             }
           }
         }
+
+        // The hours the building is shut, shown as their own "Closed" areas so
+        // they don't read as bookings. The bar carries the open range too, for
+        // the hover cursor. Unknown hours draw nothing.
+        const opening = getBuildingOpening(roomBuilding, dayData.date);
+
+        let openFrom = DAY_START,
+          openTo = DAY_END;
+
+        if (opening?.closed) {
+          openFrom = openTo = DAY_START;
+        } else if (opening) {
+          openFrom = Math.max(timeToMinutes(opening.opens), DAY_START);
+          openTo = Math.min(timeToMinutes(opening.closes), DAY_END);
+        }
+
+        const closedRanges =
+          openFrom >= openTo
+            ? [[DAY_START, DAY_END]]
+            : [
+                [DAY_START, openFrom],
+                [openTo, DAY_END],
+              ].filter(([s, e]) => e > s);
+
+        const closedHtml = closedRanges.map(([s, e]) => {
+          const left = (((s - DAY_START) / total) * 100).toFixed(2);
+          const width = (((e - s) / total) * 100).toFixed(2);
+          // Label only where there's room for it; the hatching still says it
+          const label = (e - s) / total >= 0.15 ? <span>{t("detail.closed")}</span> : "";
+
+          return (
+            <div
+              key={`closed-${s}`}
+              className={"detail-schedule-closed"}
+              role={"img"}
+              aria-label={`${t("detail.closed")} ${minutesToTimeDisplay(s)}–${minutesToTimeDisplay(e)}`}
+              style={cssVars({ "--block-start": left + "%", "--block-size": width + "%" })}
+            >
+              {label}
+            </div>
+          );
+        });
 
         const blocksHtml = (occupancy || []).map((slot, idx) => {
           if (!slot.inizio || !slot.fine) return "";
@@ -1853,7 +1899,12 @@ class ClassroomDetail {
                     ""
                   )}
                   {querySideIndicatorsHtml}
-                  <div className={"detail-schedule-bar"}>
+                  <div
+                    className={"detail-schedule-bar"}
+                    data-open-from={opening ? openFrom : undefined}
+                    data-open-to={opening ? openTo : undefined}
+                  >
+                    {Children.toArray(closedHtml)}
                     {queryOverlayHtml}
                     {Children.toArray(blocksHtml)}
                     {isToday && nowPct !== null ? (
@@ -2295,7 +2346,15 @@ class ClassroomDetail {
             cursorRoots.set(cursor, cursorRoot);
           }
 
-          flushSync(() => cursorRoot.render(minutesToTimeDisplay(minutes)));
+          const { openFrom, openTo } = bar.dataset;
+
+          const isClosedHere =
+            openFrom !== undefined && (minutes < Number(openFrom) || minutes >= Number(openTo));
+
+          const cursorText =
+            minutesToTimeDisplay(minutes) + (isClosedHere ? ` · ${t("detail.closed")}` : "");
+
+          flushSync(() => cursorRoot.render(cursorText));
           cursor.hidden = false;
           line.hidden = false;
         },

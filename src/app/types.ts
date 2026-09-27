@@ -62,10 +62,16 @@ export interface OccupancyDay {
   campuses: Campus<Classroom & { occupancy: Occupation[] }>[];
 }
 
+export interface HolidayPeriod {
+  start: string;
+  end: string;
+}
+
 export interface OpeningHours {
   buildings: Record<string, BuildingHours>;
   campus_defaults: Record<string, BuildingHours>;
   default_hours: BuildingHours;
+  holiday_periods?: HolidayPeriod[];
 }
 
 export type ClassroomStatus =
@@ -73,7 +79,8 @@ export type ClassroomStatus =
   | "partially-free"
   | "occupied"
   | "free-soon"
-  | "occupied-soon";
+  | "occupied-soon"
+  | "closed";
 
 export interface AvailableClassroom extends Classroom {
   status: "free" | "partially-free";

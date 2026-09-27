@@ -47,6 +47,7 @@
   "status.partiallyFree": "Partially Free",
   "status.freeSoon": "Free soon",
   "status.occupiedSoon": "Occupied soon",
+  "status.closed": "Closed",
 
   "search.title": "Search Classroom",
   "search.subtitle": "Browse campuses and buildings to find any classroom.",
