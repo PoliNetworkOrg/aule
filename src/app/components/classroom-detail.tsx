@@ -176,6 +176,7 @@ import {
   isMapTabShowing,
 } from "./campus-map.tsx";
 import { startTrackedTransition, vtFlag } from "../utils/vt-debug.ts";
+import { dismissSearchOverlayInstant } from "./search-overlay-controller.ts";
 
 // No zoom and no shared element when motion is unwelcome: the pair of them is
 // the whole animation, so what is left is the browser's own cross-fade.
@@ -1109,6 +1110,7 @@ class ClassroomDetail {
         () => {
           if (this._disposed || generation !== this._generation) return;
           frozenAt = performance.now();
+          dismissSearchOverlayInstant();
 
           if (fromInfo) {
             infoPage._applyReturnVT();
@@ -1178,9 +1180,9 @@ class ClassroomDetail {
       );
 
       const cleanup = () => {
-        if (generation !== this._generation) return;
-
         unpinScroll?.();
+
+        if (generation !== this._generation) return;
 
         if (heroTargetEl) heroTargetEl.style.viewTransitionName = "";
 
@@ -1212,6 +1214,8 @@ class ClassroomDetail {
       vt.finished.then(cleanup).catch(cleanup);
     } else {
       // Fallback: show overlay, swap tabbar for back button without animation
+      dismissSearchOverlayInstant();
+
       if (fromInfo) {
         infoPage._applyReturnVT();
       } else {
@@ -2880,7 +2884,12 @@ class ClassroomDetail {
           ".detail-schedule-block--highlight",
         );
 
-        if (primaryBlock) {
+        const scheduleSignal = this._scheduleEvents.signal;
+
+        // Waits for the open transition: it holds the page at the top until it
+        // lands (see _pinScroll), which would cancel this scroll outright.
+        this._afterTransition(() => {
+          if (!primaryBlock?.isConnected || scheduleSignal.aborted) return;
           const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
           showOccupationPopover(primaryBlock);
@@ -2900,14 +2909,14 @@ class ClassroomDetail {
             primaryBlock.scrollIntoView({ block: "center", behavior: "smooth" });
             window.addEventListener("scrollend", stopAutoScroll, {
               once: true,
-              signal: this._scheduleEvents.signal,
+              signal: scheduleSignal,
             });
             // scrollend never fires if the block was already in view (no scroll
             // happens at all), which would leave the flag stuck and disable
             // close-on-scroll for the rest of this render.
             setTimeout(stopAutoScroll, 1000);
           }
-        }
+        });
       }
 
       {

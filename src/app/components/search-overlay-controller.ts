@@ -76,6 +76,13 @@ export function closeSearchOverlay() {
   closeMounted?.();
 }
 
+// For a caller that runs its own view transition (classroom detail): call it
+// inside that transition's update callback, so the overlay leaves as part of
+// the same transition rather than racing it with one of its own.
+export function dismissSearchOverlayInstant() {
+  dismissInstant();
+}
+
 const STATUS_KEYS: Record<ClassroomStatus, string> = {
   free: "status.free",
   "partially-free": "status.partiallyFree",
@@ -472,10 +479,15 @@ function buildSessionRow(s: OccupationSession, ctx: DayTimeCtx) {
   // Reuses the existing classroom-detail "query context" highlight/day-select
   // mechanism (the same attributes ClassroomCard sets for an available-tab
   // search result) rather than a bespoke pulse mechanism, since the detail
-  // page already implements that path end to end.
+  // page already implements that path end to end. queryDate/From/To pick the
+  // right day; highlightDate/From/To (separate — see classroom-detail.tsx's
+  // `_highlight`) are what actually scroll to and pop the matched slot open.
   b.dataset.queryDate = s.date;
   b.dataset.queryFrom = s.inizio;
   b.dataset.queryTo = s.fine;
+  b.dataset.highlightDate = s.date;
+  b.dataset.highlightFrom = s.inizio;
+  b.dataset.highlightTo = s.fine;
   b.tabIndex = -1;
   b.innerHTML =
     `<span class="search-session-body">` +
@@ -508,6 +520,9 @@ function buildProfessorSessionRow(s: OccupationSession, ctx: DayTimeCtx) {
   b.dataset.queryDate = s.date;
   b.dataset.queryFrom = s.inizio;
   b.dataset.queryTo = s.fine;
+  b.dataset.highlightDate = s.date;
+  b.dataset.highlightFrom = s.inizio;
+  b.dataset.highlightTo = s.fine;
   b.tabIndex = -1;
   const titleText = s.title || t("detail.occupied");
 
@@ -1897,16 +1912,6 @@ export function initSearchOverlay() {
     { signal: events.signal },
   );
 
-  // Opening a result navigates to the classroom detail page — get the
-  // overlay out of the way so the card → page morph isn't behind the blur.
-  resultsEl.addEventListener(
-    "click",
-    (e) => {
-      if (e.target instanceof Element && e.target.closest("[data-open-classroom]")) close();
-    },
-    { signal: events.signal },
-  );
-
   // The header sits above the overlay (z-index), so its controls stay
   // clickable while search is open. Any such click (info page, settings, …)
   // should take the overlay down first — the destination runs its own
@@ -1920,10 +1925,14 @@ export function initSearchOverlay() {
   );
 
   // Safety net: any other hash route opened while we're open takes it down too.
+  // Not the classroom page: opening a result morphs the tapped row into it, so
+  // the overlay must still be on screen for that transition's old snapshot —
+  // classroom-detail.tsx hides it inside its own transition instead (see
+  // dismissSearchOverlayInstant).
   window.addEventListener(
     "poliaule:routechange",
     () => {
-      if (isOpen && location.hash) dismissInstant();
+      if (isOpen && location.hash && !location.hash.startsWith("#classroom/")) dismissInstant();
     },
     { signal: events.signal },
   );
