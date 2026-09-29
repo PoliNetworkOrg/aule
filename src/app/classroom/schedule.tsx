@@ -2,9 +2,10 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 
 type PositionStyle = CSSProperties & { "--pos": string };
 
-import { romeMinutesOfDay } from "../available-rooms-script";
+import { hasOpeningHours, romeMinutesOfDay } from "../available-rooms-script";
 import { t, tf, useLocale } from "../i18n";
-import { availableDates, roomOccupancy } from "../state/availability";
+import { availableDates, roomDay } from "../state/availability";
+import { buildAgenda, type AgendaItem } from "../state/agenda";
 import type { ClassroomContext } from "../state/navigation-context";
 import { useStore } from "../state/store";
 import {
@@ -24,10 +25,6 @@ import { Icon } from "../ui/icon";
 import { titleCase } from "../ui/text";
 import { ProfessorList } from "../home/professor-link";
 
-type AgendaItem =
-  | { kind: "busy"; start: string; end: string; slot: Occupation }
-  | { kind: "free"; start: string; end: string };
-
 const TICKS = [8, 10, 12, 14, 16, 18, 20];
 
 const TOTAL = DAY_END - DAY_START;
@@ -44,29 +41,6 @@ function tickStyle(hour: number): PositionStyle {
 
 function percent(time: string) {
   return percentOf(toMinutes(time));
-}
-
-/** The day from DAY_START to DAY_END as alternating busy and free intervals. */
-function buildAgenda(occupancy: Occupation[]) {
-  const items: AgendaItem[] = [];
-  let cursor = fromMinutes(DAY_START);
-
-  const sorted = occupancy
-    .filter((slot) => slot.inizio && slot.fine && slot.fine > slot.inizio)
-    .sort((a, b) => a.inizio.localeCompare(b.inizio));
-
-  for (const slot of sorted) {
-    if (slot.inizio > cursor) items.push({ kind: "free", start: cursor, end: slot.inizio });
-
-    items.push({ kind: "busy", start: slot.inizio, end: slot.fine, slot });
-
-    if (slot.fine > cursor) cursor = slot.fine;
-  }
-
-  if (cursor < fromMinutes(DAY_END))
-    items.push({ kind: "free", start: cursor, end: fromMinutes(DAY_END) });
-
-  return items;
 }
 
 function slotTitle(slot: Occupation) {
@@ -106,16 +80,20 @@ function DayTimeline({
           />
         )}
         {items.map((item, index) =>
-          item.kind === "busy" ? (
+          item.kind === "free" ? null : (
             <span
               key={`${index}-${item.start}-${item.end}`}
-              className={`timeline__block${item.slot.category === "EXAM" ? " timeline__block--exam" : ""}`}
+              className={
+                item.kind === "closed"
+                  ? "timeline__block timeline__block--closed"
+                  : `timeline__block${item.slot.category === "EXAM" ? " timeline__block--exam" : ""}`
+              }
               style={{
                 left: percent(item.start),
                 width: `calc(${percent(item.end)} - ${percent(item.start)})`,
               }}
             />
-          ) : null,
+          ),
         )}
         {nowMinutes !== null && (
           <span className="timeline__now" style={{ left: percentOf(nowMinutes) }} />
@@ -170,6 +148,8 @@ function AgendaRow({
       <div className="agenda__body">
         {item.kind === "free" ? (
           <p className="agenda__title agenda__title--free">{t("schedule.free")}</p>
+        ) : item.kind === "closed" ? (
+          <p className="agenda__title agenda__title--closed">{t("schedule.closed")}</p>
         ) : (
           <>
             <p className="agenda__title">
@@ -234,8 +214,8 @@ export function Schedule({
       </p>
     );
 
-  const occupancy = roomOccupancy(roomId, day) ?? [];
-  const items = buildAgenda(occupancy);
+  const { occupancy, opening } = roomDay(roomId, day) ?? { occupancy: [], opening: null };
+  const items = buildAgenda(occupancy, opening);
   const isToday = day === today;
   const nowInDay = isToday && nowMinutes >= DAY_START && nowMinutes <= DAY_END ? nowMinutes : null;
 
@@ -252,6 +232,13 @@ export function Schedule({
   });
 
   const lessons = items.filter((item) => item.kind === "busy").length;
+  const closedTime = items.some((item) => item.kind === "closed");
+
+  const noLessonsKey = !closedTime
+    ? "schedule.allDayFree"
+    : items.every((item) => item.kind === "closed")
+      ? "schedule.closedAllDay"
+      : "schedule.freeWhenOpen";
 
   return (
     <div className="schedule" data-revision={revision}>
@@ -284,9 +271,15 @@ export function Schedule({
           <span className="schedule__count">
             {lessons
               ? tf(lessons === 1 ? "schedule.oneEvent" : "schedule.events", { n: lessons })
-              : t("schedule.allDayFree")}
+              : t(noLessonsKey)}
           </span>
         </div>
+        {!hasOpeningHours() && (
+          <p className="schedule__note">
+            <Icon name="alert-02" />
+            {t("schedule.hoursUnavailable")}
+          </p>
+        )}
         <DayTimeline items={items} searchWindow={searchWindow} nowMinutes={nowInDay} />
         {searchWindow && (
           <p className="schedule__legend">

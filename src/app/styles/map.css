@@ -129,6 +129,11 @@
   background: var(--slate-400);
 }
 
+.map-marker--closed {
+  border-style: dashed;
+  color: var(--text-muted);
+}
+
 .map-marker--selected {
   border-color: var(--accent);
   background: var(--accent);

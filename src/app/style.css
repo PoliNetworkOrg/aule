@@ -625,6 +625,11 @@ mark {
   color: var(--busy);
 }
 
+.tag--closed {
+  background: var(--surface-muted);
+  color: var(--text-muted);
+}
+
 .tag--exam {
   background: var(--exam-soft);
   color: var(--exam);
@@ -657,6 +662,10 @@ mark {
 
 .status-dot--occupied {
   background: var(--busy);
+}
+
+.status-dot--closed {
+  background: var(--slate-400);
 }
 
 .star-button {
