@@ -216,3 +216,16 @@
     font-size: 16px;
   }
 }
+
+/* Phones: campus, day and time are right above in the controls; keep the summary to two lines. */
+@media (max-width: 639px) {
+  .summary__context {
+    display: none;
+  }
+
+  .summary__partial {
+    display: block;
+    margin-left: 0;
+    font-size: 13px;
+  }
+}
