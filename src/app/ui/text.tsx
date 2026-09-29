@@ -1,5 +1,10 @@
 import { Fragment } from "react";
-import { compactName, ROOM_NAME_SEPARATORS, tokenize } from "../classroom-search-data";
+import {
+  compactName,
+  ROOM_NAME_SEPARATORS,
+  searchCorrections,
+  tokenize,
+} from "../classroom-search-data";
 
 /** Course and professor names come from the API in upper case; show them in title case. */
 export function titleCase(text: string, locale: string) {
@@ -17,14 +22,17 @@ function escapeRegExp(text: string) {
   return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-/** Wraps every match of `query` (as a phrase, as separate words, or compacted like "T11") in <mark>. */
+/**
+ * Wraps every match of `query` (as a phrase, as separate words, compacted like
+ * "T11", or through a typo correction) in <mark>.
+ */
 export function Highlight({ text, query = "" }: { text: string; query?: string }) {
   const trimmed = query.trim();
 
   if (!trimmed) return text;
 
   const phrase = escapeRegExp(trimmed).replace(/ /g, "[\\s.]");
-  const words = tokenize(trimmed).map(escapeRegExp);
+  const words = [...tokenize(trimmed), ...searchCorrections(trimmed)].map(escapeRegExp);
 
   const compact = [...compactName(trimmed)]
     .map(escapeRegExp)

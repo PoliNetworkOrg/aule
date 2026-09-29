@@ -40,6 +40,16 @@ interface OccupationRow extends OccupationSession {
 import { fetchJson } from "../lib/query";
 import { classroomsData as occupancyDays } from "./available-rooms-script.ts";
 import { getApiBase } from "./config.ts";
+import {
+  buildVocab,
+  expandToken,
+  scoreMatch,
+  tokenize,
+  type ExpandedToken,
+  type VocabWord,
+} from "./search-matching.ts";
+
+export { compactName, ROOM_NAME_SEPARATORS, tokenize } from "./search-matching.ts";
 
 // Static classroom directory (campus → buildings → classrooms) plus the text /
 // occupation search that runs against it. The search UI lives in
@@ -64,39 +74,51 @@ export async function ensureClassroomDirectory() {
   await loadData();
 }
 
-export function runClassroomSearch(query: string) {
+const numericCollator = new Intl.Collator(undefined, { numeric: true });
+
+interface RoomSearchResult {
+  visible: SearchRoom[];
+  total: number;
+  capped: boolean;
+}
+
+let lastRoomSearch: { query: string; vocab: VocabWord[]; result: RoomSearchResult } | null = null;
+
+/** Rooms matching `query` by room, building or campus name, best match first. */
+export function runClassroomSearch(query: string): RoomSearchResult {
   if (!classroomsData) return { visible: [], total: 0, capped: false };
 
   if (!searchIndex) searchIndex = buildSearchIndex();
-  const q = query.trim().toLowerCase();
-  const qDotted = q.replace(/\s+/g, ".");
-  const qCompact = compactName(q);
 
-  const results = searchIndex.filter(
-    (room) =>
-      room.name.toLowerCase().includes(q) ||
-      room.name.toLowerCase().includes(qDotted) ||
-      (qCompact !== "" && compactName(room.name).includes(qCompact)) ||
-      room.buildingName.toLowerCase().includes(q) ||
-      (room.buildingAltName && room.buildingAltName.toLowerCase().includes(q)) ||
-      room.campusName.toLowerCase().includes(q),
-  );
+  const tokens = expandQuery(query);
+
+  if (lastRoomSearch?.query === query && lastRoomSearch.vocab === vocab)
+    return lastRoomSearch.result;
+
+  const results = searchIndex
+    .map((room) => ({
+      room,
+      score: scoreMatch(
+        [room.name, room.buildingName, room.buildingAltName, room.campusName],
+        tokens,
+        { compactPrimary: true },
+      ),
+    }))
+    .filter(({ score }) => score > 0)
+    .sort((a, b) => b.score - a.score || numericCollator.compare(a.room.name, b.room.name))
+    .map(({ room }) => room);
 
   const capped = results.length > SEARCH_MAX_RESULTS;
 
-  return {
+  const result = {
     visible: capped ? results.slice(0, SEARCH_MAX_RESULTS) : results,
     total: results.length,
     capped,
   };
-}
 
-/** Separators ignored when matching room names, so "T11" finds "T.1.1". */
-export const ROOM_NAME_SEPARATORS = /[\s._\-/]+/g;
+  lastRoomSearch = { query, vocab, result };
 
-/** Lowercases `name` and drops its separators — "T.1.1" and "t 1-1" both become "t11". */
-export function compactName(name: string): string {
-  return name.toLowerCase().replace(ROOM_NAME_SEPARATORS, "");
+  return result;
 }
 
 function buildSearchIndex() {
@@ -196,32 +218,101 @@ function ensureOccIndex() {
   }
 }
 
-/**
- * Splits a query into lowercase words, order-independent — "rossi analisi"
- * and "analisi rossi" tokenize the same.
- */
-export function tokenize(query: string): string[] {
-  return query.trim().toLowerCase().split(/\s+/).filter(Boolean);
-}
+// ---------- QUERY EXPANSION ----------
+//
+// The vocabulary typo corrections are drawn from: every word in the directory
+// and in the loaded lessons. Rebuilt along with the occupation index.
 
-/**
- * Whether a single search token matches a row, also trying the token with
- * leading zeros stripped (codes are stored as ints, so a leading zero the
- * user typed — "061182" — is gone from the haystack, "61182").
- */
-function rowMatchesToken(row: OccupationRow, token: string): boolean {
-  if (row.haystack.includes(token)) return true;
+let vocab: VocabWord[] = [];
 
-  const alt = token.replace(/^0+/, "");
+let vocabSources: { directory: Campus[] | null; occupations: OccupationRow[] | null } | null = null;
 
-  return alt !== "" && alt !== token && row.haystack.includes(alt);
-}
+let expansions = new Map<string, ExpandedToken[]>();
 
-/** Finds occupation rows matching every token of `query`, in any order, grouped by course/section. */
-export function runOccupationSearch(query: string) {
+function ensureVocab() {
   ensureOccIndex();
-  const tokens = tokenize(query);
 
+  if (vocabSources?.directory === classroomsData && vocabSources.occupations === occIndex)
+    return vocab;
+
+  const texts: (string | undefined)[] = [];
+
+  for (const campus of classroomsData ?? []) {
+    texts.push(campus.name);
+
+    for (const building of campus.buildings) {
+      texts.push(building.name, building.altName);
+
+      for (const room of building.classrooms) texts.push(room.name);
+    }
+  }
+
+  for (const row of occIndex ?? []) texts.push(row.haystack);
+
+  vocab = buildVocab(texts);
+  vocabSources = { directory: classroomsData, occupations: occIndex };
+  expansions = new Map();
+
+  return vocab;
+}
+
+/** The query's tokens, each with the words it may be a typo of. */
+export function expandQuery(query: string): ExpandedToken[] {
+  const words = tokenize(query);
+  const vocabulary = ensureVocab();
+  const key = words.join(" ");
+  let tokens = expansions.get(key);
+
+  if (!tokens) {
+    tokens = words.map((word, index) => expandToken(word, index === words.length - 1, vocabulary));
+    expansions.set(key, tokens);
+  }
+
+  return tokens;
+}
+
+/** Words the query matches only through a correction, for highlighting them in the results. */
+export function searchCorrections(query: string): string[] {
+  const words = expandQuery(query).flatMap((token) => token.variants.slice(1));
+
+  return [...new Set(words.map((variant) => variant.text))];
+}
+
+function rowMatchesToken(row: OccupationRow, token: ExpandedToken): boolean {
+  return token.variants.some((variant) => row.haystack.includes(variant.text));
+}
+
+interface OccupationSearchResult {
+  groups: OccupationGroup[];
+  total: number;
+  capped: boolean;
+  maxSessions: number;
+}
+
+let lastOccupationSearch: {
+  query: string;
+  index: OccupationRow[] | null;
+  result: OccupationSearchResult;
+} | null = null;
+
+/**
+ * Finds occupation rows matching every token of `query`, in any order, grouped
+ * by course/section, best match first.
+ */
+export function runOccupationSearch(query: string): OccupationSearchResult {
+  const tokens = expandQuery(query);
+
+  if (lastOccupationSearch?.query === query && lastOccupationSearch.index === occIndex)
+    return lastOccupationSearch.result;
+
+  const result = searchOccupations(tokens);
+
+  lastOccupationSearch = { query, index: occIndex, result };
+
+  return result;
+}
+
+function searchOccupations(tokens: ExpandedToken[]): OccupationSearchResult {
   if (!tokens.length || occIndex!.length === 0)
     return { groups: [], total: 0, capped: false, maxSessions: OCC_MAX_SESSIONS };
 
@@ -262,15 +353,28 @@ export function runOccupationSearch(query: string) {
 
   const list = [...groups.values()];
 
+  const scores = new Map<OccupationGroup, number>();
+
   for (const g of list) {
     g.sessions.sort((a, b) => (a.date + a.inizio).localeCompare(b.date + b.inizio));
     g.sessionCount = g.sessions.length;
+
+    // A row can also match on its raw booking text, which none of these
+    // fields carry: still a match, just the weakest.
+    const score = scoreMatch(
+      [g.title, g.code != null ? String(g.code) : "", g.section, g.professors.join(" ")],
+      tokens,
+    );
+
+    scores.set(g, Math.max(1, score));
   }
 
-  list.sort((a, b) =>
-    (a.sessions[0].date + a.sessions[0].inizio).localeCompare(
-      b.sessions[0].date + b.sessions[0].inizio,
-    ),
+  list.sort(
+    (a, b) =>
+      scores.get(b)! - scores.get(a)! ||
+      (a.sessions[0].date + a.sessions[0].inizio).localeCompare(
+        b.sessions[0].date + b.sessions[0].inizio,
+      ),
   );
 
   const capped = list.length > OCC_MAX_GROUPS;

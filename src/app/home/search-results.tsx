@@ -1,11 +1,11 @@
 import { useMemo } from "react";
 import { t, tf, useLocale } from "../i18n";
 import {
+  expandQuery,
   OCC_MAX_GROUPS,
   runClassroomSearch,
   runOccupationSearch,
   SEARCH_MAX_RESULTS,
-  tokenize,
   type OccupationGroup,
 } from "../classroom-search-data";
 import { findClassroom, roomWindowStatus } from "../state/availability";
@@ -33,7 +33,7 @@ function formatDay(iso: string, locale: string) {
  * for a name, that professor first. Picking one searches for their timetable.
  */
 function matchingProfessors(groups: OccupationGroup[], query: string) {
-  const words = tokenize(query);
+  const tokens = expandQuery(query);
   const byName = new Set<string>();
   const others = new Set<string>();
 
@@ -41,7 +41,10 @@ function matchingProfessors(groups: OccupationGroup[], query: string) {
     for (const professor of group.professors) {
       const lower = professor.toLowerCase();
 
-      (words.every((word) => lower.includes(word)) ? byName : others).add(professor);
+      (tokens.every((token) => token.variants.some((v) => lower.includes(v.text)))
+        ? byName
+        : others
+      ).add(professor);
     }
 
   return [...byName, ...[...others].filter((name) => !byName.has(name))].slice(0, 10);
