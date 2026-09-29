@@ -173,6 +173,12 @@ body[data-page="home"] #root {
   color: var(--accent-text);
 }
 
+@media (max-width: 639px) and (max-height: 700px) {
+  .search__hint {
+    display: none;
+  }
+}
+
 /* ---------- Date strip ---------- */
 
 .date-strip {
@@ -577,6 +583,14 @@ body[data-page="home"] #root {
 
   .time-select {
     max-width: none;
+  }
+
+  .filters .chip-row,
+  .favourites .chip-row {
+    flex-wrap: wrap;
+    overflow: visible;
+    margin-inline: 0;
+    padding-inline: 0;
   }
 }
 

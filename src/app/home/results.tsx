@@ -1,4 +1,5 @@
 import { lazy, Suspense, useMemo } from "react";
+import { formatRomeYYYYMMDD } from "../available-rooms-script";
 import { reloadOccupancy } from "../boot";
 import { t, tf, useLocale } from "../i18n";
 import { findAvailability, findCampus, type BuildingAvailability } from "../state/availability";
@@ -63,7 +64,9 @@ function Summary({ results }: { results: BuildingAvailability[] }) {
   const from = useStore((state) => state.from);
   const to = useStore((state) => state.to);
   const campus = findCampus(useStore((state) => state.campusId));
-  const rooms = results.reduce((sum, building) => sum + building.rooms.length, 0);
+  const rooms = results.flatMap((building) => building.rooms);
+  const free = rooms.filter((room) => room.status === "free").length;
+  const partial = rooms.length - free;
 
   const day = date
     ? date === romeTodayIso()
@@ -81,7 +84,10 @@ function Summary({ results }: { results: BuildingAvailability[] }) {
   return (
     <div className="summary">
       <p className="summary__count">
-        {rooms === 1 ? t("results.oneRoom") : tf("results.rooms", { n: rooms })}
+        {free === 1 ? t("results.oneRoom") : tf("results.rooms", { n: free })}
+        {partial > 0 && (
+          <span className="summary__partial">{tf("results.partial", { n: partial })}</span>
+        )}
       </p>
       <p className="summary__context">
         {campus?.name} · {day} · {formatRange(from, to)}
@@ -109,7 +115,7 @@ function DataNotice() {
       </div>
     );
 
-  if (generatedAt && generatedAt.toDateString() !== new Date().toDateString())
+  if (generatedAt && formatRomeYYYYMMDD(generatedAt) !== formatRomeYYYYMMDD(new Date()))
     return (
       <div className="notice notice--warning">
         <Icon name="alert-02" />
@@ -134,7 +140,9 @@ function BuildingGroup({ group }: { group: BuildingAvailability }) {
           {building.altName && <span className="building-group__alt">{building.altName}</span>}
         </h3>
         <span className="building-group__count">
-          {rooms.length === 1 ? t("results.oneRoom") : tf("results.rooms", { n: rooms.length })}
+          {tf(rooms.length === 1 ? "results.oneAvailable" : "results.available", {
+            n: rooms.length,
+          })}
         </span>
         <button
           type="button"

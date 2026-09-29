@@ -234,15 +234,19 @@ export function Schedule({
   const items = buildAgenda(occupancy);
   const isToday = day === today;
   const nowInDay = isToday && nowMinutes >= DAY_START && nowMinutes <= DAY_END ? nowMinutes : null;
+
   const searchWindow =
     context && context.date === day ? { from: context.from, to: context.to } : null;
+
   const now = fromMinutes(nowMinutes);
   const weekday = new Intl.DateTimeFormat(locale, { weekday: "short" });
+
   const longDay = new Intl.DateTimeFormat(locale, {
     weekday: "long",
     day: "numeric",
     month: "long",
   });
+
   const lessons = items.filter((item) => item.kind === "busy").length;
 
   return (

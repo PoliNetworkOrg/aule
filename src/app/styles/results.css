@@ -27,6 +27,13 @@
   font-weight: 700;
 }
 
+.summary__partial {
+  margin-left: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--partial);
+}
+
 .summary__context {
   font-size: 13px;
   color: var(--text-muted);
@@ -111,7 +118,7 @@
 
 .room-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
   gap: 8px;
 }
 

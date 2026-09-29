@@ -101,7 +101,9 @@ function BuildingPanel({
             {t("building.prefix")} {building.name}
           </h3>
           <p className="map-panel__subtitle">
-            {rooms.length === 1 ? t("results.oneRoom") : tf("results.rooms", { n: rooms.length })}
+            {tf(rooms.length === 1 ? "results.oneAvailable" : "results.available", {
+              n: rooms.length,
+            })}
             {building.address ? ` · ${building.address}` : ""}
           </p>
         </div>
@@ -228,6 +230,7 @@ export default function CampusMap({ results }: { results: BuildingAvailability[]
 
       const free =
         results.find((group) => group.building.name === building.name)?.rooms.length ?? 0;
+
       const element = document.createElement("button");
       const label = document.createElement("span");
       const count = document.createElement("span");
@@ -236,7 +239,7 @@ export default function CampusMap({ results }: { results: BuildingAvailability[]
       element.className = `map-marker${free ? "" : " map-marker--none"}${building.name === selected ? " map-marker--selected" : ""}`;
       element.setAttribute(
         "aria-label",
-        `${t("building.prefix")} ${building.name}: ${tf("results.rooms", { n: free })}`,
+        `${t("building.prefix")} ${building.name}: ${tf("results.available", { n: free })}`,
       );
       label.className = "map-marker__label";
       label.textContent = building.altName || building.name;
