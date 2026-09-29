@@ -21,8 +21,6 @@ export interface Filters {
   accessible: boolean;
   /** Feature 143: seats with a wired network socket. */
   network: boolean;
-  /** Feature 4 or 11: a projector. */
-  projector: boolean;
   minSeats: SeatsFilter;
   /** Restrict results to one building (by name) of the selected campus. */
   building: string;
@@ -50,7 +48,6 @@ export const DEFAULT_FILTERS: Filters = {
   sockets: false,
   accessible: false,
   network: false,
-  projector: false,
   minSeats: 0,
   building: "",
 };
@@ -89,7 +86,7 @@ function readFilters(): Filters {
       readStorage(FILTERS_KEY) ?? "{}",
     );
 
-    for (const key of ["fullyFree", "sockets", "accessible", "network", "projector"] as const) {
+    for (const key of ["fullyFree", "sockets", "accessible", "network"] as const) {
       if (saved[key] === true) filters[key] = true;
     }
 
@@ -200,7 +197,6 @@ export function countActiveFilters(filters: Filters) {
     Number(filters.sockets) +
     Number(filters.accessible) +
     Number(filters.network) +
-    Number(filters.projector) +
     Number(filters.minSeats > 0) +
     Number(filters.building !== "")
   );
@@ -208,10 +204,5 @@ export function countActiveFilters(filters: Filters) {
 
 /** Filters that live behind "More filters", counted for that button's badge. */
 export function countAdvancedFilters(filters: Filters) {
-  return (
-    Number(filters.network) +
-    Number(filters.projector) +
-    Number(filters.minSeats > 0) +
-    Number(filters.building !== "")
-  );
+  return Number(filters.network) + Number(filters.minSeats > 0) + Number(filters.building !== "");
 }

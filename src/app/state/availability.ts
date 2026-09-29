@@ -142,8 +142,6 @@ export function matchesFilters(room: Classroom, filters: Filters) {
 
   if (filters.network && !hasFeature(room, [143])) return false;
 
-  if (filters.projector && !hasFeature(room, [4, 11])) return false;
-
   if (filters.accessible && !room.accessible_seats) return false;
 
   if (filters.minSeats && (room.seats ?? 0) < filters.minSeats) return false;

@@ -86,12 +86,6 @@ function MoreFilters({ filters }: { filters: FilterState }) {
             label={t("filters.network")}
             onToggle={() => setFilters({ network: !filters.network })}
           />
-          <ToggleChip
-            active={filters.projector}
-            icon="projector-01"
-            label={t("filters.projector")}
-            onToggle={() => setFilters({ projector: !filters.projector })}
-          />
         </div>
       </fieldset>
     </div>
