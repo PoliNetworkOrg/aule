@@ -318,16 +318,14 @@
   position: absolute;
   top: 0;
   bottom: 0;
-  background: var(--busy-soft);
-  border-inline: 1px solid var(--busy-border);
-  background-image: linear-gradient(var(--busy-border), var(--busy-border));
-  background-size: 100% 3px;
-  background-repeat: no-repeat;
-  background-position: bottom;
+  background: color-mix(in srgb, var(--busy) 24%, var(--surface));
+  border-inline: 1px solid var(--surface);
+  box-shadow: inset 0 -3px 0 var(--busy);
 }
 
 .timeline__block--exam {
-  background-color: var(--exam-soft);
+  background: color-mix(in srgb, var(--exam) 24%, var(--surface));
+  box-shadow: inset 0 -3px 0 var(--exam);
 }
 
 .timeline__window {
