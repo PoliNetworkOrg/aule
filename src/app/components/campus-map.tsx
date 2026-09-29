@@ -475,6 +475,22 @@ async function boot(_container: HTMLElement) {
   });
 
   map = instance;
+
+  // setStyle() reports a failed style request (OpenFreeMap down, offline)
+  // through the map's `error` event, not by throwing — so boot()'s own
+  // rejection path never sees it and the map would just sit empty. Any
+  // error before the first style load is that failure; later ones (a missed
+  // tile or sprite) are routine and leave the map usable.
+  let styleLoaded = false;
+  instance.once("style.load", () => {
+    styleLoaded = true;
+  });
+  instance.on("error", (e) => {
+    if (styleLoaded || currentGeneration !== generation) return;
+    console.error("Campus map style failed to load", e.error);
+    showError(_container);
+  });
+
   applyTheme();
 
   // The constructor's own `center`/`zoom`/`pitch` above ignore `padding` —
@@ -599,24 +615,29 @@ async function boot(_container: HTMLElement) {
     );
   }
 
-  // MapLibre opens a compact (narrow-viewport) attribution expanded the
-  // first time it switches to compact — once the sources report their
-  // attribution, after "load". Start it as the plain "i" badge instead, so it
-  // doesn't cover the map on phones; a tap still expands it.
+  // MapLibre opens a compact (narrow-viewport) attribution expanded whenever
+  // it switches to compact — already inside the Map constructor on a narrow
+  // map, since the pinned credit means it's never empty, and again after any
+  // widen-then-narrow resize. Keep it as the plain "i" badge instead, so it
+  // doesn't cover the map on phones, until the user taps it open.
   const attribution = attributionButton?.parentElement;
 
   if (attribution) {
-    const collapseObserver = new MutationObserver((_records, observer) => {
-      if (!attribution.classList.contains("maplibregl-compact-show")) return;
-      attribution.classList.remove("maplibregl-compact-show");
-      observer.disconnect();
+    const collapse = () => attribution.classList.remove("maplibregl-compact-show");
+    collapse();
+
+    const collapseObserver = new MutationObserver(() => {
+      if (attribution.classList.contains("maplibregl-compact-show")) collapse();
     });
 
     observers.push(collapseObserver);
     collapseObserver.observe(attribution, { attributes: true, attributeFilter: ["class"] });
-    // A tap before that first switch means the user wants it open — stop
-    // collapsing.
-    attributionButton!.addEventListener("click", () => collapseObserver.disconnect(), {
+    // A tap means the user wants it open — stop collapsing. Capture phase on
+    // the container, so this runs before MapLibre's own toggle on the button:
+    // for a real click the browser delivers the observer's callback between
+    // listeners, so stopping it any later would re-collapse that very tap.
+    attribution.addEventListener("click", () => collapseObserver.disconnect(), {
+      capture: true,
       once: true,
       signal: events.signal,
     });
