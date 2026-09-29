@@ -109,14 +109,22 @@ export function mountApplication() {
   }
 
   function dismissSplash() {
-    const overlay = document.getElementById("splash-overlay")!;
-
-    if (!overlay) return;
+    const overlay = document.getElementById("splash-overlay");
 
     const revealHeader = () =>
       document
         .querySelectorAll(".splash-header-item")
         .forEach((el) => el.classList.add("splash-revealed"));
+
+    // No splash left to dismiss: the app is re-initialising after the first
+    // run (a remount, or an HMR update in dev) against freshly rendered header
+    // items that don't carry `splash-revealed` — reveal them straight away,
+    // or they stay hidden with nothing left to ever reveal them.
+    if (!overlay) {
+      revealHeader();
+
+      return;
+    }
 
     if (_splashFailed) {
       removeSplash(overlay);
