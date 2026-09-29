@@ -737,16 +737,39 @@ function panBackInBounds() {
 // 404s (or comes back with no MIME type) and no tiles ever load. `?worker&url`
 // has Vite bundle that worker, with the shared chunk it imports, into one file
 // and hands back its URL instead.
+//
+// Its stylesheet goes the same way (`?url`): the build sets
+// `cssCodeSplit: false`, which would otherwise fold even a dynamically
+// imported stylesheet into the shell CSS every page loads (~83KB).
 async function loadMapLibre(): Promise<MapLibreLibrary> {
-  const [lib, { default: workerUrl }] = await Promise.all([
+  const [lib, { default: workerUrl }, { default: cssUrl }] = await Promise.all([
     import("maplibre-gl"),
     import("maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url"),
-    import("maplibre-gl/dist/maplibre-gl.css"),
+    import("maplibre-gl/dist/maplibre-gl.css?url"),
   ]);
 
   lib.setWorkerUrl(workerUrl);
+  await loadStylesheet(cssUrl);
 
   return lib;
+}
+
+// Appended after the shell stylesheet, so campus-map.css's overrides meet
+// MapLibre's rules in the same cascade order they were written against.
+// Non-fatal if it fails — the map still renders, controls just sit slightly
+// off. Reused across remounts rather than appended again.
+function loadStylesheet(href: string) {
+  if (document.querySelector("link[data-maplibre-css]")) return Promise.resolve();
+
+  return new Promise<void>((resolve) => {
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = href;
+    link.dataset.maplibreCss = "";
+    link.onload = () => resolve();
+    link.onerror = () => resolve();
+    document.head.appendChild(link);
+  });
 }
 
 // Re-applies the style with the current theme's palette (OpenFreeMap styles
