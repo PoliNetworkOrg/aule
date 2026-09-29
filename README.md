@@ -13,7 +13,7 @@ pnpm build
 pnpm lint
 ```
 
-`pnpm preview` serves the production build. `pnpm build:beta` builds with the original beta favicons and API preconnect. `pnpm lint:fix` applies Oxlint fixes and Oxfmt formatting; `pnpm format` only formats. Build includes TypeScript checking. There is no new test suite: upstream has no application tests to port.
+`pnpm preview` serves the production build. `pnpm build:beta` uses the beta API preconnect with the same branding as the production build. `pnpm lint:fix` applies Oxlint fixes and Oxfmt formatting; `pnpm format` only formats. Build includes TypeScript checking. There is no new test suite: upstream has no application tests to port.
 
 The frontend uses the existing hosted APIs. Production hosts use the stable backend; other hosts default to beta and expose a switch on the info page. The 3D map gets its public Mapbox token from `/v1/config`. Google Fonts (DM Sans), Mapbox resources and classroom photos are the only third-party requests.
 

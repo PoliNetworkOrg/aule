@@ -1,5 +1,3 @@
-import { copyFile } from "node:fs/promises";
-import { resolve } from "node:path";
 import { defineConfig, type Plugin } from "vite-plus";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
@@ -28,34 +26,12 @@ function shellStyles(): Plugin {
   };
 }
 
-function betaAssets(): Plugin {
-  let outDir: string;
-
+function betaBackend(): Plugin {
   return {
-    name: "poliaule-beta-assets",
+    name: "poliaule-beta-backend",
     apply: "build",
-    configResolved(config) {
-      outDir = config.build.outDir;
-    },
     transformIndexHtml(html) {
       return html.replaceAll("https://api.poliaule.com", "https://api-beta.poliaule.com");
-    },
-    async closeBundle() {
-      const files = [
-        "favicon-96x96.png",
-        "favicon.svg",
-        "favicon.ico",
-        "apple-touch-icon.png",
-        "web-app-manifest-192x192.png",
-        "web-app-manifest-512x512.png",
-        "site.webmanifest",
-      ];
-
-      await Promise.all(
-        files.map((file) =>
-          copyFile(resolve("public/favicons/beta", file), resolve(outDir, "favicons/main", file)),
-        ),
-      );
     },
   };
 }
@@ -66,7 +42,7 @@ export default defineConfig(({ mode }) => ({
     react(),
     tailwindcss(),
     shellStyles(),
-    ...(mode === "beta" ? [betaAssets()] : []),
+    ...(mode === "beta" ? [betaBackend()] : []),
   ],
   build: {
     sourcemap: !process.env.CF_PAGES_BRANCH || process.env.CF_PAGES_BRANCH === "dev",

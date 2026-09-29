@@ -45,7 +45,7 @@ export function Header({ page }: { page: "home" | "classroom" | "info" }) {
             src="/favicons/main/favicon.svg"
             alt=""
             width="40"
-            height="46"
+            height="40"
           />
           <span className="brand__name">PoliNetwork</span>
           <span className="brand__product">{t("app.name")}</span>
