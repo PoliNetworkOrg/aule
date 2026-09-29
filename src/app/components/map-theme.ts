@@ -155,7 +155,7 @@ function roadPaint(id: string, t: MapTheme): Paint | null {
 
   if (/(trunk_primary|secondary_tertiary|_link)$/.test(id)) return { "line-color": t.roadMajor };
 
-  if (/path_pedestrian$/.test(id)) return { "line-color": t.path };
+  if (id.endsWith("path_pedestrian")) return { "line-color": t.path };
 
   if (/(minor|service_track|street)$/.test(id)) return { "line-color": t.roadMinor };
 
