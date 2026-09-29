@@ -205,11 +205,14 @@ export default function CampusMap({ results }: { results: BuildingAvailability[]
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Follow the campus and building selection.
+  // Follow the campus and building selection. The building panel has just
+  // shrunk (or grown) the canvas, so resize before aiming the camera.
   useEffect(() => {
     const map = mapRef.current;
 
     if (!map) return;
+
+    map.resize();
 
     if (selectedBuilding && hasCoordinates(selectedBuilding))
       flyTo(map, selectedBuilding, BUILDING_ZOOM);
@@ -256,11 +259,6 @@ export default function CampusMap({ results }: { results: BuildingAvailability[]
       );
     }
   }, [library, campus, results, selected]);
-
-  // The panel changes the map's width on desktop.
-  useEffect(() => {
-    mapRef.current?.resize();
-  }, [selectedBuilding]);
 
   return (
     <div className={`campus-map${selectedBuilding ? " campus-map--panel" : ""}`}>
