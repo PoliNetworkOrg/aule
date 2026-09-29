@@ -10,7 +10,7 @@ import {
 import { romeMinutesOfDay } from "../available-rooms-script";
 import { LOCALES, t, translate, useLocale, type Locale } from "../i18n";
 import { availableDates } from "../state/availability";
-import { setDate, setState, setWindow, useStore } from "../state/store";
+import { setDate, setDuration, setState, setWindow, useStore } from "../state/store";
 import {
   capitalise,
   DAY_END,
@@ -198,6 +198,8 @@ function TimePickerButton({
 
 type DragMode = "from" | "to" | "move";
 
+const DURATION_STEP = 30;
+
 function snap(minutes: number) {
   return Math.round(minutes / STEP_MINUTES) * STEP_MINUTES;
 }
@@ -210,7 +212,25 @@ function percentOf(minutes: number) {
   return `${((clamp(minutes, DAY_START, DAY_END) - DAY_START) / TOTAL) * 100}%`;
 }
 
-/** Drag either end, or the whole range, across the 07:15–20:15 day. */
+/**
+ * Which part of the slider a pointer at `x` grabs. Edges resize, the inside
+ * moves the window; a short window is moved from anywhere near its centre so
+ * it never gets stuck between its own handles; elsewhere the window jumps there.
+ */
+function hitTest(x: number, fromX: number, toX: number): DragMode | "jump" {
+  const width = toX - fromX;
+  const edge = Math.min(10, width / 4);
+
+  if (width < 32 && Math.abs(x - (fromX + toX) / 2) <= 12) return "move";
+
+  if (x >= fromX - 18 && x < fromX + edge) return "from";
+
+  if (x > toX - edge && x <= toX + 18) return "to";
+
+  return x > fromX && x < toX ? "move" : "jump";
+}
+
+/** Drag either end, or the whole window, across the 07:15–20:15 day. */
 function RangeSlider() {
   useLocale();
   const from = toMinutes(useStore((state) => state.from));
@@ -227,8 +247,15 @@ function RangeSlider() {
     return () => window.clearInterval(timer);
   }, []);
 
-  function minutesAt(clientX: number) {
+  function geometry() {
     const rect = track.current!.getBoundingClientRect();
+    const toX = (minutes: number) => rect.left + ((minutes - DAY_START) / TOTAL) * rect.width;
+
+    return { rect, fromX: toX(from), toX: toX(to) };
+  }
+
+  function minutesAt(clientX: number) {
+    const { rect } = geometry();
 
     return DAY_START + clamp((clientX - rect.left) / rect.width, 0, 1) * TOTAL;
   }
@@ -246,24 +273,29 @@ function RangeSlider() {
     }
   }
 
-  function start(event: ReactPointerEvent<HTMLElement>, mode: DragMode | null) {
+  function start(event: ReactPointerEvent<HTMLDivElement>) {
     if (event.button !== 0 || !track.current) return;
 
+    const { fromX, toX } = geometry();
     const minutes = minutesAt(event.clientX);
-
-    const chosen: DragMode =
-      mode ?? (Math.abs(minutes - from) <= Math.abs(minutes - to) ? "from" : "to");
+    const hit = hitTest(event.clientX, fromX, toX);
+    const length = to - from;
 
     event.preventDefault();
-    event.stopPropagation();
     track.current.setPointerCapture(event.pointerId);
-    drag.current = { mode: chosen, offset: chosen === "move" ? minutes - from : 0 };
-    setDragging(chosen);
 
-    if (!mode) apply(chosen, minutes);
+    if (hit === "jump") {
+      // Centre the window where the track was pressed, then keep dragging it.
+      drag.current = { mode: "move", offset: length / 2 };
+      apply("move", minutes, length / 2);
+    } else {
+      drag.current = { mode: hit, offset: hit === "move" ? minutes - from : 0 };
+    }
+
+    setDragging(drag.current.mode);
   }
 
-  function move(event: ReactPointerEvent<HTMLElement>) {
+  function move(event: ReactPointerEvent<HTMLDivElement>) {
     if (!drag.current) return;
 
     apply(drag.current.mode, minutesAt(event.clientX), drag.current.offset);
@@ -274,12 +306,12 @@ function RangeSlider() {
     setDragging(null);
   }
 
-  function onKey(mode: "from" | "to", event: ReactKeyboardEvent) {
-    const value = mode === "from" ? from : to;
+  function onKey(mode: DragMode, event: ReactKeyboardEvent) {
+    const value = mode === "to" ? to : from;
     const step = KEY_STEPS.get(event.key);
 
     if (event.key === "Home") apply(mode, DAY_START);
-    else if (event.key === "End") apply(mode, DAY_END);
+    else if (event.key === "End") apply(mode, mode === "move" ? DAY_END - (to - from) : DAY_END);
     else if (step !== undefined) apply(mode, value + step);
     else return;
 
@@ -288,12 +320,17 @@ function RangeSlider() {
 
   const showNow = date === romeTodayIso() && now > DAY_START && now < DAY_END;
 
+  const handles: { mode: DragMode; value: number; label: string }[] = [
+    { mode: "from", value: from, label: t("when.from") },
+    { mode: "to", value: to, label: t("when.to") },
+  ];
+
   return (
-    <div className={`range${dragging ? " range--dragging" : ""}`}>
+    <div className={`range${dragging ? ` range--dragging range--${dragging}` : ""}`}>
       <div
         ref={track}
         className="range__track"
-        onPointerDown={(event) => start(event, null)}
+        onPointerDown={start}
         onPointerMove={move}
         onPointerUp={end}
         onPointerCancel={end}
@@ -302,31 +339,33 @@ function RangeSlider() {
           <span key={hour} className="range__gridline" style={{ left: percentOf(hour * 60) }} />
         ))}
         {showNow && <span className="range__now" style={{ left: percentOf(now) }} />}
-        <div
+        <span
           className="range__selection"
           style={{ left: percentOf(from), width: `calc(${percentOf(to)} - ${percentOf(from)})` }}
-          onPointerDown={(event) => start(event, "move")}
+          role="slider"
+          tabIndex={0}
+          aria-label={t("when.window")}
+          aria-valuemin={DAY_START}
+          aria-valuemax={DAY_END}
+          aria-valuenow={from}
+          aria-valuetext={`${formatTime(fromMinutes(from))}–${formatTime(fromMinutes(to))}`}
+          onKeyDown={(event) => onKey("move", event)}
         />
-        {(["from", "to"] as const).map((mode) => {
-          const value = mode === "from" ? from : to;
-
-          return (
-            <span
-              key={mode}
-              className="range__handle"
-              style={{ left: percentOf(value) }}
-              role="slider"
-              tabIndex={0}
-              aria-label={t(mode === "from" ? "when.from" : "when.to")}
-              aria-valuemin={DAY_START}
-              aria-valuemax={DAY_END}
-              aria-valuenow={value}
-              aria-valuetext={formatTime(fromMinutes(value))}
-              onPointerDown={(event) => start(event, mode)}
-              onKeyDown={(event) => onKey(mode, event)}
-            />
-          );
-        })}
+        {handles.map(({ mode, value, label }) => (
+          <span
+            key={mode}
+            className="range__handle"
+            style={{ left: percentOf(value) }}
+            role="slider"
+            tabIndex={0}
+            aria-label={label}
+            aria-valuemin={DAY_START}
+            aria-valuemax={DAY_END}
+            aria-valuenow={value}
+            aria-valuetext={formatTime(fromMinutes(value))}
+            onKeyDown={(event) => onKey(mode, event)}
+          />
+        ))}
       </div>
       <div className="range__ticks" aria-hidden="true">
         {SLIDER_TICKS.map((hour) => (
@@ -339,7 +378,48 @@ function RangeSlider() {
   );
 }
 
-export function TimeRange() {
+function DurationStepper() {
+  useLocale();
+  const from = toMinutes(useStore((state) => state.from));
+  const to = toMinutes(useStore((state) => state.to));
+  const length = to - from;
+
+  const shorter = Math.max(
+    DURATION_STEP,
+    Math.ceil(length / DURATION_STEP) * DURATION_STEP - DURATION_STEP,
+  );
+
+  const longer = Math.floor(length / DURATION_STEP) * DURATION_STEP + DURATION_STEP;
+
+  return (
+    <div className="stepper" role="group" aria-label={t("when.duration")}>
+      <button
+        type="button"
+        className="stepper__button"
+        aria-label={t("when.shorter")}
+        disabled={length <= DURATION_STEP}
+        onClick={() => setDuration(shorter)}
+      >
+        <Icon name="remove-01" />
+      </button>
+      <span className="stepper__value" aria-live="polite">
+        {formatDuration(length)}
+      </span>
+      <button
+        type="button"
+        className="stepper__button"
+        aria-label={t("when.longer")}
+        disabled={to >= DAY_END}
+        onClick={() => setDuration(longer)}
+      >
+        <Icon name="add-01" />
+      </button>
+    </div>
+  );
+}
+
+/** Jumps to today and the current time, keeping the chosen duration. */
+function NowButton() {
   useLocale();
   const from = useStore((state) => state.from);
   const to = useStore((state) => state.to);
@@ -348,40 +428,65 @@ export function TimeRange() {
   useStore((state) => state.dataRevision);
 
   const today = romeTodayIso();
-  const now = defaultWindow(false);
-  const isNow = date === today && from === now.from;
+  const start = toMinutes(defaultWindow(false).from);
+  const active = date === today && toMinutes(from) === start;
   const hasToday = availableDates().includes(today);
 
   return (
-    <div className="time-range">
-      <div className="time-range__row">
-        <TimePickerButton
-          field="from"
-          value={from}
-          onChange={(value) => setWindow(value, to, "from")}
-        />
-        <Icon name="arrow-right-02" className="time-range__arrow" />
-        <TimePickerButton
-          field="to"
-          value={to}
-          after={from}
-          onChange={(value) => setWindow(from, value, "to")}
-        />
-        <span className="time-range__duration">
-          {formatDuration(toMinutes(to) - toMinutes(from))}
-        </span>
-        <button
-          type="button"
-          className="chip time-range__now"
-          aria-pressed={isNow}
-          disabled={!hasToday}
-          onClick={() => setState({ date: today, ...now })}
-        >
-          <Icon name="clock-01" />
-          <StableText k="when.now" />
-        </button>
+    <button
+      type="button"
+      className="now-button"
+      aria-pressed={active}
+      disabled={!hasToday}
+      onClick={() => {
+        const length = toMinutes(to) - toMinutes(from);
+        const end = Math.min(start + length, DAY_END);
+
+        setState({
+          date: today,
+          from: fromMinutes(start),
+          to: fromMinutes(Math.max(end, start + STEP_MINUTES)),
+        });
+      }}
+    >
+      <span className="now-button__dot" aria-hidden="true" />
+      <StableText k="when.now" />
+    </button>
+  );
+}
+
+export function WhenPanel() {
+  useLocale();
+  const from = useStore((state) => state.from);
+  const to = useStore((state) => state.to);
+
+  return (
+    <section className="panel" aria-labelledby="when-title">
+      <div className="panel__header">
+        <h2 className="section-title" id="when-title">
+          {t("when.title")}
+        </h2>
+        <NowButton />
       </div>
-      <RangeSlider />
-    </div>
+      <DateStrip />
+      <div className="time-range">
+        <div className="time-range__row">
+          <TimePickerButton
+            field="from"
+            value={from}
+            onChange={(value) => setWindow(value, to, "from")}
+          />
+          <Icon name="arrow-right-02" className="time-range__arrow" />
+          <TimePickerButton
+            field="to"
+            value={to}
+            after={from}
+            onChange={(value) => setWindow(from, value, "to")}
+          />
+          <DurationStepper />
+        </div>
+        <RangeSlider />
+      </div>
+    </section>
   );
 }

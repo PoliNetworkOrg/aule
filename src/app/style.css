@@ -33,7 +33,7 @@
   --slate-950: #020617;
 
   /* Semantic */
-  --bg: var(--slate-50);
+  --bg: #ffffff;
   --surface: #ffffff;
   --surface-muted: var(--slate-100);
   --border: var(--slate-200);
@@ -74,14 +74,14 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: var(--slate-950);
-    --surface: var(--slate-900);
-    --surface-muted: var(--slate-800);
-    --border: #243044;
+    --bg: #131c2e;
+    --surface: #182236;
+    --surface-muted: #222d44;
+    --border: #2c3850;
     --border-strong: var(--slate-700);
     --text: var(--slate-100);
     --text-muted: var(--slate-400);
-    --text-subtle: var(--slate-500);
+    --text-subtle: #7f8ca3;
     --accent: #5b9cf0;
     --accent-hover: #7db1f4;
     --accent-soft: rgb(91 156 240 / 12%);
@@ -209,6 +209,17 @@ mark {
   outline-offset: 2px;
 }
 
+/* Controls inside scrolling rows draw their ring inside, so it's never clipped. */
+.chip:focus-visible,
+.date-strip__day:focus-visible,
+.segmented__option:focus-visible,
+.choice:focus-visible,
+.time-grid__option:focus-visible,
+.option:focus-visible {
+  outline-offset: -2px;
+  box-shadow: inset 0 0 0 4px var(--surface);
+}
+
 .visually-hidden {
   position: absolute !important;
   width: 1px;
@@ -333,6 +344,8 @@ mark {
 .chip-row {
   display: flex;
   gap: 8px;
+  padding-block: 4px;
+  margin-block: -4px;
   overflow-x: auto;
   scrollbar-width: none;
   margin-inline: calc(var(--page-gutter) * -1);
@@ -393,6 +406,24 @@ mark {
 .chip--active {
   border-color: var(--accent-soft-border);
   color: var(--accent-text);
+}
+
+.chip__chevron {
+  font-size: 14px;
+  transition: rotate 0.15s;
+}
+
+.chip__chevron--open {
+  rotate: 180deg;
+}
+
+.chip__gain {
+  font-weight: 700;
+  color: var(--free);
+}
+
+.chip--impact {
+  border-style: dashed;
 }
 
 .chip__badge {
@@ -471,6 +502,56 @@ mark {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin-bottom: 6px;
+}
+
+.panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 32px;
+}
+
+.action-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: var(--busy-soft);
+  color: var(--busy);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.action-link:hover {
+  background: color-mix(in srgb, var(--busy) 16%, transparent);
+}
+
+.action-link__count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--busy);
+  color: #ffffff;
+  font-size: 11px;
+}
+
+.link-button {
+  padding: 0;
+  color: var(--accent-text);
+  font: inherit;
+  text-align: left;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--accent) 35%, transparent);
+  text-underline-offset: 2px;
+}
+
+.link-button:hover {
+  text-decoration-color: currentcolor;
 }
 
 .section-title {
@@ -688,6 +769,7 @@ mark {
 
 .stable {
   display: inline-grid;
+  justify-items: start;
 }
 
 .stable__text {

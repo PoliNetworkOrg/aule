@@ -100,8 +100,9 @@ export function Header({ page }: { page: "home" | "classroom" | "info" }) {
           <span className="brand__product">{t("app.name")}</span>
         </a>
 
+        {page === "home" && <CampusSelect />}
+
         <div className="app-header__actions">
-          {page === "home" && <CampusSelect />}
           <LanguageToggle />
           <button
             type="button"

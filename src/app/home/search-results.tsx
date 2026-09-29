@@ -15,6 +15,7 @@ import { capitalise, formatRange, parseIsoDate } from "../state/time";
 import { Highlight, titleCase } from "../ui/text";
 import { Icon } from "../ui/icon";
 import { StatusTag } from "./room-card";
+import { ProfessorList } from "./professor-link";
 
 function formatDay(iso: string, locale: string) {
   const text = new Intl.DateTimeFormat(locale, {
@@ -26,19 +27,23 @@ function formatDay(iso: string, locale: string) {
   return capitalise(text, locale);
 }
 
-/** Professors named in the matching sessions whose name contains every search word. */
+/**
+ * Professors teaching the matching lessons: for a course query, who teaches it;
+ * for a name, that professor first. Picking one searches for their timetable.
+ */
 function matchingProfessors(groups: OccupationGroup[], query: string) {
   const words = tokenize(query);
-  const names = new Set<string>();
+  const byName = new Set<string>();
+  const others = new Set<string>();
 
   for (const group of groups)
     for (const professor of group.professors) {
       const lower = professor.toLowerCase();
 
-      if (words.every((word) => lower.includes(word))) names.add(professor);
+      (words.every((word) => lower.includes(word)) ? byName : others).add(professor);
     }
 
-  return [...names].slice(0, 8);
+  return [...byName, ...[...others].filter((name) => !byName.has(name))].slice(0, 10);
 }
 
 function RoomResults({ query }: { query: string }) {
@@ -144,10 +149,7 @@ function EventResults({ query }: { query: string }) {
                   <span>
                     <Icon name="user-multiple" />
                     <span>
-                      <Highlight
-                        text={group.professors.map((name) => titleCase(name, locale)).join(", ")}
-                        query={query}
-                      />
+                      <ProfessorList names={group.professors} query={query} />
                     </span>
                   </span>
                 )}

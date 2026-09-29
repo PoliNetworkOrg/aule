@@ -1,5 +1,12 @@
 import { useSyncExternalStore } from "react";
-import { defaultWindow, normaliseWindow } from "./time";
+import {
+  DAY_END,
+  defaultWindow,
+  fromMinutes,
+  normaliseWindow,
+  STEP_MINUTES,
+  toMinutes,
+} from "./time";
 
 // The whole home screen is driven by this one store: what the user is looking
 // for (campus, day, time window, filters, free-text query) plus the data
@@ -13,8 +20,8 @@ export type ResultsView = "list" | "map";
 export type SeatsFilter = 0 | 30 | 60 | 100 | 200;
 
 export interface Filters {
-  /** Hide rooms that are only free for part of the window. */
-  fullyFree: boolean;
+  /** Also list rooms that are free for only part of the window. */
+  partial: boolean;
   /** Feature 142: seats with power sockets. */
   sockets: boolean;
   /** At least one seat reserved for wheelchair users. */
@@ -41,10 +48,12 @@ export interface AppState {
   view: ResultsView;
   /** Building focused on the 3D map (by name), shown in the map's side panel. */
   mapBuilding: string | null;
+  /** Phones/tablets: controls folded into a one-line summary while browsing results. */
+  controlsCollapsed: boolean;
 }
 
 export const DEFAULT_FILTERS: Filters = {
-  fullyFree: false,
+  partial: false,
   sockets: false,
   accessible: false,
   network: false,
@@ -54,9 +63,8 @@ export const DEFAULT_FILTERS: Filters = {
 
 const CAMPUS_KEY = "poliAule_lastCampusId";
 
-const FILTERS_KEY = "poliAule_filters";
-
-const LEGACY_SHOW_PARTIAL_KEY = "poliAule_showPartial";
+// v2: rooms free for the whole window are the default, partially free ones opt-in.
+const FILTERS_KEY = "poliAule_filters_v2";
 
 function readStorage(key: string) {
   try {
@@ -86,7 +94,7 @@ function readFilters(): Filters {
       readStorage(FILTERS_KEY) ?? "{}",
     );
 
-    for (const key of ["fullyFree", "sockets", "accessible", "network"] as const) {
+    for (const key of ["partial", "sockets", "accessible", "network"] as const) {
       if (saved[key] === true) filters[key] = true;
     }
 
@@ -96,10 +104,6 @@ function readFilters(): Filters {
   } catch {
     /* corrupted value: fall back to defaults */
   }
-
-  // The old settings panel stored "show partially free" separately.
-  if (readStorage(FILTERS_KEY) === null && readStorage(LEGACY_SHOW_PARTIAL_KEY) === "false")
-    filters.fullyFree = true;
 
   return filters;
 }
@@ -131,6 +135,7 @@ let state: AppState = {
   query: "",
   view: "list",
   mapBuilding: null,
+  controlsCollapsed: false,
 };
 
 const listeners = new Set<() => void>();
@@ -205,7 +210,7 @@ export function setMapBuilding(mapBuilding: string | null) {
 
 export function countActiveFilters(filters: Filters) {
   return (
-    Number(filters.fullyFree) +
+    Number(filters.partial) +
     Number(filters.sockets) +
     Number(filters.accessible) +
     Number(filters.network) +
@@ -217,4 +222,38 @@ export function countActiveFilters(filters: Filters) {
 /** Filters that live behind "More filters", counted for that button's badge. */
 export function countAdvancedFilters(filters: Filters) {
   return Number(filters.network) + Number(filters.minSeats > 0) + Number(filters.building !== "");
+}
+
+/** Filters that narrow the results down, in the order their chips appear. */
+export const RESTRICTIVE_FILTERS = [
+  "sockets",
+  "accessible",
+  "minSeats",
+  "building",
+  "network",
+] as const;
+
+export type RestrictiveFilter = (typeof RESTRICTIVE_FILTERS)[number];
+
+export function isFilterActive(filters: Filters, key: RestrictiveFilter) {
+  return key === "minSeats"
+    ? filters.minSeats > 0
+    : key === "building"
+      ? filters.building !== ""
+      : filters[key];
+}
+
+export function clearFilter(key: RestrictiveFilter) {
+  setFilters({ [key]: DEFAULT_FILTERS[key] });
+}
+
+export function setDuration(minutes: number) {
+  const from = toMinutes(state.from);
+  const end = Math.min(from + minutes, DAY_END);
+
+  setState({ to: fromMinutes(Math.max(end, from + STEP_MINUTES)) });
+}
+
+export function setControlsCollapsed(controlsCollapsed: boolean) {
+  if (controlsCollapsed !== state.controlsCollapsed) setState({ controlsCollapsed });
 }

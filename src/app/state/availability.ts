@@ -1,7 +1,13 @@
 import { classroomsData as occupancyDays, SKIP_DAYS } from "../available-rooms-script";
 import { classroomsData as directory } from "../classroom-search-data";
 import type { Building, Campus, Classroom, Occupation } from "../types";
-import type { Filters } from "./store";
+import {
+  DEFAULT_FILTERS,
+  isFilterActive,
+  RESTRICTIVE_FILTERS,
+  type Filters,
+  type RestrictiveFilter,
+} from "./store";
 import { dateKeyToIso, isoToDateKey, parseIsoDate, romeTodayIso, toMinutes } from "./time";
 
 export type WindowStatus = "free" | "partial" | "occupied";
@@ -150,7 +156,8 @@ export function matchesFilters(room: Classroom, filters: Filters) {
 }
 
 /**
- * Rooms of a campus that are free for at least part of [from, to] on `isoDate`,
+ * Rooms of a campus that are free for at least part of [from, to] on `isoDate`
+ * (partially free ones included regardless of the `partial` filter: see visibleResults),
  * grouped by building. Room metadata (seats, features) comes from the static
  * directory; occupancy from the day's data.
  */
@@ -184,7 +191,7 @@ export function findAvailability(
       const slots = freeSlots(occupied.occupancy ?? [], from, to);
       const status = windowStatus(slots, from, to);
 
-      if (status === "occupied" || (status === "partial" && filters.fullyFree)) continue;
+      if (status === "occupied") continue;
 
       rooms.push({
         room,
@@ -218,4 +225,51 @@ export function roomWindowStatus(roomId: number, isoDate: string, from: string, 
   const slots = freeSlots(occupancy, from, to);
 
   return { status: windowStatus(slots, from, to), slots };
+}
+
+/** Drops partially free rooms unless the "partially free" filter is on. */
+export function visibleResults(results: BuildingAvailability[], filters: Filters) {
+  if (filters.partial) return results;
+
+  return results.flatMap((group) => {
+    const rooms = group.rooms.filter((room) => room.status === "free");
+
+    return rooms.length ? [{ ...group, rooms }] : [];
+  });
+}
+
+export function countRooms(results: BuildingAvailability[]) {
+  return results.reduce((sum, group) => sum + group.rooms.length, 0);
+}
+
+export interface FilterImpact {
+  key: RestrictiveFilter;
+  /** How many more rooms would be listed without this filter. */
+  gain: number;
+}
+
+/** For each active filter, how many rooms it hides on its own: the biggest culprit first. */
+export function filterImpact(
+  campusId: string,
+  isoDate: string,
+  from: string,
+  to: string,
+  filters: Filters,
+): FilterImpact[] {
+  const shown = countRooms(
+    visibleResults(findAvailability(campusId, isoDate, from, to, filters), filters),
+  );
+
+  return RESTRICTIVE_FILTERS.filter((key) => isFilterActive(filters, key))
+    .map((key) => {
+      const relaxed = { ...filters, [key]: DEFAULT_FILTERS[key] };
+
+      const total = countRooms(
+        visibleResults(findAvailability(campusId, isoDate, from, to, relaxed), relaxed),
+      );
+
+      return { key, gain: total - shown };
+    })
+    .filter((impact) => impact.gain > 0)
+    .sort((a, b) => b.gain - a.gain);
 }

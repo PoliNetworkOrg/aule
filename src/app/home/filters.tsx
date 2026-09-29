@@ -1,10 +1,9 @@
-import { useCallback, useRef, useState } from "react";
+import { useState } from "react";
 import { t, tf, useLocale } from "../i18n";
 import { findCampus } from "../state/availability";
 import {
   countActiveFilters,
   countAdvancedFilters,
-  DEFAULT_FILTERS,
   resetFilters,
   setFilters,
   useStore,
@@ -12,7 +11,6 @@ import {
   type SeatsFilter,
 } from "../state/store";
 import { Icon } from "../ui/icon";
-import { Popup } from "../ui/popup";
 import { StableText } from "../ui/stable";
 
 const SEAT_OPTIONS: SeatsFilter[] = [0, 30, 60, 100, 200];
@@ -36,13 +34,13 @@ function ToggleChip({
   );
 }
 
-function MoreFilters({ filters, onDone }: { filters: FilterState; onDone: () => void }) {
+function MoreFilters({ filters }: { filters: FilterState }) {
   useLocale();
   const campusId = useStore((state) => state.campusId);
   const buildings = findCampus(campusId)?.buildings ?? [];
 
   return (
-    <div className="more-filters">
+    <div className="more-filters" id="more-filters">
       <fieldset className="field">
         <legend className="field__label">{t("filters.seats")}</legend>
         <div className="segmented segmented--fill" role="group" aria-label={t("filters.seats")}>
@@ -100,26 +98,6 @@ function MoreFilters({ filters, onDone }: { filters: FilterState; onDone: () => 
           />
         </div>
       </fieldset>
-
-      <div className="more-filters__actions">
-        <button
-          type="button"
-          className="button button--ghost"
-          disabled={countAdvancedFilters(filters) === 0}
-          onClick={() =>
-            setFilters({
-              minSeats: DEFAULT_FILTERS.minSeats,
-              building: DEFAULT_FILTERS.building,
-              network: DEFAULT_FILTERS.network,
-            })
-          }
-        >
-          <StableText k="filters.clearMore" />
-        </button>
-        <button type="button" className="button button--primary" onClick={onDone}>
-          <StableText k="filters.done" />
-        </button>
-      </div>
     </div>
   );
 }
@@ -127,20 +105,34 @@ function MoreFilters({ filters, onDone }: { filters: FilterState; onDone: () => 
 export function Filters() {
   useLocale();
   const filters = useStore((state) => state.filters);
-  const [open, setOpen] = useState(false);
-  const trigger = useRef<HTMLButtonElement>(null);
-  const close = useCallback(() => setOpen(false), []);
   const advanced = countAdvancedFilters(filters);
   const active = countActiveFilters(filters);
+  const [open, setOpen] = useState(() => advanced > 0);
 
   return (
-    <div className="filters">
+    <section className="panel filters" aria-labelledby="filters-title">
+      <div className="panel__header">
+        <h2 className="section-title" id="filters-title">
+          {t("filters.title")}
+        </h2>
+        <button
+          type="button"
+          className="action-link"
+          hidden={active === 0}
+          aria-label={tf("filters.resetCount", { n: active })}
+          onClick={resetFilters}
+        >
+          <Icon name="cancel-01" />
+          <StableText k="filters.reset" />
+          <span className="action-link__count">{active}</span>
+        </button>
+      </div>
       <div className="chip-row">
         <ToggleChip
-          active={filters.fullyFree}
+          active={filters.partial}
           icon="time-quarter-pass"
-          label="filters.fullyFree"
-          onToggle={() => setFilters({ fullyFree: !filters.fullyFree })}
+          label="filters.partial"
+          onToggle={() => setFilters({ partial: !filters.partial })}
         />
         <ToggleChip
           active={filters.sockets}
@@ -155,32 +147,22 @@ export function Filters() {
           onToggle={() => setFilters({ accessible: !filters.accessible })}
         />
         <button
-          ref={trigger}
           type="button"
           className={`chip${advanced > 0 ? " chip--active" : ""}`}
-          aria-haspopup="dialog"
           aria-expanded={open}
+          aria-controls="more-filters"
           onClick={() => setOpen(!open)}
         >
           <Icon name="filter-horizontal" />
           <StableText k="filters.more" />
           {advanced > 0 && <span className="chip__badge">{advanced}</span>}
+          <Icon
+            name="arrow-down-01"
+            className={`chip__chevron${open ? " chip__chevron--open" : ""}`}
+          />
         </button>
-        {active > 0 && (
-          <button
-            type="button"
-            className="chip chip--reset"
-            aria-label={tf("filters.resetCount", { n: active })}
-            onClick={resetFilters}
-          >
-            <Icon name="cancel-01" />
-            <StableText k="filters.reset" />
-          </button>
-        )}
       </div>
-      <Popup open={open} anchor={trigger} title={t("filters.more")} onClose={close} minWidth={340}>
-        <MoreFilters filters={filters} onDone={close} />
-      </Popup>
-    </div>
+      {open && <MoreFilters filters={filters} />}
+    </section>
   );
 }

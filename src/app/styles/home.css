@@ -38,12 +38,56 @@ body[data-page="home"] #root {
   display: flex;
   flex-direction: column;
   flex: none;
-  gap: 16px;
-  padding: 20px var(--page-gutter) 14px;
+  gap: 22px;
+  padding: 22px var(--page-gutter) 18px;
 }
 
-/* Phones and tablets: the controls never take more than half the screen. */
+.controls-summary {
+  display: none;
+}
+
+/* Phones and tablets: the controls never take more than half the screen, and
+   fold into a one-line summary while the results are being scrolled. */
 @media (max-width: 959px) {
+  .home__controls--collapsed {
+    display: none;
+  }
+
+  .controls-summary {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 12px var(--page-gutter) 10px;
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    text-align: left;
+    font-size: 14px;
+  }
+
+  .controls-summary .icon {
+    color: var(--accent);
+  }
+
+  .controls-summary__text {
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .controls-summary__edit {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--accent-text);
+    font-weight: 700;
+    font-size: 13px;
+  }
+
   .home__controls {
     max-height: 52dvh;
     overflow-y: auto;
@@ -55,15 +99,7 @@ body[data-page="home"] #root {
 .panel {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-}
-
-.visually-hidden-mobile {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
+  gap: 14px;
 }
 
 /* ---------- Search ---------- */
@@ -278,18 +314,6 @@ body[data-page="home"] #root {
   color: var(--text-subtle);
 }
 
-.time-range__duration {
-  margin-left: 4px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-muted);
-  white-space: nowrap;
-}
-
-.time-range__now {
-  margin-left: auto;
-}
-
 .time-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -315,16 +339,107 @@ body[data-page="home"] #root {
   color: var(--on-accent);
 }
 
-/* Range slider: drag either end, or the whole selection. */
+/* Duration stepper */
+.stepper {
+  display: inline-flex;
+  align-items: center;
+  margin-left: auto;
+  height: 46px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.stepper__button {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 100%;
+  color: var(--text-muted);
+  font-size: 16px;
+}
+
+.stepper__button:hover:not(:disabled) {
+  color: var(--accent-text);
+  background: var(--accent-soft);
+}
+
+.stepper__button:first-child {
+  border-radius: var(--radius) 0 0 var(--radius);
+}
+
+.stepper__button:last-child {
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+
+.stepper__button:disabled {
+  opacity: 0.35;
+}
+
+.stepper__value {
+  min-width: 56px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* "Now": jumps to the current time; lit while the window starts now. */
+.now-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  transition:
+    background-color 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+}
+
+.now-button:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.now-button__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 2px solid var(--busy);
+}
+
+.now-button[aria-pressed="true"] {
+  border-color: var(--busy-border);
+  background: var(--busy-soft);
+  color: var(--busy);
+}
+
+.now-button[aria-pressed="true"] .now-button__dot {
+  background: var(--busy);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--busy) 25%, transparent);
+}
+
+.now-button:disabled {
+  opacity: 0.45;
+}
+
+/* Range slider: edges resize, the inside moves, anywhere else jumps. */
 .range {
-  padding: 0 10px;
+  padding: 0 12px;
   user-select: none;
 }
 
 .range__track {
   position: relative;
-  height: 28px;
-  border-radius: 999px;
+  height: 36px;
+  border-radius: var(--radius);
   background: var(--surface-muted);
   touch-action: none;
   cursor: pointer;
@@ -332,59 +447,54 @@ body[data-page="home"] #root {
 
 .range__gridline {
   position: absolute;
-  top: 9px;
-  bottom: 9px;
+  top: 12px;
+  bottom: 12px;
   width: 1px;
   background: var(--border-strong);
 }
 
 .range__now {
   position: absolute;
-  top: -3px;
-  bottom: -3px;
+  top: -4px;
+  bottom: -4px;
   width: 2px;
   margin-left: -1px;
   border-radius: 1px;
   background: var(--busy);
+  pointer-events: none;
 }
 
 .range__selection {
   position: absolute;
-  top: 0;
-  bottom: 0;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--accent) 22%, transparent);
-  border: 1.5px solid var(--accent);
+  top: 3px;
+  bottom: 3px;
+  min-width: 6px;
+  border-radius: 7px;
+  background: var(--accent);
+  opacity: 0.9;
   cursor: grab;
 }
 
-.range--dragging .range__selection {
+.range--move .range__selection {
   cursor: grabbing;
 }
 
 .range__handle {
   position: absolute;
   top: 50%;
-  width: 22px;
-  height: 22px;
+  width: 6px;
+  height: 20px;
   translate: -50% -50%;
-  border-radius: 50%;
+  border-radius: 3px;
   background: var(--surface);
-  border: 2px solid var(--accent);
-  box-shadow: var(--shadow-sm);
-  cursor: ew-resize;
-  touch-action: none;
+  box-shadow: 0 0 0 1.5px var(--accent);
+  pointer-events: none;
 }
 
-.range__handle::after {
-  content: "";
-  position: absolute;
-  inset: -12px;
-}
-
+.range__selection:focus-visible,
 .range__handle:focus-visible {
   outline: 3px solid var(--focus-ring);
-  outline-offset: 1px;
+  outline-offset: 2px;
 }
 
 .range__ticks {
@@ -412,13 +522,10 @@ body[data-page="home"] #root {
 .more-filters {
   display: grid;
   gap: 18px;
-}
-
-.more-filters__actions {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  padding-top: 4px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
 }
 
 .choice-grid {
@@ -676,15 +783,16 @@ body[data-page="home"] #root {
 
   .home__body {
     display: grid;
-    grid-template-columns: 360px minmax(0, 1fr);
-    gap: 28px;
-    padding: 28px var(--page-gutter) 0;
+    grid-template-columns: 384px minmax(0, 1fr);
+    gap: 36px;
+    padding: 32px var(--page-gutter) 0;
   }
 
   .home__controls {
     display: flex;
-    padding: 0 0 24px;
-    gap: 28px;
+    padding: 4px 6px 32px;
+    margin: -4px -6px 0;
+    gap: 36px;
     overflow-y: auto;
     scrollbar-width: thin;
   }
@@ -693,12 +801,8 @@ body[data-page="home"] #root {
     grid-row: auto;
   }
 
-  .visually-hidden-mobile {
-    position: static;
-    width: auto;
-    height: auto;
-    overflow: visible;
-    clip-path: none;
+  .panel {
+    gap: 16px;
   }
 
   .chip-row {

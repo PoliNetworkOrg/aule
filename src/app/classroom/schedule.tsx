@@ -22,6 +22,7 @@ import {
 import type { Occupation } from "../types";
 import { Icon } from "../ui/icon";
 import { titleCase } from "../ui/text";
+import { ProfessorList } from "../home/professor-link";
 
 type AgendaItem =
   | { kind: "busy"; start: string; end: string; slot: Occupation }
@@ -181,7 +182,9 @@ function AgendaRow({
               {item.slot.professors?.length ? (
                 <span>
                   <Icon name="user-multiple" />
-                  {item.slot.professors.map((name) => titleCase(name, locale)).join(", ")}
+                  <span>
+                    <ProfessorList names={item.slot.professors} />
+                  </span>
                 </span>
               ) : null}
               {item.slot.code != null && <span>{item.slot.code}</span>}
