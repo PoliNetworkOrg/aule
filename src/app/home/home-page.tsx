@@ -101,10 +101,11 @@ export function HomePage({ hidden }: { hidden: boolean }) {
         <div className="home__body">
           <ControlsSummary />
           <aside className="home__controls" aria-label={t("controls.label")}>
-            <div className="controls__close">
+            <div className="controls__header">
+              <span className="controls__title">{t("controls.label")}</span>
               <button
                 type="button"
-                className="icon-button"
+                className="icon-button controls__close"
                 aria-label={t("controls.close")}
                 title={t("controls.close")}
                 onClick={() => setControlsCollapsed(true)}

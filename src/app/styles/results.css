@@ -130,7 +130,8 @@ button.summary__partial[aria-pressed="true"] {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 0;
+  margin-inline: calc(var(--page-gutter) * -1);
+  padding: 8px var(--page-gutter);
   background: var(--surface);
 }
 

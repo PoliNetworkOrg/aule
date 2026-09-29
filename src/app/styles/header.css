@@ -29,8 +29,8 @@
 }
 
 .brand__logo {
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   flex: none;
 }
 
@@ -82,12 +82,6 @@
   background: var(--surface);
   color: var(--accent-text);
   box-shadow: var(--shadow-sm);
-}
-
-@media (max-width: 419px) {
-  .brand__product {
-    display: none;
-  }
 }
 
 @media (max-width: 479px) {
