@@ -1,5 +1,6 @@
 """
-Fetches classroom photos from Polimi and writes changed ones to photos/<classroom_id>.jpg.
+Fetches classroom photos from Polimi and writes changed ones to photos/<classroom_id>.jpg,
+with a photos/<classroom_id>_thumb.jpg copy for cards and search results.
 
 Polimi's photo flow is two calls: resolve idfoto -> a docmanager.polimi.it URL carrying
 a short-lived signed token, then download the bytes from that URL. Both calls need a
@@ -11,10 +12,12 @@ where it lives next to the photos as the single source of truth for what's uploa
 7-day actions/cache eviction window can't outlast this monthly job). Only new/changed photos
 are written to disk; the workflow then only uploads and purges what's on disk, and this
 script always rewrites manifest.json so unchanged hashes carry forward to the next run.
+Run with --backfill-thumbs to write thumbnails for photos already uploaded to R2.
 """
 
 import argparse
 import hashlib
+import io
 import json
 import os
 import sys
@@ -23,6 +26,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import httpx
+from PIL import Image, ImageOps, UnidentifiedImageError
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -51,6 +55,8 @@ REQUEST_HEADERS = {
 }
 
 MAX_DETAIL_LINES = 10  # per category, in the Telegram summary
+THUMB_MAX_SIDE = 640
+THUMB_QUALITY = 80
 
 
 # ---------------------------------------------------------------------------
@@ -109,11 +115,24 @@ def fetch_photo_bytes(client: httpx.Client, room: dict) -> bytes:
     raise RuntimeError(last_error)
 
 
-def summarize(new: list[dict], updated: list[dict], unchanged_count: int, failures: list[dict]) -> tuple[str, str]:
+def make_thumbnail(content: bytes) -> bytes:
+    """Apply EXIF orientation and fit the image into a 640px JPEG."""
+    with Image.open(io.BytesIO(content)) as original:
+        image = ImageOps.exif_transpose(original).convert("RGB")
+    image.thumbnail((THUMB_MAX_SIDE, THUMB_MAX_SIDE), Image.Resampling.LANCZOS)
+    output = io.BytesIO()
+    image.save(output, "JPEG", quality=THUMB_QUALITY, optimize=True)
+    return output.getvalue()
+
+
+def summarize(new: list[dict], updated: list[dict], unchanged_count: int, failures: list[dict],
+              thumbs_backfilled: int = 0, thumb_failures: list[dict] | None = None) -> tuple[str, str]:
     """Build a (status, message) pair describing the run, for the Telegram notification step."""
     lines = [
         f"{len(new)} new, {len(updated)} updated, {unchanged_count} unchanged, {len(failures)} failed."
     ]
+    if thumbs_backfilled:
+        lines.append(f"{thumbs_backfilled} thumbnail(s) backfilled for unchanged photos.")
 
     def add_section(title: str, rooms: list[dict]):
         if not rooms:
@@ -133,7 +152,14 @@ def summarize(new: list[dict], updated: list[dict], unchanged_count: int, failur
         if len(failures) > MAX_DETAIL_LINES:
             lines.append(f"    ...and {len(failures) - MAX_DETAIL_LINES} more")
 
-    status = "failed" if failures else "ok"
+    if thumb_failures:
+        lines.append("Thumbnail failed (the API serves the full photo instead):")
+        for failure in thumb_failures[:MAX_DETAIL_LINES]:
+            lines.append(f"    {failure['name']} (id={failure['id']}): {failure['error']}")
+        if len(thumb_failures) > MAX_DETAIL_LINES:
+            lines.append(f"    ...and {len(thumb_failures) - MAX_DETAIL_LINES} more")
+
+    status = "failed" if failures or thumb_failures else "ok"
     return status, "\n".join(lines)
 
 
@@ -145,6 +171,8 @@ def summarize(new: list[dict], updated: list[dict], unchanged_count: int, failur
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--no-delay", action="store_true", help="Skip delay between API calls")
+    parser.add_argument("--backfill-thumbs", action="store_true",
+                        help="Also write thumbnails for unchanged photos already in R2")
     args = parser.parse_args()
 
     with open(CLASSROOMS_FILE, encoding="utf-8") as f:
@@ -170,6 +198,8 @@ def main() -> int:
     updated: list[dict] = []
     failures: list[dict] = []
     unchanged_count = 0
+    thumbs_backfilled = 0
+    thumb_failures: list[dict] = []
 
     with httpx.Client(headers=REQUEST_HEADERS) as client:
         for i, room in enumerate(rooms, start=1):
@@ -186,16 +216,31 @@ def main() -> int:
 
             digest = hashlib.md5(content).hexdigest()
             previous_digest = manifest.get(key)
+            changed = digest != previous_digest
 
-            if digest == previous_digest:
+            thumbnail = None
+            if changed or args.backfill_thumbs:
+                try:
+                    thumbnail = make_thumbnail(content)
+                except (OSError, ValueError, UnidentifiedImageError) as e:
+                    print(f"  {label}: thumbnail failed - {e}")
+                    thumb_failures.append({**room, "error": str(e)})
+                if thumbnail is not None:
+                    (OUTPUT_DIR / f"{key}_thumb.jpg").write_bytes(thumbnail)
+
+            if not changed:
                 unchanged_count += 1
-                print(f"  {label}: unchanged")
+                if thumbnail is not None:
+                    thumbs_backfilled += 1
+                print(f"  {label}: unchanged{' (thumbnail written)' if thumbnail is not None else ''}")
             else:
-                (new if previous_digest is None else updated).append(room)
-                with open(OUTPUT_DIR / f"{key}.jpg", "wb") as f:
-                    f.write(content)
-                manifest[key] = digest
-                print(f"  {label}: {'new' if previous_digest is None else 'updated'}")
+                if thumbnail is None:
+                    print(f"  {label}: skipped unreadable photo; will retry next run")
+                else:
+                    (new if previous_digest is None else updated).append(room)
+                    (OUTPUT_DIR / f"{key}.jpg").write_bytes(content)
+                    manifest[key] = digest
+                    print(f"  {label}: {'new' if previous_digest is None else 'updated'}")
 
             if not args.no_delay:
                 time.sleep(DELAY_BETWEEN_CALLS)
@@ -203,7 +248,8 @@ def main() -> int:
     with open(MANIFEST_FILE, "w", encoding="utf-8") as f:
         json.dump(manifest, f, indent=2, sort_keys=True)
 
-    status, message = summarize(new, updated, unchanged_count, failures)
+    status, message = summarize(new, updated, unchanged_count, failures,
+                                thumbs_backfilled, thumb_failures)
     print(f"\n{message}")
     write_github_output(status, message)
 

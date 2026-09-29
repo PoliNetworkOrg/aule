@@ -1,0 +1,304 @@
+/* ---------- Results pane ---------- */
+
+.results {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.results__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px var(--page-gutter);
+  border-bottom: 1px solid var(--border);
+}
+
+.summary {
+  min-width: 0;
+  flex: 1;
+}
+
+.summary__count {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.summary__partial {
+  margin-left: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--partial);
+}
+
+button.summary__partial {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--partial-soft);
+  font-weight: 700;
+}
+
+button.summary__partial[aria-pressed="true"] {
+  background: var(--surface-muted);
+  color: var(--text-muted);
+}
+
+.summary__context {
+  font-size: 13px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+}
+
+.results .notice {
+  margin: 10px var(--page-gutter) 0;
+}
+
+.results__body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.results__body--list {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.results__body--map {
+  display: flex;
+}
+
+.results-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 12px var(--page-gutter) 32px;
+}
+
+.hints {
+  display: grid;
+  gap: 10px;
+}
+
+.hint {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius-lg);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-soft-border);
+}
+
+.hint__icon {
+  font-size: 20px;
+  color: var(--accent);
+}
+
+.hint__text {
+  font-size: 14px;
+}
+
+.hint > .button,
+.hint > .chip-row {
+  grid-column: 2;
+  justify-self: start;
+}
+
+.skeleton-group .room-grid {
+  margin-top: 0;
+}
+
+/* ---------- Building groups ---------- */
+
+.building-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.building-group__header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-inline: calc(var(--page-gutter) * -1);
+  padding: 8px var(--page-gutter);
+  background: var(--surface);
+  /* Bleed the background upwards: the scrollport often starts at a fractional
+     offset, and the snapped sticky header can leave a sliver of rows showing
+     above it on high-DPR screens. */
+  box-shadow: 0 -8px 0 var(--surface);
+}
+
+.building-group__title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.building-group__alt {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.building-group__count {
+  font-size: 13px;
+  color: var(--text-subtle);
+}
+
+.building-group__header .icon-button {
+  margin-left: auto;
+}
+
+/* ---------- Room cards ---------- */
+
+.room-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  gap: 8px;
+}
+
+.room-grid--single {
+  grid-template-columns: 1fr;
+}
+
+.room-card {
+  position: relative;
+}
+
+.room-card__main {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+  height: 100%;
+  padding: 10px 12px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  text-align: left;
+  overflow: hidden;
+  transition:
+    border-color 0.15s,
+    background-color 0.15s;
+}
+
+.room-thumbnail {
+  display: block;
+  flex: none;
+  overflow: hidden;
+  background: var(--surface-muted);
+}
+
+.room-thumbnail img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.room-card .room-thumbnail {
+  width: calc(100% + 24px);
+  height: 88px;
+  margin: -10px -12px 6px;
+}
+
+.room-card__main:hover {
+  border-color: var(--accent-soft-border);
+  background: color-mix(in srgb, var(--accent-soft) 50%, var(--surface));
+}
+
+.room-card__name {
+  max-width: 100%;
+  padding-right: 32px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+
+.room-card__meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 18px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.room-card__meta > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.room-card__main .tag {
+  margin-top: 4px;
+}
+
+.room-card .star-button {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+}
+
+@media (min-width: 960px) {
+  .results {
+    border: 1px solid var(--border);
+    border-bottom: 0;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  }
+
+  .results__toolbar,
+  .results-list {
+    padding-inline: 20px;
+  }
+
+  .results .notice {
+    margin-inline: 20px;
+  }
+
+  .room-grid {
+    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  }
+}
+
+@media (max-width: 359px) {
+  .segmented--icons .segmented__option span {
+    display: none;
+  }
+
+  .segmented--icons .segmented__option {
+    padding: 0 10px;
+    font-size: 16px;
+  }
+}
+
+/* Phones: campus, day and time are right above in the controls; keep the summary to two lines. */
+@media (max-width: 639px) {
+  .summary__context {
+    display: none;
+  }
+
+  .summary__partial {
+    display: block;
+    margin-left: 0;
+    font-size: 13px;
+  }
+}

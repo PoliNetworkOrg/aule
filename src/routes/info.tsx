@@ -1,6 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { ApplicationRoute } from "../Application";
+import { InfoPage } from "../app/info/info-page";
 
-export const Route = createFileRoute("/info")({
-  component: () => <ApplicationRoute page="info" />,
-});
+export const Route = createFileRoute("/info")({ component: InfoPage });
