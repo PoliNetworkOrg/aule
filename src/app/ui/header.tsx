@@ -64,7 +64,7 @@ export function Header({ page }: { page: "home" | "classroom" | "info" }) {
             title={themeLabel}
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
           >
-            <Icon name={theme === "dark" ? "sun-01" : "moon-01"} />
+            <Icon name={theme === "dark" ? "sun-01" : "moon"} />
           </button>
           <button
             type="button"
