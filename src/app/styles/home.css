@@ -235,14 +235,14 @@ body[data-page="home"] #root {
   color: var(--text-subtle);
 }
 
-.date-strip__day[aria-checked="true"] {
+.date-strip__day[aria-pressed="true"] {
   background: var(--accent);
   border-color: var(--accent);
   color: var(--on-accent);
 }
 
-.date-strip__day[aria-checked="true"] .date-strip__weekday,
-.date-strip__day[aria-checked="true"] .date-strip__month {
+.date-strip__day[aria-pressed="true"] .date-strip__weekday,
+.date-strip__day[aria-pressed="true"] .date-strip__month {
   color: inherit;
   opacity: 0.85;
 }

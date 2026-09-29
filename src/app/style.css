@@ -438,7 +438,7 @@ mark {
   color: var(--text);
 }
 
-.segmented__option[aria-checked="true"] {
+.segmented__option[aria-pressed="true"] {
   background: var(--surface);
   color: var(--accent-text);
   box-shadow: var(--shadow-sm);

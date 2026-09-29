@@ -35,7 +35,7 @@ export function DateStrip() {
     );
 
   return (
-    <div className="date-strip" role="radiogroup" aria-label={t("when.day")}>
+    <div className="date-strip" role="group" aria-label={t("when.day")}>
       {dates.map((date, index) => {
         const day = parseIsoDate(date);
         const previous = index > 0 ? parseIsoDate(dates[index - 1]) : null;
@@ -45,8 +45,8 @@ export function DateStrip() {
           <button
             key={date}
             type="button"
-            role="radio"
-            aria-checked={date === selected}
+
+            aria-pressed={date === selected}
             className="date-strip__day"
             onClick={() => setDate(date)}
           >

@@ -40,13 +40,13 @@ function ViewSwitch() {
   ];
 
   return (
-    <div className="segmented segmented--icons" role="radiogroup" aria-label={t("results.view")}>
+    <div className="segmented segmented--icons" role="group" aria-label={t("results.view")}>
       {options.map((option) => (
         <button
           key={option.value}
           type="button"
-          role="radio"
-          aria-checked={view === option.value}
+
+          aria-pressed={view === option.value}
           className="segmented__option"
           onClick={() => setView(option.value)}
         >

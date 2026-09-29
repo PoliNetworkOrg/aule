@@ -252,13 +252,13 @@
   background: var(--free);
 }
 
-.day-tabs__tab[aria-selected="true"] {
+.day-tabs__tab[aria-pressed="true"] {
   background: var(--accent);
   border-color: var(--accent);
   color: var(--on-accent);
 }
 
-.day-tabs__tab[aria-selected="true"] .day-tabs__weekday {
+.day-tabs__tab[aria-pressed="true"] .day-tabs__weekday {
   color: inherit;
   opacity: 0.85;
 }

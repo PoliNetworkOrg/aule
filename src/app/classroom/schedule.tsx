@@ -251,7 +251,7 @@ export function Schedule({
 
   return (
     <div className="schedule" data-revision={revision}>
-      <div className="day-tabs" role="tablist" aria-label={t("schedule.days")}>
+      <div className="day-tabs" role="group" aria-label={t("schedule.days")}>
         {dates.map((date) => {
           const busy = (roomOccupancy(roomId, date) ?? []).length;
 
@@ -259,8 +259,8 @@ export function Schedule({
             <button
               key={date}
               type="button"
-              role="tab"
-              aria-selected={date === day}
+
+              aria-pressed={date === day}
               className="day-tabs__tab"
               onClick={() => setSelected(date)}
             >
@@ -279,7 +279,7 @@ export function Schedule({
         })}
       </div>
 
-      <div className="schedule__day" role="tabpanel">
+      <div className="schedule__day">
         <div className="schedule__heading">
           <h3 className="schedule__date">
             {capitalise(longDay.format(parseIsoDate(day)), locale)}

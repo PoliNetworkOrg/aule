@@ -41,13 +41,13 @@ function MoreFilters({ filters }: { filters: FilterState }) {
     <div className="more-filters" id="more-filters">
       <fieldset className="field">
         <legend className="field__label">{t("filters.seats")}</legend>
-        <div className="segmented" role="radiogroup" aria-label={t("filters.seats")}>
+        <div className="segmented" role="group" aria-label={t("filters.seats")}>
           {SEAT_OPTIONS.map((seats) => (
             <button
               key={seats}
               type="button"
-              role="radio"
-              aria-checked={filters.minSeats === seats}
+
+              aria-pressed={filters.minSeats === seats}
               className="segmented__option"
               onClick={() => setFilters({ minSeats: seats })}
             >
