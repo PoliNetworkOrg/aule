@@ -15,6 +15,7 @@ import { capitalise, formatRange, parseIsoDate } from "../state/time";
 import { Highlight, titleCase } from "../ui/text";
 import { Icon } from "../ui/icon";
 import { StatusTag } from "./room-card";
+import { RoomThumbnail } from "./room-thumbnail";
 import { ProfessorList } from "./professor-link";
 
 function formatDay(iso: string, locale: string) {
@@ -76,6 +77,7 @@ function RoomResults({ query }: { query: string }) {
                   openClassroom(entry, date ? { date, from, to, highlight: false } : null)
                 }
               >
+                <RoomThumbnail id={room.id} idfoto={room.idfoto} />
                 <span className="search-room__name">
                   <Highlight text={room.name} query={query} />
                 </span>

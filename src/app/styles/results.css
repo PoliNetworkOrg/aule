@@ -190,9 +190,30 @@ button.summary__partial[aria-pressed="true"] {
   border-radius: var(--radius);
   background: var(--surface);
   text-align: left;
+  overflow: hidden;
   transition:
     border-color 0.15s,
     background-color 0.15s;
+}
+
+.room-thumbnail {
+  display: block;
+  flex: none;
+  overflow: hidden;
+  background: var(--surface-muted);
+}
+
+.room-thumbnail img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.room-card .room-thumbnail {
+  width: calc(100% + 24px);
+  height: 88px;
+  margin: -10px -12px 6px;
 }
 
 .room-card__main:hover {

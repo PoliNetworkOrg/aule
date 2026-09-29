@@ -16,3 +16,11 @@ photos.get("/:id", (c) => {
 
   return serveR2Image(c, c.env.DATA_BUCKET, `photos/${id}.jpg`);
 });
+
+photos.get("/:id/thumb", (c) => {
+  const id = c.req.param("id");
+
+  if (!ID_RE.test(id)) return c.json({ error: "id must be numeric" }, 400);
+
+  return serveR2Image(c, c.env.DATA_BUCKET, `photos/${id}_thumb.jpg`, `photos/${id}.jpg`);
+});

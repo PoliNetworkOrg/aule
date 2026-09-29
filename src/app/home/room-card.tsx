@@ -6,6 +6,7 @@ import { findClassroom } from "../state/availability";
 import { openClassroom } from "../state/navigation-context";
 import { formatRange } from "../state/time";
 import { Icon } from "../ui/icon";
+import { RoomThumbnail } from "./room-thumbnail";
 
 function subscribeFavourites(listener: () => void) {
   window.addEventListener("favourites-changed", listener);
@@ -96,6 +97,7 @@ export function RoomCard({
         className="room-card__main"
         onClick={() => entry && openClassroom(entry, { date, from, to, highlight: false })}
       >
+        <RoomThumbnail id={room.id} idfoto={room.idfoto} />
         <span className="room-card__name" title={room.name}>
           {room.name}
         </span>
