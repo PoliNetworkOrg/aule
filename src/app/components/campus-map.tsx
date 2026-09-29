@@ -10,7 +10,7 @@ import type {
   Map as MapLibreMap,
   Marker as MapLibreMarker,
 } from "maplibre-gl";
-import { toDarkStyle } from "./map-dark-style.ts";
+import { DARK_THEME, LIGHT_THEME, themedStyle } from "./map-theme.ts";
 
 type MapLibreLibrary = typeof import("maplibre-gl");
 
@@ -45,9 +45,8 @@ import { getSheetHeightPx, heightAfterBuildingSelect, isUserResizing } from "./c
 // reflect live occupancy yet.
 
 // OpenFreeMap (openfreemap.org): free, keyless, no usage caps. Liberty is the
-// only one of its styles with 3D buildings; the dark theme is derived from it
-// at load time (see map-dark-style.ts) rather than using OpenFreeMap's own
-// "Dark", a different and much barer design.
+// only one of its styles with 3D buildings; both themes repaint it at load
+// time (see map-theme.ts).
 const STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
 
 const OPENFREEMAP_ATTRIBUTION =
@@ -729,13 +728,15 @@ async function loadMapLibre(): Promise<MapLibreLibrary> {
   return lib;
 }
 
-// Re-applies the style with or without the dark remap (Mapbox Standard's
+// Re-applies the style with the current theme's palette (Mapbox Standard's
 // `lightPreset` has no OpenFreeMap equivalent). Same style URL both ways, so
 // MapLibre diffs it into paint-property updates instead of a full reload.
 // Markers are DOM overlays, so they're untouched either way.
 function applyTheme() {
   if (!map) return;
-  map.setStyle(STYLE_URL, { transformStyle: darkScheme.matches ? toDarkStyle : undefined });
+  map.setStyle(STYLE_URL, {
+    transformStyle: themedStyle(darkScheme.matches ? DARK_THEME : LIGHT_THEME),
+  });
 }
 
 function campuses() {
