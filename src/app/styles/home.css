@@ -384,6 +384,7 @@ body[data-page="home"] #root {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  margin-top: 8px;
 }
 
 .time-range__row {
