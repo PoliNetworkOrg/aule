@@ -133,6 +133,10 @@ button.summary__partial[aria-pressed="true"] {
   margin-inline: calc(var(--page-gutter) * -1);
   padding: 8px var(--page-gutter);
   background: var(--surface);
+  /* Bleed the background upwards: the scrollport often starts at a fractional
+     offset, and the snapped sticky header can leave a sliver of rows showing
+     above it on high-DPR screens. */
+  box-shadow: 0 -8px 0 var(--surface);
 }
 
 .building-group__title {
