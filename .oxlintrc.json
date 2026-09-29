@@ -40,6 +40,7 @@
         "allow": [
           "hgi-*",
           "liquid-glass",
+          "lg-glass",
           "empty",
           "secondary",
           "splash-header-item",
@@ -92,6 +93,8 @@
           "data-reload-label",
           "bo-count-label",
           "info-intro",
+          "info-pwa",
+          "info-badge--stable",
           "info-section-text",
           "timeline-time-indicator",
           "timeline-popover-body",

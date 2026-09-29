@@ -105,15 +105,64 @@ const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
 const darkScheme = window.matchMedia("(prefers-color-scheme: dark)");
 
-let started = false;
-
 let map: MapboxMap | null = null;
+
+let bootPromise: Promise<void> | null = null; // single-flight: the Map() is constructed exactly once per page load
+
+let campusContainer: HTMLElement | null = null;
+
+let mapEl: HTMLElement | null = null; // the .campus-map element the one Map() lives in — reparented, never rebuilt
 
 let mapboxglLib: MapboxLibrary | null = null; // set once loaded — reused by the picker's change listener below
 
-let mode = "campus"; // 'campus' | 'buildings'
+let mode = "campus"; // 'campus' | 'buildings' | 'embedded'
 
 let markers: MapboxMarker[] = [];
+
+let markerCampus: Campus | null = null; // the campus whose building markers are up (mode 'buildings')
+
+// The classroom detail page borrows this very map (see embedMap() at the
+// bottom) for its 3D building preview: the same Map() instance is moved into
+// the page's card and back, never recreated. `embed` is the live request
+// (host null while parked); `embedActive` is true once the map's
+// camera/markers/handlers are switched to the preview.
+const EMBED_ZOOM = 17.5;
+
+// The preview's point of view, switchable from the detail card's 2D/3D picker.
+type Pov = "2d" | "3d";
+
+const POV: Record<Pov, { pitch: number; bearing: number }> = {
+  "3d": { pitch: 60, bearing: -20 },
+  "2d": { pitch: 0, bearing: 0 },
+};
+
+interface EmbedRequest {
+  host: HTMLElement | null;
+  lat: number;
+  long: number;
+  label: string;
+  siblings?: Coordinates[];
+}
+
+interface SavedView {
+  camera: CameraOptions;
+  mode: string;
+  campus: Campus | null;
+}
+
+let embedPov: Pov = "3d";
+
+let embed: EmbedRequest | null = null;
+
+let embedActive = false;
+
+let embedToken = 0;
+
+let embedShownKey: string | null = null; // building the preview camera is already framing (skips a re-tilt on re-render)
+
+let createdForEmbed = false; // map was built by a direct-URL detail load: no campus view to restore
+
+let savedView: SavedView | null = null; // campus-tab camera/markers captured when the preview took over
 
 const markerRoots: Root[] = [];
 
@@ -125,7 +174,7 @@ const observers: (MutationObserver | ResizeObserver)[] = [];
 
 let events = new AbortController();
 
-let generation = 0; // currently-rendered mapboxgl.Marker[]
+let generation = 0; // bumped when the map is torn down, so a boot still in flight bails out
 
 // The mobile sheet's current live height (px) — seeded from its resting
 // value up front (safe even before campus-sheet.js's own init runs, see
@@ -178,6 +227,7 @@ const CENTER_SLACK_PX = 2;
 const ANGLE_SLACK_DEG = 0.5;
 
 function updateShifted() {
+  if (embed) return;
   const focus = selectedFocus();
 
   if (!focus || !map) {
@@ -208,7 +258,7 @@ function attachCampusMap() {
   if (!container) return () => {};
 
   events = new AbortController();
-  const currentGeneration = ++generation;
+  campusContainer = container;
 
   // Either campus picker changing — the Available tab's or the campus
   // sheet's own (components/campus-buildings.js), now kept in sync as the
@@ -218,7 +268,7 @@ function attachCampusMap() {
   document.addEventListener(
     "campuschange",
     (e) => {
-      if (!map || !mapboxglLib) return;
+      if (!map || !mapboxglLib || embed) return;
       const campus = campuses().find((c) => c.id === e.detail.id);
 
       if (!campus || !isNumber(campus.lat) || !isNumber(campus.long)) return;
@@ -233,7 +283,7 @@ function attachCampusMap() {
   document.addEventListener(
     "campusrecenter",
     () => {
-      if (!map || !mapboxglLib) return;
+      if (!map || !mapboxglLib || embed) return;
       const building = selectedBuilding();
 
       if (building) {
@@ -259,7 +309,7 @@ function attachCampusMap() {
   document.addEventListener(
     "buildingchange",
     (e) => {
-      if (!map || !mapboxglLib) return;
+      if (!map || !mapboxglLib || embed) return;
       const campus = campuses().find((c) => c.id === e.detail.campusId);
 
       if (!campus) return;
@@ -294,13 +344,8 @@ function attachCampusMap() {
   );
 
   const onVisible = () => {
-    if (!started) {
-      started = true;
-      boot(container).catch((err) => {
-        if (currentGeneration !== generation) return;
-        console.error("Campus map failed to load", err);
-        showError(container);
-      });
+    if (!bootPromise) {
+      deferredBoot(container);
     } else if (map) {
       // Container may have resized (rotation, toolbar) while the tab was hidden.
       map.resize();
@@ -408,6 +453,14 @@ function attachCampusMap() {
   return () => {
     generation++;
     events.abort();
+    embedToken++;
+    embed = null;
+    embedActive = false;
+    embedShownKey = null;
+    createdForEmbed = false;
+    savedView = null;
+    markerCampus = null;
+    campusContainer = null;
     observers.forEach((observer) => observer.disconnect());
     observers.length = 0;
     clearMarkers();
@@ -416,43 +469,123 @@ function attachCampusMap() {
 
     if (map) map.remove();
     map = null;
+    mapEl?.remove();
+    mapEl = null;
     enabled = false;
-    hostReady = false;
     mapError = false;
-    started = false;
+    bootPromise = null;
     mapboxglLib = null;
     autoFlying = false;
     flyDestination = null;
   };
 }
 
-async function boot(_container: HTMLElement) {
-  const currentGeneration = generation;
+/* Booting Mapbox — token, script parse, WebGL context, first tiles — is about
+   a second of main-thread work, and the tab it lands in is running its own
+   0.3s blur-and-scale entrance at exactly that moment, so doing it on
+   `tabvisible` is what made switching to the Campus tab stutter the first time
+   in a session. It can't move off the main thread (Mapbox needs the DOM and a
+   WebGL context; its own workers only handle tiles), but it can wait: first
+   for the tab's entrance animation to finish, then for an idle slot. The map
+   fades in when it's ready (see .campus-map in campus-map.css).
+
+   The classroom detail page defers its own embed the same way, and waits for
+   the map section to be scrolled near as well — see _scheduleMapEmbed() in
+   classroom-detail.tsx. */
+function deferredBoot(_container: HTMLElement) {
+  const generationAtStart = generation;
+  const entrance = _container.getAnimations?.() ?? [];
+
+  // Raced against a deadline: waiting on an animation is only worth doing if
+  // it actually ends, and nothing here should be able to hold the map back for
+  // longer than the entrance itself takes.
+  const settled = entrance.length
+    ? Promise.race([
+        Promise.allSettled(entrance.map((a) => a.finished)),
+        new Promise((resolve) => setTimeout(resolve, 400)),
+      ])
+    : Promise.resolve();
+
+  void settled.then(() => {
+    if (generationAtStart !== generation) return;
+
+    // A short idle deadline, not a long one: by now the entrance is over and
+    // the thread is usually free anyway, so this is about slotting in politely
+    // rather than about waiting.
+    if ("requestIdleCallback" in window) {
+      requestIdleCallback(() => void ensureMap(), { timeout: 150 });
+    } else {
+      setTimeout(() => void ensureMap(), 60);
+    }
+  });
+}
+
+// Boots the map once (from whichever surface asks first: the Campus tab or a
+// directly-loaded detail page) and hands every later caller the same promise.
+function ensureMap(): Promise<void> {
+  if (!bootPromise) {
+    const currentGeneration = generation;
+
+    bootPromise = boot(currentGeneration).catch((err) => {
+      if (currentGeneration !== generation) return;
+      console.error("Campus map failed to load", err);
+
+      if (!embed && campusContainer) showError(campusContainer);
+    });
+  }
+
+  return bootPromise;
+}
+
+// Puts the map element where it currently belongs: the detail card while a
+// preview is requested, the Campus tab otherwise.
+function placeEl() {
+  if (!mapEl) return;
+  const parent = embed?.host ?? campusContainer;
+
+  if (parent && mapEl.parentNode !== parent) parent.appendChild(mapEl);
+  mapEl.classList.toggle("campus-map--embedded", !!embed?.host);
+}
+
+async function boot(currentGeneration: number) {
   const token = await getMapboxToken();
   const mapboxgl = await loadMapboxGl();
 
   if (currentGeneration !== generation) return;
   mapboxglLib = mapboxgl;
 
-  hostReady = true;
-  notifyView();
-  const el = document.querySelector<HTMLElement>(".campus-map")!;
+  // Whoever wants the map right now (read after the awaits above): a detail
+  // page opened straight from a URL builds it in place, at its building.
+  const startEmbed = embed;
+  createdForEmbed = !!startEmbed;
+
+  const el = document.createElement("div");
+  el.className = "campus-map";
+  el.setAttribute("role", "application");
+  el.setAttribute("aria-label", t("tabs.campus"));
+  mapEl = el;
+  placeEl();
 
   // Opens straight onto whichever campus the sheet's picker already has
   // selected, at the same spot/zoom a marker tap flies to — rather than the
   // region-wide overview.
-  const startCampus = selectedCampus();
+  const startCampus = startEmbed ? null : selectedCampus();
 
   mapboxgl.accessToken = token;
 
   const instance = new mapboxgl.Map({
     container: el,
     style: "mapbox://styles/mapbox/standard",
-    center: startCampus ? [startCampus.long, startCampus.lat] : INITIAL_CENTER,
-    zoom: startCampus ? CAMPUS_FLY_ZOOM : INITIAL_ZOOM,
+    center: startEmbed
+      ? [startEmbed.long, startEmbed.lat]
+      : startCampus
+        ? [startCampus.long, startCampus.lat]
+        : INITIAL_CENTER,
+    zoom: startEmbed ? EMBED_ZOOM : startCampus ? CAMPUS_FLY_ZOOM : INITIAL_ZOOM,
     minZoom: 8.5,
     maxZoom: 18,
-    pitch: startCampus ? 55 : 0,
+    pitch: startEmbed ? POV[embedPov].pitch : startCampus ? 55 : 0,
+    bearing: startEmbed ? POV[embedPov].bearing : 0,
     maxPitch: 70,
     pitchWithRotate: true,
     touchPitch: true,
@@ -597,8 +730,16 @@ async function boot(_container: HTMLElement) {
   observers.push(attributionObserver);
   attributionObserver.observe(instance.getContainer(), { childList: true, subtree: true });
 
-  // Match the map's daylight to the app theme (Standard style only).
-  instance.on("style.load", applyLightPreset);
+  // Match the map's daylight to the app theme (Standard style only), and
+  // reveal the map here rather than on 'load': 'load' means the first
+  // *visually complete* render — every tile, every glyph — which on a slow
+  // connection is seconds away. From 'style.load' the map paints its
+  // background and fills in tiles as they arrive, which is what it looked like
+  // before any of this was deferred, only now it fades in instead of popping.
+  instance.on("style.load", () => {
+    applyLightPreset();
+    el.classList.add("campus-map--ready");
+  });
   darkScheme.addEventListener("change", applyLightPreset, { signal: events.signal });
 
   instance.on("load", () => {
@@ -606,15 +747,26 @@ async function boot(_container: HTMLElement) {
     // while the style/tiles were still loading, this "load" event can still
     // fire against the now-destroyed instance — bail before touching it.
     if (currentGeneration !== generation) return;
+    el.classList.add("campus-map--ready"); // belt: a style that loaded without firing style.load
     instance.resize();
 
-    if (startCampus) showBuildingMarkers(mapboxgl, startCampus);
+    if (markers.length) return; // an embed/release already put its own up
+
+    if (embed) showEmbedMarker(mapboxgl);
+    else if (startCampus) showBuildingMarkers(mapboxgl, startCampus);
     else showCampusMarkers(mapboxgl);
   });
 
+  // And braces: a style that never loads at all shouldn't leave the map (and
+  // its own error UI) invisible behind the fade-in.
+  const revealTimer = setTimeout(() => el.classList.add("campus-map--ready"), 3000);
+  events.signal.addEventListener("abort", () => clearTimeout(revealTimer), { once: true });
+
+  if (startEmbed) setInteractive(false);
+
   // Zoom back out past a campus → return to the campus overview.
   instance.on("zoomend", () => {
-    if (mode === "buildings" && instance.getZoom() < CAMPUS_ZOOM) {
+    if (!embed && mode === "buildings" && instance.getZoom() < CAMPUS_ZOOM) {
       // A zoom-out this big leaves any single-building focus behind too —
       // fall the sheet back to its campus page in sync (see
       // clearSelectedBuildingSilently()'s own note on why this doesn't just
@@ -639,8 +791,15 @@ async function boot(_container: HTMLElement) {
   instance.on("moveend", updateShifted);
 
   // Keep the GL canvas glued to the panel through rotations / dynamic toolbars.
-  const resizeObserver = new ResizeObserver(() => {
-    if (map) instance.resize();
+  // Not down to nothing, though: hiding it (closing the detail page it's
+  // embedded in, opening one over the Campus tab) collapses it to 0x0, and
+  // Mapbox reallocating its canvas for that took 80-230ms of an older phone's
+  // main thread, right as the close transition started. A hidden map keeps its
+  // last size; this fires again, with a real one, once it's shown.
+  const resizeObserver = new ResizeObserver(([entry]) => {
+    const { width, height } = entry!.contentRect;
+
+    if (map && width && height) instance.resize();
   });
 
   observers.push(resizeObserver);
@@ -648,7 +807,7 @@ async function boot(_container: HTMLElement) {
 }
 
 function onWheel(e: WheelEvent, el: HTMLElement) {
-  if (!map) return;
+  if (!map || embed) return;
   e.preventDefault(); // stop page scroll / trackpad back-swipe navigation
 
   // deltaMode 1 = lines (Firefox), 2 = pages — normalise to pixels.
@@ -670,7 +829,7 @@ function onWheel(e: WheelEvent, el: HTMLElement) {
 let clampingBounds = false;
 
 function panBackInBounds() {
-  if (!map || clampingBounds) return;
+  if (!map || clampingBounds || embed) return;
   const [[w, s], [e, n]] = MAX_BOUNDS;
   const c = map.getCenter();
   const lng = Math.min(e, Math.max(w, c.lng));
@@ -855,7 +1014,7 @@ function flyToBuilding(_mapboxgl: MapboxLibrary, building: Building) {
 // its campus) as the sheet resizes, so the focused marker never ends up
 // hidden behind a sheet that grew out from under it.
 function followSheetResize() {
-  if (!map || !mapboxglLib || desktopMQ.matches) return;
+  if (!map || !mapboxglLib || desktopMQ.matches || embed) return;
 
   if (autoFlying) {
     // A flyTo is mid-flight (see startFly()) — its own padding was only a
@@ -935,6 +1094,7 @@ function showBuildingMarkers(mapboxgl: MapboxLibrary, campus: Campus) {
   if (!map) return;
   clearMarkers();
   mode = "buildings";
+  markerCampus = campus;
 
   for (const b of campus.buildings || []) {
     const { lat, long } = b;
@@ -984,8 +1144,6 @@ function showError(_container: HTMLElement) {
 
 let enabled = false;
 
-let hostReady = false;
-
 let mapError = false;
 
 let revision = 0;
@@ -1014,16 +1172,256 @@ function MapContents() {
   useSyncExternalStore(subscribe, () => revision);
   useLayoutEffect(attachCampusMap, []);
 
-  return (
-    <>
-      {hostReady && <div className="campus-map" role="application" aria-label={t("tabs.campus")} />}{" "}
-      {mapError && <div className="campus-map-error">{t("campus.mapError")}</div>}
-    </>
-  );
+  return <>{mapError && <div className="campus-map-error">{t("campus.mapError")}</div>}</>;
 }
 
 export function CampusMap() {
   useSyncExternalStore(subscribe, () => revision);
 
   return enabled ? <MapContents /> : null;
+}
+
+// ── Classroom detail preview ───────────────────────────────────────────
+// The detail page's "location" card shows this same map, 3D-tilted onto the
+// building. Constructing a Map() is a billed load, so it's never rebuilt:
+// embedMap() moves the one instance into the card (booting it there if the
+// page was opened straight from a URL), parkMap() steps it out of the way
+// before the page wipes its DOM, and releaseMap() sends it back to the
+// Campus tab with the camera and markers it had.
+
+const INTERACTION_HANDLERS = [
+  "dragPan",
+  "dragRotate",
+  "touchZoomRotate",
+  "touchPitch",
+  "doubleClickZoom",
+  "keyboard",
+  "boxZoom",
+] as const;
+
+// The preview sits inside a scrolling page, so it's view-only — leaving the
+// gestures on would swallow the page's own touch/wheel scrolling.
+function setInteractive(on: boolean) {
+  if (!map) return;
+
+  for (const h of INTERACTION_HANDLERS) {
+    if (on) map[h]?.enable();
+    else map[h]?.disable();
+  }
+}
+
+function showEmbedMarker(mapboxgl: MapboxLibrary) {
+  if (!map || !embed) return;
+  const current = map;
+  const request = embed;
+  clearMarkers();
+  mode = "embedded";
+
+  const add = (lat: number, long: number, cls: string, label?: string) => {
+    const el = document.createElement("div");
+    el.className = `campus-marker campus-marker--building campus-marker--static ${cls}`;
+    const dot = document.createElement("span");
+    dot.className = "campus-marker__dot";
+    el.append(dot);
+
+    if (label) {
+      const text = document.createElement("span");
+      text.textContent = label;
+      el.append(text);
+    }
+
+    markers.push(
+      new mapboxgl.Marker({ element: el, anchor: "bottom" }).setLngLat([long, lat]).addTo(current),
+    );
+  };
+
+  // 2D is the campus overview: the rest of the campus as quiet dots, this
+  // building labelled. 3D is just the building.
+  if (embedPov === "2d") {
+    for (const b of request.siblings ?? []) {
+      if (b.lat !== request.lat || b.long !== request.long)
+        add(b.lat, b.long, "campus-marker--dim");
+    }
+  }
+
+  add(request.lat, request.long, "campus-marker--current", request.label);
+}
+
+// Camera for a point of view: 3D tilts in on the building; 2D pulls back,
+// top-down, to fit the whole campus around it.
+function embedCamera(pov: Pov, request: EmbedRequest): CameraOptions {
+  const { pitch, bearing } = POV[pov];
+
+  const base: CameraOptions = {
+    center: [request.long, request.lat],
+    zoom: EMBED_ZOOM,
+    pitch,
+    bearing,
+  };
+
+  if (pov !== "2d" || !map || !mapboxglLib) return base;
+
+  const pts: LngLat[] = [
+    [request.long, request.lat],
+    ...(request.siblings ?? []).map((b): LngLat => [b.long, b.lat]),
+  ];
+
+  const bounds = pts.reduce((b, p) => b.extend(p), new mapboxglLib.LngLatBounds(pts[0], pts[0]));
+
+  const fit = map.cameraForBounds(bounds, { padding: 44, maxZoom: EMBED_ZOOM, bearing, pitch });
+
+  return fit ? { ...base, center: fit.center, zoom: fit.zoom } : base;
+}
+
+function captureView(): SavedView {
+  if (!map) throw new Error("Campus map is not ready");
+
+  return {
+    camera: {
+      center: map.getCenter(),
+      zoom: map.getZoom(),
+      pitch: map.getPitch(),
+      bearing: map.getBearing(),
+      padding: map.getPadding(),
+    },
+    mode,
+    campus: markerCampus,
+  };
+}
+
+function applyEmbedView() {
+  if (!map || !mapboxglLib || !embed) return;
+  setInteractive(false);
+  const key = `${embed.lat},${embed.long}`;
+  const unchanged = embedShownKey === key && mode === "embedded";
+  embedShownKey = key;
+  showEmbedMarker(mapboxglLib);
+
+  // Same building, e.g. a language switch re-render: keep the camera.
+  if (unchanged) return;
+
+  const camera: CameraOptions = {
+    ...embedCamera(embedPov, embed),
+    padding: { top: 0, right: 0, bottom: 0, left: 0 },
+  };
+
+  if (reduceMotion.matches || camera.pitch === 0) {
+    map.jumpTo(camera);
+  } else {
+    // Settle in from a flatter angle so the tilt reads as the map rising.
+    map.jumpTo({ ...camera, pitch: 25 });
+    map.easeTo({ pitch: camera.pitch, duration: 1200 });
+  }
+}
+
+/**
+ * Shows the shared map in `host`, 3D-tilted onto a building. Resolves once
+ * it's in place (false if superseded or released meanwhile).
+ */
+export async function embedMap(
+  host: HTMLElement,
+  { lat, long, label, siblings }: Omit<EmbedRequest, "host">,
+) {
+  const token = ++embedToken;
+  embed = { host, lat, long, label, siblings };
+  await ensureMap();
+
+  if (token !== embedToken || !map || !embed) return false;
+
+  if (!embedActive) {
+    // A map built by this very request has no campus view of its own yet.
+    savedView = createdForEmbed ? null : captureView();
+    embedActive = true;
+  }
+
+  placeEl();
+  map.resize();
+  applyEmbedView();
+
+  return true;
+}
+
+/** Moves the map out of the detail page (still in preview state) before its DOM is rebuilt. */
+export function parkMap() {
+  if (!embed) return;
+  embed.host = null;
+  placeEl();
+}
+
+/** Whether the map's own tab (Campus) is the one on screen. */
+export function isMapTabShowing() {
+  return !!document.getElementById(CONTAINER_ID)?.classList.contains("visible");
+}
+
+/** Ends the preview: the map goes back to the Campus tab exactly as it was left. */
+export function releaseMap() {
+  embedToken++;
+
+  if (!embed) return;
+  embed = null;
+
+  if (!map || !mapboxglLib) return; // still booting: boot() sees `embed` gone and builds for the tab
+
+  if (!embedActive && !createdForEmbed) return; // preview never took over this map
+
+  embedActive = false;
+  embedShownKey = null;
+  setInteractive(true);
+  placeEl();
+
+  // Back in a tab that's hidden unless it's Campus: see the ResizeObserver in
+  // boot(), which sizes it once the tab shows.
+  if (mapEl && mapEl.clientWidth && mapEl.clientHeight) map.resize();
+
+  const view = savedView;
+  savedView = null;
+  createdForEmbed = false;
+
+  if (view) {
+    map.jumpTo(view.camera);
+
+    if (view.mode === "buildings" && view.campus) showBuildingMarkers(mapboxglLib, view.campus);
+    else showCampusMarkers(mapboxglLib);
+
+    return;
+  }
+
+  // Built for the detail page: give the Campus tab its usual opening view.
+  const campus = selectedCampus();
+
+  if (campus) {
+    map.jumpTo({
+      center: [campus.long, campus.lat],
+      zoom: CAMPUS_FLY_ZOOM,
+      pitch: 55,
+      bearing: 0,
+      padding: mapPadding(),
+    });
+    showBuildingMarkers(mapboxglLib, campus);
+  } else {
+    map.jumpTo({
+      center: INITIAL_CENTER,
+      zoom: INITIAL_ZOOM,
+      pitch: 0,
+      bearing: 0,
+      padding: mapPadding(),
+    });
+    showCampusMarkers(mapboxglLib);
+  }
+}
+
+export const getEmbedPov = () => embedPov;
+
+/** Switches the preview between '2d' (top-down, north up) and '3d' (tilted). */
+export function setEmbedPov(pov: string) {
+  if ((pov !== "2d" && pov !== "3d") || pov === embedPov) return;
+  embedPov = pov;
+
+  if (!map || !mapboxglLib || !embedActive || !embed) return;
+  showEmbedMarker(mapboxglLib);
+  map.easeTo({
+    ...embedCamera(pov, embed),
+    duration: reduceMotion.matches ? 0 : 800,
+    essential: true,
+  });
 }

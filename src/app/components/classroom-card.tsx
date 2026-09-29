@@ -7,9 +7,9 @@ import {
   type CSSProperties,
 } from "react";
 import { onTranslationChange, getTranslationVersion, t } from "../i18n";
-import { fetchPhotoUrl, photoUrlCache } from "../utils/photo";
+import { fetchThumbUrl, thumbUrlCache, markPhotoBroken, isPhotoBroken } from "../utils/photo";
 import { isFavourite } from "../utils/favourites";
-import { compactName, ROOM_NAME_SEPARATORS, tokenize } from "../classroom-search-data";
+import { highlightRegExp } from "../utils/html";
 import type { Building, Classroom, ClassroomStatus } from "../types";
 
 export function subscribeFavourites(listener: () => void) {
@@ -33,29 +33,21 @@ export function FilledStar() {
   );
 }
 
-/** Escapes regex-special characters so `text` can be embedded literally in a `RegExp`. */
-function escapeRegExp(text: string): string {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
+export function Highlight({
+  text,
+  query = "",
+  extraTerms,
+}: {
+  text: string;
+  query?: string;
+  extraTerms?: string[];
+}) {
+  const pattern = highlightRegExp(query, extraTerms);
 
-/** Wraps every match of `query` (as a whole phrase or as individual tokens) in `<mark>`. */
-export function Highlight({ text, query = "" }: { text: string; query?: string }) {
-  if (!query) return text;
-  const fullPattern = escapeRegExp(query).replace(/ /g, "[\\s.]");
-  const tokenPatterns = tokenize(query).map(escapeRegExp);
-
-  // "T11" should also mark "T.1.1": the compact query with optional separators between chars.
-  const compactPattern = [...compactName(query)]
-    .map(escapeRegExp)
-    .join(`(?:${ROOM_NAME_SEPARATORS.source})?`);
-
-  const pattern = [fullPattern, ...tokenPatterns, compactPattern]
-    .filter(Boolean)
-    .sort((a, b) => b.length - a.length)
-    .join("|");
+  if (!pattern) return text;
 
   return text
-    .split(new RegExp(`(${pattern})`, "gi"))
+    .split(pattern)
     .map((part, index) =>
       index % 2 ? <mark key={index}>{part}</mark> : <Fragment key={index}>{part}</Fragment>,
     );
@@ -67,6 +59,7 @@ const STATUS_KEYS: Record<ClassroomStatus, string> = {
   occupied: "status.occupied",
   "free-soon": "status.freeSoon",
   "occupied-soon": "status.occupiedSoon",
+  closed: "status.closed",
 };
 
 export interface ClassroomCardProps {
@@ -95,14 +88,16 @@ export function ClassroomCard({
   const cardRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
 
+  const hasPhoto = !!classroom.idfoto && !isPhotoBroken(classroom.id);
+
   const [photo, setPhoto] = useState(() => ({
-    url: photoUrlCache.get(classroom.id),
-    loaded: photoUrlCache.has(classroom.id),
+    url: thumbUrlCache.get(classroom.id),
+    loaded: thumbUrlCache.has(classroom.id),
     failed: false,
   }));
 
   useEffect(() => {
-    if (!classroom.idfoto || photo.url) return;
+    if (!hasPhoto || photo.url) return;
     let disposed = false;
 
     const observer = new IntersectionObserver(
@@ -110,7 +105,7 @@ export function ClassroomCard({
         for (const entry of entries) {
           if (!entry.isIntersecting) continue;
           observer.unobserve(entry.target);
-          void fetchPhotoUrl(classroom.id).then((url) => {
+          void fetchThumbUrl(classroom.id).then((url) => {
             if (!disposed) setPhoto({ url, loaded: false, failed: false });
           });
         }
@@ -124,7 +119,7 @@ export function ClassroomCard({
       disposed = true;
       observer.disconnect();
     };
-  }, [classroom.id, classroom.idfoto, photo.url]);
+  }, [classroom.id, hasPhoto, photo.url]);
   useEffect(() => {
     const img = imgRef.current;
 
@@ -149,7 +144,7 @@ export function ClassroomCard({
   return (
     <div
       ref={cardRef}
-      className={`classroom-card ${classroom.idfoto ? "classroom-card--photo" : "classroom-card--plain"}${showFavouriteStar && favourite ? " classroom-card--fav" : ""}${photo.failed ? " photo-failed" : ""}`}
+      className={`classroom-card ${hasPhoto ? "classroom-card--photo" : "classroom-card--plain"}${showFavouriteStar && favourite ? " classroom-card--fav" : ""}${photo.failed ? " photo-failed" : ""}`}
       data-open-classroom={classroom.id}
       data-query-from={fromTime || undefined}
       data-query-to={toTime || undefined}
@@ -171,14 +166,17 @@ export function ClassroomCard({
       }}
     >
       <div className="classroom-card-clip">
-        {classroom.idfoto ? (
+        {hasPhoto ? (
           <>
             <img
               ref={imgRef}
               className={`classroom-card-photo${photo.loaded ? " loaded" : ""}`}
               alt=""
               src={photo.url}
-              onError={() => setPhoto((current) => ({ ...current, failed: true }))}
+              onError={() => {
+                markPhotoBroken(classroom.id);
+                setPhoto((current) => ({ ...current, failed: true }));
+              }}
             />
             <div className="classroom-card-scrim" />
           </>

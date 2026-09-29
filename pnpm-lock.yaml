@@ -18,6 +18,9 @@ importers:
       '@tanstack/react-router':
         specifier: ^1.170.38
         version: 1.170.38(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      qrcode-generator:
+        specifier: ^2.0.4
+        version: 2.0.4
       react:
         specifier: ^19.2.0
         version: 19.3.0
@@ -25,8 +28,8 @@ importers:
         specifier: ^19.2.0
         version: 19.3.0(react@19.3.0)
       vitrium:
-        specifier: ^0.2.0
-        version: 0.2.0
+        specifier: ^0.4.0
+        version: 0.4.0
       web-haptics:
         specifier: 0.0.6
         version: 0.0.6(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
@@ -1877,6 +1880,9 @@ packages:
     resolution: {integrity: sha512-+Owyggi9IxT1ePKGafcI87ubSmxol6smwJ+RAHDQlx9+9cPwFWDiKFFCPuWhr9ignlGpZ9vDQLw67N4dcTVFEA==}
     engines: {node: '>=20'}
 
+  qrcode-generator@2.0.4:
+    resolution: {integrity: sha512-mZSiP6RnbHl4xL2Ap5HfkjLnmxfKcPWpWe/c+5XxCuetEenqmNFf1FH/ftXPCtFG5/TDobjsjz6sSNL0Sr8Z9g==}
+
   react-dom@19.3.0:
     resolution: {integrity: sha512-JDk8dgif51OjFoDE70+OT9ICyYr+69HlmihNwp1+Nsfbna3t5sIiCa9ZJktDmQ4/1b/rn26hIAR2uYXDMr5r0Q==}
     peerDependencies:
@@ -2097,8 +2103,8 @@ packages:
       jsdom:
         optional: true
 
-  vitrium@0.2.0:
-    resolution: {integrity: sha512-dQTa13LvqLo/zOsnpKv6ldjiNLFx5OuOZnq0qlpsErli6mWoIKvpQ6vVS0yroTQDzNNVHN+nkc8Pcz1pOIJTkg==}
+  vitrium@0.4.0:
+    resolution: {integrity: sha512-S0rf2du1hTSNbLg2cqKMy/RUq9o9kOpkANZKMWxyuHL8++63zfvYiMX2UP3a5/g0hzyBVsHsejXLBlBCAj3Etw==}
 
   web-haptics@0.0.6:
     resolution: {integrity: sha512-eCzcf1LDi20+Fr0x9V3OkX92k0gxEQXaHajmhXHitsnk6SxPeshv8TBtBRqxyst8HI1uf2FyFVE7QS3jo1gkrw==}
@@ -3599,6 +3605,8 @@ snapshots:
     dependencies:
       hookified: 2.2.0
 
+  qrcode-generator@2.0.4: {}
+
   react-dom@19.3.0(react@19.3.0):
     dependencies:
       react: 19.3.0
@@ -3803,7 +3811,7 @@ snapshots:
     transitivePeerDependencies:
       - msw
 
-  vitrium@0.2.0:
+  vitrium@0.4.0:
     dependencies:
       '@floating-ui/dom': 1.8.0
 

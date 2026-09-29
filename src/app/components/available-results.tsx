@@ -48,6 +48,13 @@ function BuildingSection({
 }) {
   const section = useRef<HTMLLIElement>(null);
   const downAt = useRef<{ x: number; y: number; t: number } | null>(null);
+  // Set when a pointerup already opened the overview for a touch tap: Chrome on
+  // Android then sends that same tap's click to whatever is under the finger by
+  // then, which is the overview's own card for this building, and a card's
+  // click navigates back out of the overview — opened and closed in one tap.
+  // The touchend listener below cancels that trailing click.
+  const openedByTap = useRef(false);
+  const titlesBtn = useRef<HTMLButtonElement>(null);
   const { building, rooms } = result;
 
   const openOverview = () => {
@@ -58,6 +65,23 @@ function BuildingSection({
         buildingName: building.name,
       });
   };
+
+  useEffect(() => {
+    const btn = titlesBtn.current;
+
+    if (!btn) return;
+
+    const onTouchEnd = (e: TouchEvent) => {
+      if (!openedByTap.current) return;
+      openedByTap.current = false;
+
+      if (e.cancelable) e.preventDefault();
+    };
+
+    btn.addEventListener("touchend", onTouchEnd, { passive: false });
+
+    return () => btn.removeEventListener("touchend", onTouchEnd);
+  }, []);
 
   const allPartial = rooms.every((room) => room.status === "partially-free");
 
@@ -74,12 +98,14 @@ function BuildingSection({
         style={{ animationDelay: `${Math.min(cardIndex * 30, 300)}ms` }}
       >
         <button
+          ref={titlesBtn}
           className="building-section-titles liquid-glass"
           type="button"
           aria-haspopup="dialog"
           aria-label={`${t("building.prefix")} ${building.name}`}
           onPointerDown={(e) => {
             downAt.current = { x: e.clientX, y: e.clientY, t: performance.now() };
+            openedByTap.current = false;
 
             if (section.current) buildingOverview.prewarm(section.current);
           }}
@@ -92,8 +118,10 @@ function BuildingSection({
             if (
               Math.hypot(e.clientX - start.x, e.clientY - start.y) <= 12 &&
               performance.now() - start.t < 700
-            )
+            ) {
+              openedByTap.current = e.pointerType === "touch";
               openOverview();
+            }
           }}
           onClick={openOverview}
         >

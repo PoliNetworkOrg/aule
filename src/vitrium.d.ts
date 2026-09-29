@@ -32,8 +32,8 @@ declare module "vitrium" {
 
   export function attachLiquidGlass(
     el: HTMLElement,
-    options?: { from?: string; exclude?: string },
-  ): () => void;
+    options?: { from?: string; exclude?: string; controls?: boolean },
+  ): void;
   export function initLiquidGlass(): (() => void) | undefined;
 
   export interface PillDragCore {
@@ -95,6 +95,20 @@ declare module "vitrium" {
     label?: string;
   }): Toggle;
 
+  export function createButton(options: {
+    icon?: Node | string;
+    text?: string;
+    label?: string;
+    className?: string;
+    tint?: string;
+    onClick?: (event: MouseEvent) => void;
+  }): HTMLButtonElement;
+
+  export function createBackButton(options?: {
+    label?: string;
+    onClick?: (event: MouseEvent) => void;
+  }): HTMLButtonElement;
+
   export interface SegmentedControl {
     value: string | undefined;
     select(value: string, options?: { animate?: boolean; silent?: boolean }): void;
@@ -104,6 +118,9 @@ declare module "vitrium" {
   export function createSegmentedControl(
     root: HTMLElement,
     options: {
+      items?: { value: string; label?: string; icon?: string }[];
+      orientation?: "horizontal" | "vertical";
+      blur?: boolean;
       value?: string;
       onSelect?: (value: string, info: { silent: boolean }) => void;
     },
@@ -180,6 +197,7 @@ declare module "vitrium" {
     trigger?: HTMLElement;
     content?: Node;
     placement?: string;
+    offset?: number;
     role?: string;
     dismissable?: boolean;
   }): Popover;
@@ -195,6 +213,31 @@ declare module "vitrium" {
     setDetent(id: string): void;
     destroy(): void;
   }
+  export interface AlertAction {
+    id?: string;
+    label: string;
+    role?: "default" | "cancel" | "destructive";
+    onClick?: () => void;
+    dismiss?: boolean;
+  }
+  export interface Alert {
+    el: HTMLElement;
+    present(options?: { from?: HTMLElement }): Promise<string | null>;
+    dismiss(): void;
+    setTransition(mode: "pop" | "morph"): void;
+    isOpen: boolean;
+    destroy(): void;
+  }
+  export function createAlert(options: {
+    title?: string;
+    message?: string;
+    content?: Node;
+    actions?: AlertAction[];
+    dismissible?: boolean;
+    transition?: "pop" | "morph";
+    zIndex?: number;
+  }): Alert;
+
   export function createSheet(options: {
     header: HTMLElement;
     content: HTMLElement;

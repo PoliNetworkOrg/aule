@@ -14,6 +14,7 @@ import {
 } from "./classroom-search-data.ts";
 import { classroomDetail } from "./components/classroom-detail.tsx";
 import { infoPage } from "./components/info-page.tsx";
+import { initInfoHint } from "./components/info-hint.ts";
 import { initTimeControls } from "./components/time-controls-state.ts";
 import { setupCampusPicker } from "./components/campus-picker.tsx";
 import { initCampusMap } from "./components/campus-map.tsx";
@@ -40,6 +41,9 @@ import {
   applyBlurState,
   scheduleIdleBenchmark,
 } from "vitrium";
+import { pendingImportHash } from "../lib/navigation";
+import { takeImportHash } from "./utils/transfer";
+import { promptImport } from "./components/transfer-dialog";
 
 function isTextField(value: FormDataEntryValue | null): value is string {
   return typeof value === "string";
@@ -85,6 +89,24 @@ export function mountApplication() {
   history.scrollRestoration = "manual";
 
   window.scrollTo(0, 0);
+
+  // ---------- DEVICE TRANSFER ----------
+  // `pendingImportHash` (src/lib/navigation.ts) was taken out of the URL
+  // before the router ever read it; the prompt itself waits for the splash
+  // to finish (see the dismissSplash scheduling below). This also covers a
+  // transfer link opened in a tab that's already running the app (a
+  // same-document hash change, no reload).
+  window.addEventListener(
+    "hashchange",
+    () => {
+      const raw = takeImportHash();
+
+      // Favourites are validated against the classroom directory, which may
+      // still be loading if the link arrived during start-up.
+      if (raw) void ensureClassroomDirectory().then(() => promptImport(raw, staticClassroomsData));
+    },
+    { signal: events.signal },
+  );
 
   // ---------- SPLASH SCREEN ----------
   const _splashStartTime = Date.now();
@@ -358,6 +380,7 @@ export function mountApplication() {
 
       // Init info page overlay immediately — no data dependency
       infoPage.init();
+      cleanups.push(initInfoHint());
 
       // Search overlay (bottom-nav FAB) — lazy-loads its data on first open
 
@@ -450,6 +473,13 @@ export function mountApplication() {
       const elapsed = Date.now() - _splashStartTime;
       const remaining = Math.max(0, _SPLASH_MIN_MS - elapsed);
       later(dismissSplash, remaining);
+
+      // Leave the splash hand-off time to finish before the prompt pops up.
+      const importHash = pendingImportHash;
+
+      if (importHash) {
+        later(() => promptImport(importHash, staticClassroomsData), remaining + 600);
+      }
 
       // Once things have settled, spend a moment of genuine idle time
       // benchmarking blur for real (first load / no cached verdict only).

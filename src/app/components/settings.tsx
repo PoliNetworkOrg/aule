@@ -24,6 +24,7 @@ import { getBlurMode, setBlurMode, reevaluateBlurCapability, applyBlurState } fr
 import { Toggle, type PillControl } from "./toggle";
 import { SegmentedControl } from "./segmented-control";
 import { bindSettingsMotion } from "./settings-motion";
+import { openTransferDialog } from "./transfer-dialog";
 import {
   PREFERRED_CAMPUS_ENABLED_KEY,
   PREFERRED_CAMPUS_ID_KEY,
@@ -723,6 +724,48 @@ function SettingsPopup() {
                     onSelect={changeBlurMode}
                     options={blurOptions}
                   />
+                </div>
+              </div>
+            </div>
+
+            <div className="settings-section">
+              <div className="settings-section__header">
+                <div className="settings-section__icon-badge">
+                  <i
+                    className="hgi-stroke hgi-arrow-data-transfer-horizontal"
+                    aria-hidden="true"
+                  ></i>
+                </div>
+                <span
+                  className="settings-section__header-label"
+                  data-i18n="settings.sectionTransfer"
+                >
+                  {t("settings.sectionTransfer")}
+                </span>
+              </div>
+              <div className="settings-group">
+                <div className="settings-row">
+                  <div className="settings-row__icon-title-container">
+                    <div className="settings-row__icon-badge" style={badgeColor("#30B0C7")}>
+                      <i className="hgi-stroke hgi-smart-phone-01" aria-hidden="true"></i>
+                    </div>
+                    <div className="settings-row__label-group">
+                      <span className="settings-row__label" data-i18n="settings.transfer">
+                        {t("settings.transfer")}
+                      </span>
+                      <span className="settings-row__sublabel" data-i18n="settings.transferDesc">
+                        {t("settings.transferDesc")}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="settings-action-btn"
+                    onClick={(e) => void openTransferDialog(e.currentTarget)}
+                  >
+                    <i className="hgi-stroke hgi-qr-code" aria-hidden="true"></i>
+                    <span data-i18n="settings.transferShow">{t("settings.transferShow")}</span>
+                  </button>
                 </div>
               </div>
             </div>

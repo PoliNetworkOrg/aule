@@ -35,6 +35,19 @@ function write(ids: number[]) {
   window.dispatchEvent(new CustomEvent("favourites-changed"));
 }
 
+// Replaces the whole list (used by the device transfer import).
+export function setFavouriteIds(ids: number[]) {
+  const unique = new Set<number>();
+
+  for (const id of ids) {
+    const n = Number(id);
+
+    if (Number.isFinite(n)) unique.add(n);
+  }
+
+  write([...unique]);
+}
+
 // Adds or removes the id. Returns the new favourited state (boolean).
 export function toggleFavourite(id: string | number) {
   const num = Number(id);

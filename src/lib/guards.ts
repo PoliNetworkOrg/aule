@@ -9,3 +9,13 @@ export function canDock(
 ): element is HTMLElement & { setDocked(docked: boolean): void } {
   return element !== null && "setDocked" in element && typeof element.setDocked === "function";
 }
+
+function isCallable(value: unknown): value is (...args: never[]) => void {
+  return typeof value === "function";
+}
+
+// Not every browser implements the View Transition API yet, though the DOM
+// types declare it unconditionally.
+export function supportsViewTransitions() {
+  return isCallable(document.startViewTransition);
+}

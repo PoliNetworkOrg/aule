@@ -1,5 +1,5 @@
 import { t } from "../i18n.ts";
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { flushSync } from "react-dom";
 import type { findAvailableClassrooms } from "../available-rooms-script";
@@ -846,10 +846,35 @@ function OverviewCard({
   go,
 }: BuildingCount & { active: boolean; prewarm: () => void; go: () => void }) {
   const downAt = useRef<{ x: number; y: number; t: number } | null>(null);
+  // Set when a pointerup already fired go() for a touch tap: Chrome on Android
+  // then sends that same tap's click to whatever is under the finger by then
+  // (the list back in place under the overview, often one of this building's
+  // own classroom cards), which opened it right back. The touchend listener
+  // below cancels that trailing click.
+  const wentByTap = useRef(false);
+  const cardRef = useRef<HTMLDivElement>(null);
   const total = STATUS_META.reduce((n, status) => n + (counts[status.key] || 0), 0);
+
+  useEffect(() => {
+    const card = cardRef.current;
+
+    if (!active || !card) return;
+
+    const onTouchEnd = (e: TouchEvent) => {
+      if (!wentByTap.current) return;
+      wentByTap.current = false;
+
+      if (e.cancelable) e.preventDefault();
+    };
+
+    card.addEventListener("touchend", onTouchEnd, { passive: false });
+
+    return () => card.removeEventListener("touchend", onTouchEnd);
+  }, [active]);
 
   return (
     <div
+      ref={cardRef}
       className={`bo-card${active ? "" : " bo-card--inactive"}`}
       data-building-name={building.name}
       role={active ? "button" : undefined}
@@ -859,6 +884,7 @@ function OverviewCard({
         active
           ? (e) => {
               downAt.current = { x: e.clientX, y: e.clientY, t: performance.now() };
+              wentByTap.current = false;
               prewarm();
             }
           : undefined
@@ -874,8 +900,10 @@ function OverviewCard({
               if (
                 Math.hypot(e.clientX - start.x, e.clientY - start.y) <= 12 &&
                 performance.now() - start.t < 700
-              )
+              ) {
+                wentByTap.current = e.pointerType === "touch";
                 go();
+              }
             }
           : undefined
       }

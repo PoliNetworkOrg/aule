@@ -7,7 +7,7 @@ export interface Coordinates {
 }
 
 export interface CameraOptions {
-  center?: LngLat;
+  center?: LngLat | { lng: number; lat: number };
   zoom?: number;
   pitch?: number;
   bearing?: number;
@@ -15,6 +15,15 @@ export interface CameraOptions {
   duration?: number;
   essential?: boolean;
   around?: { lng: number; lat: number };
+}
+
+export interface MapboxHandler {
+  enable(): void;
+  disable(): void;
+}
+
+export interface MapboxBounds {
+  extend(point: LngLat): MapboxBounds;
 }
 
 export interface MapboxControl {
@@ -30,12 +39,24 @@ export interface MapboxMap {
   getPitch(): number;
   getBearing(): number;
   getCenter(): { lng: number; lat: number };
+  getPadding(): { top: number; right: number; bottom: number; left: number };
+  cameraForBounds(
+    bounds: MapboxBounds,
+    options: { padding: number; maxZoom: number; bearing: number; pitch: number },
+  ): { center: LngLat; zoom: number } | undefined;
   resize(): void;
   jumpTo(options: CameraOptions): void;
   easeTo(options: CameraOptions): void;
   flyTo(options: CameraOptions): void;
   panBy(offset: [number, number], options: { duration: number }): void;
-  scrollZoom: { disable(): void };
+  scrollZoom: MapboxHandler;
+  dragPan: MapboxHandler;
+  dragRotate: MapboxHandler;
+  touchZoomRotate: MapboxHandler;
+  touchPitch: MapboxHandler;
+  doubleClickZoom: MapboxHandler;
+  keyboard: MapboxHandler;
+  boxZoom: MapboxHandler;
   addControl(control: MapboxControl, position: string): void;
   on(event: string, listener: () => void): void;
   once(event: string, listener: () => void): void;
@@ -63,6 +84,7 @@ export interface MapboxLibrary {
       logoPosition: string;
     },
   ) => MapboxMap;
+  LngLatBounds: new (sw: LngLat, ne: LngLat) => MapboxBounds;
   Marker: new (options: { element: HTMLElement; anchor: string }) => MapboxMarker;
   NavigationControl: new (options: { showZoom: boolean; showCompass: boolean }) => MapboxControl;
   GeolocateControl: new (options: {

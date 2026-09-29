@@ -16,3 +16,13 @@ photos.get("/:id", (c) => {
 
   return serveR2Image(c, c.env.DATA_BUCKET, `photos/${id}.jpg`);
 });
+
+// The small copy fetch_photos.py writes next to each photo (640px on its long
+// side). Falls back to the full photo while a room has none yet.
+photos.get("/:id/thumb", (c) => {
+  const id = c.req.param("id");
+
+  if (!ID_RE.test(id)) return c.json({ error: "id must be numeric" }, 400);
+
+  return serveR2Image(c, c.env.DATA_BUCKET, `photos/${id}_thumb.jpg`, `photos/${id}.jpg`);
+});
