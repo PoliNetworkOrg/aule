@@ -998,13 +998,15 @@ body[data-page="home"] #root {
     display: grid;
     grid-template-columns: 384px minmax(0, 1fr);
     gap: 36px;
-    padding: 24px var(--page-gutter) 0;
+    padding: 24px var(--page-gutter);
   }
 
+  /* The inline padding leaves room for the range handles (and their focus
+     rings), which overhang the track at the ends of the day. */
   .home__controls {
     display: flex;
-    padding: 4px 6px 16px;
-    margin: -4px -6px 0;
+    padding: 4px 16px 16px;
+    margin: -4px -16px 0;
     gap: 12px;
     overflow-y: auto;
     scrollbar-width: thin;

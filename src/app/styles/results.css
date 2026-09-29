@@ -260,13 +260,18 @@ button.summary__partial[aria-pressed="true"] {
 
 @media (min-width: 960px) {
   .results {
+    overflow: clip;
     border: 1px solid var(--border);
-    border-bottom: 0;
-    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    border-radius: var(--radius-lg);
   }
 
   .results__toolbar,
   .results-list {
+    padding-inline: 20px;
+  }
+
+  .building-group__header {
+    margin-inline: -20px;
     padding-inline: 20px;
   }
 
