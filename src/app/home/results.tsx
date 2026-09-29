@@ -16,7 +16,6 @@ import {
   resetFilters,
   setFilters,
   setMapBuilding,
-  setControlsCollapsed,
   setView,
   useStore,
   type RestrictiveFilter,
@@ -41,6 +40,14 @@ export function useAvailability() {
     () => (date && revision ? findAvailability(campusId, date, from, to, filters) : []),
     [campusId, date, from, to, filters, revision],
   );
+}
+
+/** The rooms the list shows: availability minus partially free ones unless asked for. */
+export function useVisibleResults() {
+  const all = useAvailability();
+  const filters = useStore((state) => state.filters);
+
+  return useMemo(() => visibleResults(all, filters), [all, filters]);
 }
 
 function ViewSwitch() {
@@ -102,19 +109,21 @@ function Summary({ results }: { results: BuildingAvailability[] }) {
           : free === 1
             ? t("results.oneRoom")
             : tf("results.rooms", { n: free })}
-        {partial > 0 &&
-          (filters.partial ? (
-            <span className="summary__partial">{tf("results.partial", { n: partial })}</span>
-          ) : (
-            <button
-              type="button"
-              className="summary__partial summary__partial--button"
-              title={tf("results.showPartial", { n: partial })}
-              onClick={() => setFilters({ partial: true })}
-            >
-              {tf("results.showPartialShort", { n: partial })}
-            </button>
-          ))}
+        {partial > 0 && (
+          <button
+            type="button"
+            className="summary__partial"
+            aria-pressed={filters.partial}
+            title={tf(filters.partial ? "results.hidePartial" : "results.showPartial", {
+              n: partial,
+            })}
+            onClick={() => setFilters({ partial: !filters.partial })}
+          >
+            {tf(filters.partial ? "results.hidePartialShort" : "results.showPartialShort", {
+              n: partial,
+            })}
+          </button>
+        )}
       </p>
       <p className="summary__context">
         {campus?.name} · {day} · {formatRange(from, to)}
@@ -330,12 +339,7 @@ export function Results() {
         <ViewSwitch />
       </div>
       <DataNotice />
-      <div
-        className={`results__body results__body--${view}`}
-        onScroll={(event) => {
-          if (event.currentTarget.scrollTop > 24) setControlsCollapsed(true);
-        }}
-      >
+      <div className={`results__body results__body--${view}`}>
         {view === "list" ? (
           <ResultsList all={all} results={results} />
         ) : (

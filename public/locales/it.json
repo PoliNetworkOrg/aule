@@ -36,7 +36,7 @@
   "filters.allBuildings": "Tutti",
   "filters.equipment": "Dotazioni",
   "filters.network": "Presa di rete",
-  "favourites.title": "Preferite",
+  "favourites.title": "Aule preferite",
   "favourites.empty": "Tocca ☆ su un'aula per ritrovarla qui.",
   "favourites.add": "Aggiungi {name} alle preferite",
   "favourites.remove": "Rimuovi {name} dalle preferite",
@@ -136,5 +136,19 @@
   "results.showPartialShort": "+{n} parziali",
   "filters.active": "{n} filtri",
   "filters.oneActive": "1 filtro",
-  "filters.edit": "Modifica"
+  "filters.edit": "Modifica",
+  "where.title": "Dove",
+  "where.change": "Cambia",
+  "results.showResults": "Mostra {n} aule",
+  "results.showOneResult": "Mostra 1 aula",
+  "results.showNone": "Nessuna aula: modifica i parametri",
+  "controls.close": "Chiudi e mostra le aule",
+  "results.hidePartialShort": "−{n} parziali",
+  "results.hidePartial": "Nascondi le {n} aule parzialmente libere",
+  "favourites.removeShort": "Rimuovi",
+  "controls.label": "Parametri di ricerca"
+  ,"classroom.enlargePhoto": "Ingrandisci la foto dell'aula {name}"
+  ,"classroom.enlarge": "Ingrandisci"
+  ,"classroom.photoOf": "Foto dell'aula {name}"
+  ,"classroom.closePhoto": "Chiudi la foto"
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { closePage } from "../../lib/navigation";
 import { formatRomeHHMM } from "../available-rooms-script";
 import { t, tf, useLocale } from "../i18n";
@@ -79,9 +79,10 @@ function NowStatus({ entry }: { entry: ClassroomEntry }) {
   );
 }
 
-function Photo({ roomId }: { roomId: number }) {
+function Photo({ roomId, roomName }: { roomId: number; roomName: string }) {
   const [url, setUrl] = useState<string | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "failed">("loading");
+  const dialog = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
     let disposed = false;
@@ -96,17 +97,58 @@ function Photo({ roomId }: { roomId: number }) {
   if (state === "failed") return null;
 
   return (
-    <div className={`room-photo room-photo--${state}`}>
-      {url && (
-        <img
-          src={url}
-          alt=""
-          decoding="async"
-          onLoad={() => setState("ready")}
-          onError={() => setState("failed")}
-        />
-      )}
-    </div>
+    <>
+      <button
+        type="button"
+        className={`room-photo room-photo--${state}`}
+        aria-label={tf("classroom.enlargePhoto", { name: roomName })}
+        disabled={!url || state !== "ready"}
+        onClick={() => dialog.current?.showModal()}
+      >
+        {url && (
+          <img
+            src={url}
+            alt=""
+            decoding="async"
+            onLoad={() => setState("ready")}
+            onError={() => setState("failed")}
+          />
+        )}
+        {state === "ready" && (
+          <span className="room-photo__expand">
+            <Icon name="full-screen" />
+            {t("classroom.enlarge")}
+          </span>
+        )}
+      </button>
+      <dialog
+        ref={dialog}
+        className="room-photo-dialog"
+        aria-label={tf("classroom.photoOf", { name: roomName })}
+        onClick={(event) => {
+          if (event.target === dialog.current) dialog.current?.close();
+        }}
+      >
+        <button
+          type="button"
+          className="room-photo-dialog__close"
+          aria-label={t("classroom.closePhoto")}
+          onClick={() => dialog.current?.close()}
+        >
+          <Icon name="cancel-01" />
+        </button>
+        {url && (
+          <button
+            type="button"
+            className="room-photo-dialog__image"
+            aria-label={t("classroom.closePhoto")}
+            onClick={() => dialog.current?.close()}
+          >
+            <img src={url} alt={tf("classroom.photoOf", { name: roomName })} />
+          </button>
+        )}
+      </dialog>
+    </>
   );
 }
 
@@ -171,7 +213,7 @@ export function ClassroomPage({
 
       <div className="classroom-page__layout">
         <section className="card room-info" aria-labelledby="room-title">
-          {room.idfoto ? <Photo roomId={room.id} /> : null}
+          {room.idfoto ? <Photo key={room.id} roomId={room.id} roomName={room.name} /> : null}
           <div className="room-info__body">
             <div className="room-info__title-row">
               <div>

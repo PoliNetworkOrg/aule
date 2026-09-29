@@ -42,18 +42,110 @@ body[data-page="home"] #root {
   padding: 22px var(--page-gutter) 18px;
 }
 
-.controls-summary {
+/* ---------- Search parameters (Where, When, Filters, Favourites) ---------- */
+
+.home__controls > .panel + .panel {
+  padding-top: 22px;
+  border-top: 1px solid var(--border);
+}
+
+.controls-summary,
+.controls__close,
+.controls__cta {
   display: none;
 }
 
-/* Phones and tablets: the controls never take more than half the screen, and
-   fold into a one-line summary while the results are being scrolled. */
+.campus-select {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 52px;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  text-align: left;
+  transition: border-color 0.15s;
+}
+
+.campus-select:hover,
+.campus-select[aria-expanded="true"] {
+  border-color: var(--accent);
+}
+
+.campus-select__text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  line-height: 1.25;
+}
+
+.campus-select__value {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.campus-select__label {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.campus-select__change {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--accent-text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* Phones and tablets: two steps. First the parameters, full screen, with a
+   button to see the rooms; then the rooms, with a summary to edit them. */
 @media (max-width: 959px) {
-  .home__controls--collapsed {
+  .home--form .results {
     display: none;
   }
 
-  .controls-summary {
+  .home--form .home__controls {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .home--results .home__controls {
+    display: none;
+  }
+
+  .home__controls:has(.more-filters) > .panel:not(.filters) {
+    display: none;
+  }
+
+  .home__controls:has(.more-filters) > .filters {
+    padding-top: 0;
+    border-top: 0;
+  }
+
+  .controls__close {
+    display: flex;
+    justify-content: flex-end;
+    margin: -12px -8px -40px 0;
+    position: relative;
+    z-index: 1;
+  }
+
+  .controls__cta {
+    display: block;
+    position: sticky;
+    bottom: 0;
+    margin: 4px calc(var(--page-gutter) * -1) -18px;
+    padding: 12px var(--page-gutter) calc(12px + env(safe-area-inset-bottom));
+    background: linear-gradient(to top, var(--bg) 70%, transparent);
+  }
+
+  .home--results .controls-summary {
     display: flex;
     align-items: center;
     gap: 10px;
@@ -88,11 +180,13 @@ body[data-page="home"] #root {
     font-size: 13px;
   }
 
-  .home__controls {
-    max-height: 52dvh;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    scrollbar-width: none;
+  /* With the whole screen for the parameters, chips wrap instead of scrolling. */
+  .filters .chip-row,
+  .favourite-list {
+    flex-wrap: wrap;
+    overflow: visible;
+    margin-inline: 0;
+    padding-inline: 0;
   }
 }
 
@@ -384,23 +478,28 @@ body[data-page="home"] #root {
   font-variant-numeric: tabular-nums;
 }
 
-/* "Now": jumps to the current time; lit while the window starts now. */
+/* "Now": jumps to the current time; highlighted while the window starts now. */
 .now-button {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  height: 32px;
-  padding: 0 12px;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px 0 10px;
   border: 1px solid var(--border);
   border-radius: 999px;
   background: var(--surface);
+  color: var(--text-muted);
   font-size: 13px;
-  font-weight: 700;
-  color: var(--text);
+  font-weight: 600;
+  line-height: 1;
   transition:
     background-color 0.15s,
     border-color 0.15s,
     color 0.15s;
+}
+
+.now-button .icon {
+  font-size: 15px;
 }
 
 .now-button:hover:not(:disabled) {
@@ -408,31 +507,18 @@ body[data-page="home"] #root {
   color: var(--accent-text);
 }
 
-.now-button__dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  border: 2px solid var(--busy);
-}
-
 .now-button[aria-pressed="true"] {
-  border-color: var(--busy-border);
-  background: var(--busy-soft);
-  color: var(--busy);
-}
-
-.now-button[aria-pressed="true"] .now-button__dot {
-  background: var(--busy);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--busy) 25%, transparent);
+  border-color: var(--accent-soft-border);
+  background: var(--accent-soft);
+  color: var(--accent-text);
 }
 
 .now-button:disabled {
   opacity: 0.45;
 }
 
-/* Range slider: edges resize, the inside moves, anywhere else jumps. */
+/* Range slider, as wide as its panel: edges resize, the inside moves, anywhere else jumps. */
 .range {
-  padding: 0 12px;
   user-select: none;
 }
 
@@ -443,6 +529,19 @@ body[data-page="home"] #root {
   background: var(--surface-muted);
   touch-action: none;
   cursor: pointer;
+}
+
+.range--from .range__track,
+.range--to .range__track {
+  cursor: ew-resize;
+}
+
+.range--move .range__track {
+  cursor: grab;
+}
+
+.range--dragging.range--move .range__track {
+  cursor: grabbing;
 }
 
 .range__gridline {
@@ -462,33 +561,37 @@ body[data-page="home"] #root {
   border-radius: 1px;
   background: var(--busy);
   pointer-events: none;
+  z-index: 2;
 }
 
 .range__selection {
   position: absolute;
-  top: 3px;
-  bottom: 3px;
-  min-width: 6px;
+  top: 4px;
+  bottom: 4px;
+  min-width: 4px;
   border-radius: 7px;
-  background: var(--accent);
-  opacity: 0.9;
-  cursor: grab;
-}
-
-.range--move .range__selection {
-  cursor: grabbing;
+  background: color-mix(in srgb, var(--accent) 28%, var(--surface));
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+  z-index: 1;
 }
 
 .range__handle {
   position: absolute;
   top: 50%;
-  width: 6px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   translate: -50% -50%;
-  border-radius: 3px;
+  border-radius: 50%;
   background: var(--surface);
-  box-shadow: 0 0 0 1.5px var(--accent);
+  border: 2px solid var(--accent);
+  box-shadow: var(--shadow-sm);
   pointer-events: none;
+  z-index: 3;
+}
+
+.range--dragging.range--from .range__handle:nth-last-child(2),
+.range--dragging.range--to .range__handle:last-child {
+  background: var(--accent);
 }
 
 .range__selection:focus-visible,
@@ -500,7 +603,7 @@ body[data-page="home"] #root {
 .range__ticks {
   position: relative;
   height: 16px;
-  margin-top: 4px;
+  margin: 4px 0 0;
 }
 
 .range__tick {
@@ -519,6 +622,13 @@ body[data-page="home"] #root {
   gap: 10px;
 }
 
+.filters .chip-row {
+  flex-wrap: wrap;
+  overflow: visible;
+  margin-inline: 0;
+  padding-inline: 0;
+}
+
 .more-filters {
   display: grid;
   gap: 18px;
@@ -526,6 +636,7 @@ body[data-page="home"] #root {
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--surface);
+  scroll-margin-top: 16px;
 }
 
 .choice-grid {
@@ -560,35 +671,63 @@ body[data-page="home"] #root {
 
 /* ---------- Favourites ---------- */
 
-.favourites {
+.favourite-list {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
-.favourite-chip {
-  gap: 8px;
+.favourite {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
 }
 
-.favourite-chip__name {
+.favourite__open {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  column-gap: 8px;
+  padding: 6px 4px 6px 12px;
+  text-align: left;
+}
+
+.favourite__open .status-dot {
+  grid-row: 1 / 3;
+}
+
+.favourite__name {
   font-weight: 700;
 }
 
-.favourite-chip__campus {
+.favourite__campus {
+  grid-column: 2;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.favourite__remove {
+  display: grid;
+  place-items: center;
+  width: 34px;
   color: var(--text-subtle);
-  font-size: 13px;
+}
+
+.favourite__remove:hover {
+  color: var(--busy);
+  background: var(--busy-soft);
+}
+
+.favourite:hover {
+  border-color: var(--accent-soft-border);
 }
 
 .favourites__hint {
   font-size: 14px;
   color: var(--text-muted);
-}
-
-@media (max-width: 959px) {
-  .favourites--empty,
-  .favourites .section-title {
-    display: none;
-  }
 }
 
 /* ---------- Search results ---------- */
@@ -746,29 +885,6 @@ body[data-page="home"] #root {
   color: var(--text-subtle);
 }
 
-/* ---------- Tablet ---------- */
-
-@media (min-width: 640px) {
-  .home__controls {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    align-items: start;
-    gap: 16px 24px;
-  }
-
-  .home__controls .panel:first-child {
-    grid-row: span 2;
-  }
-
-  .filters .chip-row,
-  .favourites .chip-row {
-    flex-wrap: wrap;
-    overflow: visible;
-    margin-inline: 0;
-    padding-inline: 0;
-  }
-}
-
 /* ---------- Desktop: controls column + results pane ---------- */
 
 @media (min-width: 960px) {
@@ -795,10 +911,6 @@ body[data-page="home"] #root {
     gap: 36px;
     overflow-y: auto;
     scrollbar-width: thin;
-  }
-
-  .home__controls .panel:first-child {
-    grid-row: auto;
   }
 
   .panel {

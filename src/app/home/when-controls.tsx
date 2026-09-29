@@ -239,6 +239,7 @@ function RangeSlider() {
   const track = useRef<HTMLDivElement>(null);
   const drag = useRef<{ mode: DragMode; offset: number } | null>(null);
   const [dragging, setDragging] = useState<DragMode | null>(null);
+  const [hover, setHover] = useState<DragMode | "jump">("jump");
   const [now, setNow] = useState(romeMinutesOfDay);
 
   useEffect(() => {
@@ -296,7 +297,16 @@ function RangeSlider() {
   }
 
   function move(event: ReactPointerEvent<HTMLDivElement>) {
-    if (!drag.current) return;
+    if (!drag.current) {
+      // Hovering: show what a press here would do.
+      if (event.pointerType === "mouse") {
+        const { fromX, toX } = geometry();
+
+        setHover(hitTest(event.clientX, fromX, toX));
+      }
+
+      return;
+    }
 
     apply(drag.current.mode, minutesAt(event.clientX), drag.current.offset);
   }
@@ -326,7 +336,7 @@ function RangeSlider() {
   ];
 
   return (
-    <div className={`range${dragging ? ` range--dragging range--${dragging}` : ""}`}>
+    <div className={`range range--${dragging ?? hover}${dragging ? " range--dragging" : ""}`}>
       <div
         ref={track}
         className="range__track"
@@ -334,6 +344,7 @@ function RangeSlider() {
         onPointerMove={move}
         onPointerUp={end}
         onPointerCancel={end}
+        onPointerLeave={() => setHover("jump")}
       >
         {SLIDER_TICKS.map((hour) => (
           <span key={hour} className="range__gridline" style={{ left: percentOf(hour * 60) }} />
@@ -449,7 +460,7 @@ function NowButton() {
         });
       }}
     >
-      <span className="now-button__dot" aria-hidden="true" />
+      <Icon name="clock-01" />
       <StableText k="when.now" />
     </button>
   );
@@ -463,7 +474,8 @@ export function WhenPanel() {
   return (
     <section className="panel" aria-labelledby="when-title">
       <div className="panel__header">
-        <h2 className="section-title" id="when-title">
+        <h2 className="panel__title" id="when-title">
+          <Icon name="calendar-03" />
           {t("when.title")}
         </h2>
         <NowButton />

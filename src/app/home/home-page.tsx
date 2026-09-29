@@ -9,6 +9,9 @@ import { Results } from "./results";
 import { SearchBar } from "./search-bar";
 import { SearchResults } from "./search-results";
 import { WhenPanel } from "./when-controls";
+import { WherePanel } from "./where-panel";
+import { useVisibleResults } from "./results";
+import { countRooms, findCampus } from "../state/availability";
 
 /** Phones/tablets: the folded controls, as "Today · 12:00–14:00 · 2 filters". */
 function ControlsSummary() {
@@ -19,6 +22,7 @@ function ControlsSummary() {
   const to = useStore((state) => state.to);
   const filters = useStore((state) => state.filters);
   const active = countActiveFilters(filters);
+  const campus = findCampus(useStore((state) => state.campusId));
 
   const day =
     date === romeTodayIso()
@@ -38,14 +42,11 @@ function ControlsSummary() {
       className="controls-summary"
       hidden={!collapsed}
       aria-expanded={!collapsed}
-      onClick={() => {
-        setControlsCollapsed(false);
-        document.querySelector(".results__body")?.scrollTo({ top: 0 });
-      }}
+      onClick={() => setControlsCollapsed(false)}
     >
-      <Icon name="calendar-03" />
+      <Icon name="search-01" />
       <span className="controls-summary__text">
-        <strong>{day}</strong> · {formatRange(from, to)}
+        <strong>{campus?.name}</strong> · {day} · {formatRange(from, to)}
         {active > 0 && (
           <> · {tf(active === 1 ? "filters.oneActive" : "filters.active", { n: active })}</>
         )}
@@ -58,13 +59,39 @@ function ControlsSummary() {
   );
 }
 
+/** Phones/tablets: closes the parameters and shows the matching rooms. */
+function ShowResultsButton() {
+  useLocale();
+  const count = countRooms(useVisibleResults());
+  const loading = useStore((state) => state.occupancy === "loading");
+
+  return (
+    <div className="controls__cta">
+      <button
+        type="button"
+        className="button button--primary button--large"
+        onClick={() => setControlsCollapsed(true)}
+      >
+        {loading
+          ? t("results.loading")
+          : count === 0
+            ? t("results.showNone")
+            : count === 1
+              ? t("results.showOneResult")
+              : tf("results.showResults", { n: count })}
+        <Icon name="arrow-right-02" />
+      </button>
+    </div>
+  );
+}
+
 export function HomePage({ hidden }: { hidden: boolean }) {
   useLocale();
   const searching = useStore((state) => state.query.trim() !== "");
   const collapsed = useStore((state) => state.controlsCollapsed);
 
   return (
-    <main className="home" hidden={hidden}>
+    <main className={`home ${collapsed ? "home--results" : "home--form"}`} hidden={hidden}>
       <div className="home__search">
         <SearchBar />
       </div>
@@ -73,13 +100,23 @@ export function HomePage({ hidden }: { hidden: boolean }) {
       ) : (
         <div className="home__body">
           <ControlsSummary />
-          <aside
-            className={`home__controls${collapsed ? " home__controls--collapsed" : ""}`}
-            aria-label={t("when.title")}
-          >
+          <aside className="home__controls" aria-label={t("controls.label")}>
+            <div className="controls__close">
+              <button
+                type="button"
+                className="icon-button"
+                aria-label={t("controls.close")}
+                title={t("controls.close")}
+                onClick={() => setControlsCollapsed(true)}
+              >
+                <Icon name="cancel-01" />
+              </button>
+            </div>
+            <WherePanel />
             <WhenPanel />
             <Filters />
             <Favourites />
+            <ShowResultsButton />
           </aside>
           <Results />
         </div>

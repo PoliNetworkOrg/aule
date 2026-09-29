@@ -112,7 +112,8 @@ export function Filters() {
   return (
     <section className="panel filters" aria-labelledby="filters-title">
       <div className="panel__header">
-        <h2 className="section-title" id="filters-title">
+        <h2 className="panel__title" id="filters-title">
+          <Icon name="filter-horizontal" />
           {t("filters.title")}
         </h2>
         <button
@@ -127,7 +128,7 @@ export function Filters() {
           <span className="action-link__count">{active}</span>
         </button>
       </div>
-      <div className="chip-row">
+      <div className="chip-row chip-row--wrap">
         <ToggleChip
           active={filters.partial}
           icon="time-quarter-pass"
@@ -151,7 +152,15 @@ export function Filters() {
           className={`chip${advanced > 0 ? " chip--active" : ""}`}
           aria-expanded={open}
           aria-controls="more-filters"
-          onClick={() => setOpen(!open)}
+          onClick={() => {
+            setOpen(!open);
+
+            if (!open && window.matchMedia("(max-width: 959px)").matches) {
+              requestAnimationFrame(() =>
+                document.getElementById("more-filters")?.scrollIntoView({ block: "start" }),
+              );
+            }
+          }}
         >
           <Icon name="filter-horizontal" />
           <StableText k="filters.more" />

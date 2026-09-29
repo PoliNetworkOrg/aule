@@ -296,6 +296,13 @@ mark {
   color: var(--accent-text);
 }
 
+.button--large {
+  width: 100%;
+  min-height: 50px;
+  font-size: 16px;
+  border-radius: var(--radius-lg);
+}
+
 .button:disabled {
   opacity: 0.5;
 }
@@ -502,6 +509,21 @@ mark {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin-bottom: 6px;
+}
+
+.panel__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.panel__title .icon {
+  font-size: 18px;
+  color: var(--accent);
 }
 
 .panel__header {

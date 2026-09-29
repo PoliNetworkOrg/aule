@@ -34,10 +34,16 @@
   color: var(--partial);
 }
 
-.summary__partial--button {
-  padding: 0;
-  text-decoration: underline;
-  text-underline-offset: 2px;
+button.summary__partial {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--partial-soft);
+  font-weight: 700;
+}
+
+button.summary__partial[aria-pressed="true"] {
+  background: var(--surface-muted);
+  color: var(--text-muted);
 }
 
 .summary__context {
@@ -260,12 +266,6 @@
 
 /* Phones: campus, day and time are right above in the controls; keep the summary to two lines. */
 @media (max-width: 639px) {
-  .summary__partial--button {
-    padding: 0;
-    text-decoration: underline;
-    text-underline-offset: 2px;
-  }
-
   .summary__context {
     display: none;
   }

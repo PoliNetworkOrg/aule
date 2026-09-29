@@ -36,7 +36,7 @@
   "filters.allBuildings": "All",
   "filters.equipment": "Equipment",
   "filters.network": "Network socket",
-  "favourites.title": "Favourites",
+  "favourites.title": "Favourite rooms",
   "favourites.empty": "Tap ☆ on a room to keep it here.",
   "favourites.add": "Add {name} to favourites",
   "favourites.remove": "Remove {name} from favourites",
@@ -136,5 +136,19 @@
   "results.showPartialShort": "+{n} partial",
   "filters.active": "{n} filters",
   "filters.oneActive": "1 filter",
-  "filters.edit": "Edit"
+  "filters.edit": "Edit",
+  "where.title": "Where",
+  "where.change": "Change",
+  "results.showResults": "Show {n} rooms",
+  "results.showOneResult": "Show 1 room",
+  "results.showNone": "No rooms: change the parameters",
+  "controls.close": "Close and show rooms",
+  "results.hidePartialShort": "−{n} partial",
+  "results.hidePartial": "Hide the {n} partly free rooms",
+  "favourites.removeShort": "Remove",
+  "controls.label": "Search parameters"
+  ,"classroom.enlargePhoto": "Enlarge the photo of room {name}"
+  ,"classroom.enlarge": "Enlarge"
+  ,"classroom.photoOf": "Photo of room {name}"
+  ,"classroom.closePhoto": "Close photo"
 }
