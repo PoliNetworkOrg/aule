@@ -364,6 +364,7 @@ export function TimeRange() {
         <TimePickerButton
           field="to"
           value={to}
+          after={from}
           onChange={(value) => setWindow(from, value, "to")}
         />
         <span className="time-range__duration">
