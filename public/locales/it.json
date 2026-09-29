@@ -146,9 +146,12 @@
   "results.hidePartialShort": "−{n} parziali",
   "results.hidePartial": "Nascondi le {n} aule parzialmente libere",
   "favourites.removeShort": "Rimuovi",
-  "controls.label": "Parametri di ricerca"
-  ,"classroom.enlargePhoto": "Ingrandisci la foto dell'aula {name}"
-  ,"classroom.enlarge": "Ingrandisci"
-  ,"classroom.photoOf": "Foto dell'aula {name}"
-  ,"classroom.closePhoto": "Chiudi la foto"
+  "controls.label": "Parametri di ricerca",
+  "classroom.enlargePhoto": "Ingrandisci la foto dell'aula {name}",
+  "classroom.enlarge": "Ingrandisci",
+  "classroom.photoOf": "Foto dell'aula {name}",
+  "classroom.closePhoto": "Chiudi la foto",
+  "when.commonTimesHint": "Le lezioni cambiano più spesso al minuto :15.",
+  "when.everyQuarter": "Mostra tutti i quarti d'ora",
+  "when.commonTimes": "Mostra gli orari più comuni"
 }

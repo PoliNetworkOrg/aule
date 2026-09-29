@@ -818,7 +818,6 @@ mark {
 
 .popup-layer--sheet .popup-backdrop {
   background: rgb(15 23 42 / 40%);
-  animation: fade-in 0.15s ease-out;
 }
 
 .popup {
@@ -830,7 +829,6 @@ mark {
   border-radius: var(--radius-lg);
   background: var(--surface);
   box-shadow: var(--shadow);
-  animation: popup-in 0.14s ease-out;
 }
 
 .popup--sheet {
@@ -841,7 +839,6 @@ mark {
   border-radius: 18px 18px 0 0;
   border-bottom: 0;
   padding-bottom: env(safe-area-inset-bottom);
-  animation: sheet-in 0.2s ease-out;
 }
 
 .popup__header {
@@ -861,25 +858,6 @@ mark {
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 4px 16px 16px;
-}
-
-@keyframes fade-in {
-  from {
-    opacity: 0;
-  }
-}
-
-@keyframes popup-in {
-  from {
-    opacity: 0;
-    translate: 0 -4px;
-  }
-}
-
-@keyframes sheet-in {
-  from {
-    translate: 0 100%;
-  }
 }
 
 .option-list {

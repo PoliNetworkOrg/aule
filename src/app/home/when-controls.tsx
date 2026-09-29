@@ -150,11 +150,15 @@ function TimePickerButton({
   useLocale();
   const trigger = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
+  const [showEveryQuarter, setShowEveryQuarter] = useState(false);
   const close = useCallback(() => setOpen(false), []);
 
   const options = (field === "from" ? TIME_OPTIONS.slice(0, -1) : TIME_OPTIONS.slice(1)).filter(
     (option) => !after || option > after,
   );
+
+  const commonOptions = options.filter((option) => option.endsWith(":15") || option === value);
+  const visibleOptions = showEveryQuarter ? options : commonOptions;
 
   const key = field === "from" ? "when.from" : "when.to";
 
@@ -167,7 +171,10 @@ function TimePickerButton({
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-label={`${t(key)} ${formatTime(value)}`}
-        onClick={() => setOpen(!open)}
+        onClick={() => {
+          setShowEveryQuarter(false);
+          setOpen(!open);
+        }}
       >
         <span className="time-value__label">
           <StableText k={key} />
@@ -175,21 +182,33 @@ function TimePickerButton({
         <span className="time-value__time">{formatTime(value)}</span>
       </button>
       <Popup open={open} anchor={trigger} title={t(key)} onClose={close} minWidth={288}>
-        <div className="time-grid">
-          {options.map((option) => (
-            <button
-              key={option}
-              type="button"
-              className="time-grid__option"
-              aria-pressed={option === value}
-              onClick={() => {
-                onChange(option);
-                close();
-              }}
-            >
-              {formatTime(option)}
-            </button>
-          ))}
+        <div className="time-picker">
+          <p className="time-picker__hint">{t("when.commonTimesHint")}</p>
+          <div className="time-grid">
+            {visibleOptions.map((option) => (
+              <button
+                key={option}
+                type="button"
+                className="time-grid__option"
+                aria-pressed={option === value}
+                onClick={() => {
+                  onChange(option);
+                  close();
+                }}
+              >
+                {formatTime(option)}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            className="time-picker__toggle"
+            aria-expanded={showEveryQuarter}
+            onClick={() => setShowEveryQuarter(!showEveryQuarter)}
+          >
+            {t(showEveryQuarter ? "when.commonTimes" : "when.everyQuarter")}
+            <Icon name={showEveryQuarter ? "arrow-up-01" : "arrow-down-01"} />
+          </button>
         </div>
       </Popup>
     </>

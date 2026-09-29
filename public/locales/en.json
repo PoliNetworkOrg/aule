@@ -146,9 +146,12 @@
   "results.hidePartialShort": "−{n} partial",
   "results.hidePartial": "Hide the {n} partly free rooms",
   "favourites.removeShort": "Remove",
-  "controls.label": "Search parameters"
-  ,"classroom.enlargePhoto": "Enlarge the photo of room {name}"
-  ,"classroom.enlarge": "Enlarge"
-  ,"classroom.photoOf": "Photo of room {name}"
-  ,"classroom.closePhoto": "Close photo"
+  "controls.label": "Search parameters",
+  "classroom.enlargePhoto": "Enlarge the photo of room {name}",
+  "classroom.enlarge": "Enlarge",
+  "classroom.photoOf": "Photo of room {name}",
+  "classroom.closePhoto": "Close photo",
+  "when.commonTimesHint": "Class schedules most often change at :15.",
+  "when.everyQuarter": "Show every quarter hour",
+  "when.commonTimes": "Show common times"
 }
