@@ -64,18 +64,13 @@ export default defineConfig(({ mode }) => ({
   plugins: [
     tanstackRouter({ target: "react", autoCodeSplitting: true }),
     react(),
-    // Tailwind also runs Lightning CSS internally; disable that optimisation
-    // to retain both prefixed and unprefixed backdrop-filter declarations.
-    tailwindcss({ optimize: false }),
+    tailwindcss(),
     shellStyles(),
     ...(mode === "beta" ? [betaAssets()] : []),
   ],
   build: {
     sourcemap: !process.env.CF_PAGES_BRANCH || process.env.CF_PAGES_BRANCH === "dev",
     target: "es2020",
-    // Preserve both backdrop-filter declarations; the source documents a
-    // Lightning CSS optimisation that drops the unprefixed declaration.
-    cssMinify: false,
     cssCodeSplit: false,
   },
 }));

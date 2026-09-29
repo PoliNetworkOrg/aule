@@ -42,9 +42,8 @@ import { classroomsData as occupancyDays } from "./available-rooms-script.ts";
 import { getApiBase } from "./config.ts";
 
 // Static classroom directory (campus → buildings → classrooms) plus the text /
-// occupation search that runs against it. The search UI itself lives in the
-// search overlay (components/search-overlay.js); this module owns the data, the
-// indexes, and the result-card builders it drives.
+// occupation search that runs against it. The search UI lives in
+// home/search-results.tsx; this module owns the data and the indexes.
 
 export let classroomsData: Campus[] | null = null;
 
@@ -59,18 +58,10 @@ async function loadData() {
   classroomsData = await fetchJson<Campus[]>(`${getApiBase()}/v1/classrooms`, Infinity);
 }
 
-// Loads the static classroom directory. Blocks the splash — it's what the page
-// shell (campus picker, classroom detail, favourites) is built from.
+// Loads the static classroom directory. Blocks the splash: the campus switcher,
+// classroom pages and favourites are built from it.
 export async function ensureClassroomDirectory() {
   await loadData();
-}
-
-// `ensureSearchData()` is idempotent and safe to call before the search overlay
-// has been opened for the first time.
-export async function ensureSearchData() {
-  await loadData();
-
-  if (!searchIndex) searchIndex = buildSearchIndex();
 }
 
 export function runClassroomSearch(query: string) {
@@ -141,10 +132,6 @@ const OCC_MAX_SESSIONS = 6;
 let occIndex: OccupationRow[] | null = null;
 
 let occIndexDayCount = -1;
-
-export function hasOccupationData() {
-  return occupancyDays.length > 0;
-}
 
 // Occupancy JSON stores the day as "YYYYMMDD"; normalise to ISO so Date() and
 // Intl can parse it.

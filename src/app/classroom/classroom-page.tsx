@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { closePage, goBack } from "../../lib/navigation";
-import { getClassroomStatusNow } from "../available-rooms-script";
+import { formatRomeHHMM } from "../available-rooms-script";
 import { t, tf, useLocale } from "../i18n";
 import {
   findClassroom,
@@ -10,7 +10,7 @@ import {
 } from "../state/availability";
 import { cameFromApp, type ClassroomContext } from "../state/navigation-context";
 import { useStore } from "../state/store";
-import { formatTime, romeTodayIso } from "../state/time";
+import { DAY_END, DAY_START, formatTime, fromMinutes, romeTodayIso } from "../state/time";
 import { fetchPhotoUrl } from "../utils/photo";
 import { FavouriteButton } from "../home/room-card";
 import { Icon } from "../ui/icon";
@@ -35,29 +35,23 @@ function useEntry(id?: string, campus?: string, name?: string) {
   return campus && name ? findClassroomBySlug(campus, name) : null;
 }
 
-/** "Free until 14:15" / "Busy, free from 13:15" for today. */
+/** "Free now, until 14:15" / "Occupied now, free from 13:15" for today. */
 function NowStatus({ entry }: { entry: ClassroomEntry }) {
   useLocale();
   useStore((state) => state.dataRevision);
 
-  const status = getClassroomStatusNow(entry.room.id);
   const occupancy = roomOccupancy(entry.room.id, romeTodayIso());
+  const now = formatRomeHHMM(new Date());
 
-  if (!status || !occupancy) return null;
-
-  const now = new Intl.DateTimeFormat("en-GB", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: "Europe/Rome",
-  }).format(new Date());
+  if (!occupancy || now < fromMinutes(DAY_START) || now >= fromMinutes(DAY_END)) return null;
 
   const sorted = [...occupancy].sort((a, b) => a.inizio.localeCompare(b.inizio));
-  const busy = sorted.find((slot) => slot.inizio <= now && slot.fine > now);
-  let detail = "";
+  const busy = sorted.some((slot) => slot.inizio <= now && slot.fine > now);
+  let detail: string;
 
   if (busy) {
-    let end = busy.fine;
+    // Back-to-back lessons count as one busy stretch.
+    let end = now;
 
     for (const slot of sorted) if (slot.inizio <= end && slot.fine > end) end = slot.fine;
 
@@ -68,12 +62,10 @@ function NowStatus({ entry }: { entry: ClassroomEntry }) {
     detail = next ? tf("now.freeUntil", { time: formatTime(next.inizio) }) : t("now.freeRestOfDay");
   }
 
-  const free = status === "free" || status === "occupied-soon";
-
   return (
-    <p className={`now-status now-status--${free ? "free" : "busy"}`}>
+    <p className={`now-status now-status--${busy ? "busy" : "free"}`}>
       <span className="status-dot" aria-hidden="true" />
-      <strong>{t(free ? "now.free" : "now.busy")}</strong>
+      <strong>{t(busy ? "now.busy" : "now.free")}</strong>
       <span>{detail}</span>
     </p>
   );
