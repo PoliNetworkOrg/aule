@@ -37,8 +37,19 @@ body[data-page="home"] #root {
 .home__controls {
   display: flex;
   flex-direction: column;
+  flex: none;
   gap: 12px;
   padding: 12px var(--page-gutter);
+}
+
+/* On phones and tablets the controls never take more than half the screen,
+   so opening "More filters" can't squeeze the results out of view. */
+@media (max-width: 959px) {
+  .home__controls {
+    max-height: 50dvh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
 }
 
 .panel {

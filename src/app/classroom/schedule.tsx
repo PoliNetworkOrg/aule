@@ -14,6 +14,7 @@ import {
   formatDuration,
   formatRange,
   fromMinutes,
+  isAfterHours,
   parseIsoDate,
   romeTodayIso,
   toMinutes,
@@ -103,10 +104,10 @@ function DayTimeline({
             }}
           />
         )}
-        {items.map((item) =>
+        {items.map((item, index) =>
           item.kind === "busy" ? (
             <span
-              key={`${item.start}-${item.end}`}
+              key={`${index}-${item.start}-${item.end}`}
               className={`timeline__block${item.slot.category === "EXAM" ? " timeline__block--exam" : ""}`}
               style={{
                 left: percent(item.start),
@@ -210,7 +211,7 @@ export function Schedule({
 
   const initial =
     (context && dates.includes(context.date) && context.date) ||
-    (dates.includes(today) && nowMinutes < DAY_END ? today : dates.find((date) => date > today)) ||
+    (dates.includes(today) && !isAfterHours() ? today : dates.find((date) => date > today)) ||
     dates[0] ||
     "";
 
@@ -293,9 +294,9 @@ export function Schedule({
           </p>
         )}
         <ol className="agenda">
-          {items.map((item) => (
+          {items.map((item, index) => (
             <AgendaRow
-              key={`${item.kind}-${item.start}`}
+              key={`${index}-${item.kind}-${item.start}`}
               item={item}
               inWindow={
                 !!searchWindow &&

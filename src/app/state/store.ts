@@ -104,6 +104,18 @@ function readFilters(): Filters {
   return filters;
 }
 
+/** Last campus used. The old settings panel could pin a "preferred" one: adopt it once. */
+function readInitialCampus() {
+  const preferred = readStorage("poliAule_preferredCampusId");
+
+  if (readStorage("poliAule_preferredCampusEnabled") === "true" && preferred) {
+    writeStorage(CAMPUS_KEY, preferred);
+    writeStorage("poliAule_preferredCampusEnabled", "false");
+  }
+
+  return readStorage(CAMPUS_KEY) ?? "MIA01";
+}
+
 const initialWindow = defaultWindow(false);
 
 let state: AppState = {
@@ -111,7 +123,7 @@ let state: AppState = {
   occupancy: "loading",
   dataRevision: 0,
   generatedAt: null,
-  campusId: readStorage(CAMPUS_KEY) ?? "MIA01",
+  campusId: readInitialCampus(),
   date: "",
   from: initialWindow.from,
   to: initialWindow.to,

@@ -2,7 +2,7 @@ import { classroomsData as occupancyDays, SKIP_DAYS } from "../available-rooms-s
 import { classroomsData as directory } from "../classroom-search-data";
 import type { Building, Campus, Classroom, Occupation } from "../types";
 import type { Filters } from "./store";
-import { dateKeyToIso, isoToDateKey, parseIsoDate, toMinutes } from "./time";
+import { dateKeyToIso, isoToDateKey, parseIsoDate, romeTodayIso, toMinutes } from "./time";
 
 export type WindowStatus = "free" | "partial" | "occupied";
 
@@ -83,7 +83,7 @@ export function findCampus(id: string) {
 export function availableDates() {
   return occupancyDays
     .map((day) => dateKeyToIso(day.date))
-    .filter((date) => !SKIP_DAYS.includes(parseIsoDate(date).getDay()));
+    .filter((date) => date >= romeTodayIso() && !SKIP_DAYS.includes(parseIsoDate(date).getDay()));
 }
 
 /** The occupancy slots of one room on one ISO date, or null when that day has no data. */

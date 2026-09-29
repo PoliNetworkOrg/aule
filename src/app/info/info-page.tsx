@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { closePage } from "../../lib/navigation";
 import { reloadOccupancy } from "../boot";
 import { IS_STABLE_BUILD, USE_BETA_BACKEND_KEY } from "../config";
 import { t, useLocale } from "../i18n";
+import { leavePage } from "../state/navigation-context";
 import { useStore } from "../state/store";
 import { RichText } from "../ui/rich-text";
 import { Icon } from "../ui/icon";
@@ -72,7 +72,7 @@ export function InfoPage() {
 
   return (
     <main className="page info-page">
-      <button type="button" className="back-link" onClick={() => closePage()}>
+      <button type="button" className="back-link" onClick={leavePage}>
         <Icon name="arrow-left-01" />
         {t("classroom.back")}
       </button>

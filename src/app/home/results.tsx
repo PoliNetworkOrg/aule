@@ -63,6 +63,7 @@ function Summary({ results }: { results: BuildingAvailability[] }) {
   const from = useStore((state) => state.from);
   const to = useStore((state) => state.to);
   const campus = findCampus(useStore((state) => state.campusId));
+  const occupancy = useStore((state) => state.occupancy);
   const rooms = results.flatMap((building) => building.rooms);
   const free = rooms.filter((room) => room.status === "free").length;
   const partial = rooms.length - free;
@@ -83,7 +84,11 @@ function Summary({ results }: { results: BuildingAvailability[] }) {
   return (
     <div className="summary">
       <p className="summary__count">
-        {free === 1 ? t("results.oneRoom") : tf("results.rooms", { n: free })}
+        {occupancy === "loading" && !rooms.length
+          ? t("results.loading")
+          : free === 1
+            ? t("results.oneRoom")
+            : tf("results.rooms", { n: free })}
         {partial > 0 && (
           <span className="summary__partial">{tf("results.partial", { n: partial })}</span>
         )}

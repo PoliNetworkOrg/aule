@@ -1,4 +1,5 @@
-import { closePage, openPage } from "../../lib/navigation";
+import { closePage } from "../../lib/navigation";
+import { leavePage, openInApp } from "../state/navigation-context";
 import { setLocale, t, useLocale } from "../i18n";
 import { campuses } from "../state/availability";
 import { setCampus, useStore } from "../state/store";
@@ -96,7 +97,7 @@ export function Header({ page }: { page: "home" | "classroom" | "info" }) {
             aria-label={t("header.info")}
             title={t("header.info")}
             aria-current={page === "info" ? "page" : undefined}
-            onClick={() => (page === "info" ? closePage() : openPage("/info"))}
+            onClick={() => (page === "info" ? leavePage() : openInApp("/info"))}
           >
             <Icon name="information-circle" />
           </button>

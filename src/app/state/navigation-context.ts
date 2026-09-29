@@ -1,4 +1,4 @@
-import { openPage } from "../../lib/navigation";
+import { closePage, goBack, openPage } from "../../lib/navigation";
 import { classroomPath, type ClassroomEntry } from "./availability";
 
 // What the user was looking at when they opened a classroom: the day and
@@ -31,11 +31,14 @@ export function takeClassroomContext() {
   return context;
 }
 
-/** Whether the current page was reached from inside the app, so "back" can use history. */
-export function cameFromApp() {
-  return openedFromApp;
+/** Opens an in-app page so that its back link can return with history.back(). */
+export function openInApp(path: string) {
+  openedFromApp = true;
+  openPage(path);
 }
 
-export function markExternalEntry() {
-  openedFromApp = false;
+/** Leaves the current page: back through history when we came from the app, else home. */
+export function leavePage() {
+  if (openedFromApp) goBack();
+  else closePage();
 }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { closePage, goBack } from "../../lib/navigation";
+import { closePage } from "../../lib/navigation";
 import { formatRomeHHMM } from "../available-rooms-script";
 import { t, tf, useLocale } from "../i18n";
 import {
@@ -8,7 +8,7 @@ import {
   roomOccupancy,
   type ClassroomEntry,
 } from "../state/availability";
-import { cameFromApp, type ClassroomContext } from "../state/navigation-context";
+import { leavePage, type ClassroomContext } from "../state/navigation-context";
 import { useStore } from "../state/store";
 import { DAY_END, DAY_START, formatTime, fromMinutes, romeTodayIso } from "../state/time";
 import { fetchPhotoUrl } from "../utils/photo";
@@ -39,6 +39,14 @@ function useEntry(id?: string, campus?: string, name?: string) {
 function NowStatus({ entry }: { entry: ClassroomEntry }) {
   useLocale();
   useStore((state) => state.dataRevision);
+
+  const [, setTick] = useState(0);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setTick((tick) => tick + 1), 60_000);
+
+    return () => window.clearInterval(timer);
+  }, []);
 
   const occupancy = roomOccupancy(entry.room.id, romeTodayIso());
   const now = formatRomeHHMM(new Date());
@@ -129,11 +137,6 @@ export function ClassroomPage({
     };
   }, [entry]);
 
-  function back() {
-    if (cameFromApp()) goBack();
-    else closePage();
-  }
-
   if (!entry)
     return (
       <main className="page">
@@ -161,7 +164,7 @@ export function ClassroomPage({
 
   return (
     <main className="page">
-      <button type="button" className="back-link" onClick={back}>
+      <button type="button" className="back-link" onClick={leavePage}>
         <Icon name="arrow-left-01" />
         {t("classroom.back")}
       </button>

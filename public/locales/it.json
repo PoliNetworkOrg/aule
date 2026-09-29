@@ -57,6 +57,7 @@
   "results.partial": "+{n} parziali",
   "results.available": "{n} disponibili",
   "results.oneAvailable": "1 disponibile",
+  "results.loading": "Caricamento aule…",
   "results.view": "Vista",
   "results.list": "Lista",
   "results.map": "Mappa 3D",

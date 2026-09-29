@@ -37,6 +37,9 @@ export function SearchBar() {
   // "/" or Ctrl/Cmd+K jumps to the search field from anywhere on the page.
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
+      // The home stays mounted under other pages; only react while it's shown.
+      if (!input.current?.offsetParent) return;
+
       const shortcut =
         (event.key === "/" && !isTypingTarget(event.target)) ||
         (event.key.toLowerCase() === "k" && (event.metaKey || event.ctrlKey));

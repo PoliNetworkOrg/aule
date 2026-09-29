@@ -57,6 +57,7 @@
   "results.partial": "+{n} partial",
   "results.available": "{n} available",
   "results.oneAvailable": "1 available",
+  "results.loading": "Loading rooms…",
   "results.view": "View",
   "results.list": "List",
   "results.map": "3D map",
