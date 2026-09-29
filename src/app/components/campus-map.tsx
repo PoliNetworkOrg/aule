@@ -1,5 +1,4 @@
 import { isNumber } from "../../lib/guards";
-import { getMapboxToken } from "../config.ts";
 import { classroomsData } from "../classroom-search-data.ts";
 import { t } from "../i18n.ts";
 import { useLayoutEffect, useSyncExternalStore } from "react";
@@ -7,13 +6,20 @@ import { createRoot, type Root } from "react-dom/client";
 import { flushSync } from "react-dom";
 import type { Building, Campus } from "../types";
 import type {
-  MapboxLibrary,
-  MapboxMap,
-  MapboxMarker,
-  CameraOptions,
-  LngLat,
-  Coordinates,
-} from "./mapbox";
+  FlyToOptions as CameraOptions,
+  Map as MapLibreMap,
+  Marker as MapLibreMarker,
+} from "maplibre-gl";
+import { toDarkStyle } from "./map-dark-style.ts";
+
+type MapLibreLibrary = typeof import("maplibre-gl");
+
+type LngLat = [number, number];
+
+interface Coordinates {
+  lat: number;
+  long: number;
+}
 
 function hasCoordinates<T extends { lat?: number; long?: number }>(
   value: T,
@@ -28,7 +34,7 @@ import {
 } from "./campus-buildings.tsx";
 import { getSheetHeightPx, heightAfterBuildingSelect, isUserResizing } from "./campus-sheet.tsx";
 
-// Fullscreen Mapbox map that fills the Campus tab. The app chrome (header,
+// Fullscreen MapLibre map that fills the Campus tab. The app chrome (header,
 // footer, bottom-nav) floats above it — see components/campus-map.css, which
 // also locks the page scroll while this tab is open so every drag / pinch /
 // rotate goes to the map instead of the page behind it.
@@ -38,7 +44,14 @@ import { getSheetHeightPx, heightAfterBuildingSelect, isUserResizing } from "./c
 // a threshold returns to the campus overview. Static for now — markers don't
 // reflect live occupancy yet.
 
-const MAPBOX_VERSION = "3.9.1";
+// OpenFreeMap (openfreemap.org): free, keyless, no usage caps. Liberty is the
+// only one of its styles with 3D buildings; the dark theme is derived from it
+// at load time (see map-dark-style.ts) rather than using OpenFreeMap's own
+// "Dark", a different and much barer design.
+const STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
+
+const OPENFREEMAP_ATTRIBUTION =
+  '<a href="https://openfreemap.org" target="_blank">OpenFreeMap</a> <a href="https://www.openmaptiles.org/" target="_blank">&copy; OpenMapTiles</a> Data from <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>';
 
 const CONTAINER_ID = "search-classrooms-container";
 
@@ -70,7 +83,7 @@ const BUILDING_FLY_ZOOM = 18;
 // The campus sheet (components/campus-sheet.{js,css}) covers part of the map
 // — a right-pinned panel on desktop, a bottom one on mobile — so a plain
 // `center` lands a picked campus in the middle of the WHOLE canvas, part of
-// which is actually hidden under the sheet. `padding` (below) tells Mapbox to
+// which is actually hidden under the sheet. `padding` (below) tells MapLibre to
 // center within the remaining, actually-visible area instead.
 //
 // Desktop's panel is a fixed 420px wide (+ its own 20px right gap) regardless
@@ -107,13 +120,13 @@ const darkScheme = window.matchMedia("(prefers-color-scheme: dark)");
 
 let started = false;
 
-let map: MapboxMap | null = null;
+let map: MapLibreMap | null = null;
 
-let mapboxglLib: MapboxLibrary | null = null; // set once loaded — reused by the picker's change listener below
+let maplibreLib: MapLibreLibrary | null = null; // set once loaded — reused by the picker's change listener below
 
 let mode = "campus"; // 'campus' | 'buildings'
 
-let markers: MapboxMarker[] = [];
+let markers: MapLibreMarker[] = [];
 
 const markerRoots: Root[] = [];
 
@@ -125,7 +138,7 @@ const observers: (MutationObserver | ResizeObserver)[] = [];
 
 let events = new AbortController();
 
-let generation = 0; // currently-rendered mapboxgl.Marker[]
+let generation = 0;
 
 // The mobile sheet's current live height (px) — seeded from its resting
 // value up front (safe even before campus-sheet.js's own init runs, see
@@ -156,7 +169,7 @@ const FLY_RETARGET_THROTTLE_MS = 120;
 
 // Whether the map's actual camera differs from the auto-centered view of the
 // current selection — recomputed after every settle (`moveend`, see boot()),
-// not inferred from *how* it got there. A few Mapbox-native gestures (the
+// not inferred from *how* it got there. A few MapLibre-native gestures (the
 // NavigationControl compass's own drag-to-rotate, its click-to-reset-north)
 // turned out not to consistently tag their originalEvent the way a plain
 // drag/wheel/pinch does, which made a "was this user-caused?" heuristic
@@ -218,11 +231,11 @@ function attachCampusMap() {
   document.addEventListener(
     "campuschange",
     (e) => {
-      if (!map || !mapboxglLib) return;
+      if (!map || !maplibreLib) return;
       const campus = campuses().find((c) => c.id === e.detail.id);
 
       if (!campus || !isNumber(campus.lat) || !isNumber(campus.long)) return;
-      flyToCampus(mapboxglLib, campus);
+      flyToCampus(maplibreLib, campus);
     },
     { signal: events.signal },
   );
@@ -233,11 +246,11 @@ function attachCampusMap() {
   document.addEventListener(
     "campusrecenter",
     () => {
-      if (!map || !mapboxglLib) return;
+      if (!map || !maplibreLib) return;
       const building = selectedBuilding();
 
       if (building) {
-        flyToBuilding(mapboxglLib, building);
+        flyToBuilding(maplibreLib, building);
 
         return;
       }
@@ -245,7 +258,7 @@ function attachCampusMap() {
       const campus = selectedCampus();
 
       if (!campus) return;
-      flyToCampus(mapboxglLib, campus);
+      flyToCampus(maplibreLib, campus);
     },
     { signal: events.signal },
   );
@@ -259,7 +272,7 @@ function attachCampusMap() {
   document.addEventListener(
     "buildingchange",
     (e) => {
-      if (!map || !mapboxglLib) return;
+      if (!map || !maplibreLib) return;
       const campus = campuses().find((c) => c.id === e.detail.campusId);
 
       if (!campus) return;
@@ -268,13 +281,13 @@ function attachCampusMap() {
         const building = (campus.buildings || []).find((b) => b.name === e.detail.buildingId);
 
         if (building && isNumber(building.lat) && isNumber(building.long)) {
-          flyToBuilding(mapboxglLib, building);
+          flyToBuilding(maplibreLib, building);
         }
       } else if (isNumber(campus.lat) && isNumber(campus.long)) {
         // Back to the campus page — zoom the camera back out to the
         // campus-level view (building markers stay up, same as a plain campus
         // pick).
-        flyToCampus(mapboxglLib, campus);
+        flyToCampus(maplibreLib, campus);
       }
     },
     { signal: events.signal },
@@ -420,7 +433,7 @@ function attachCampusMap() {
     hostReady = false;
     mapError = false;
     started = false;
-    mapboxglLib = null;
+    maplibreLib = null;
     autoFlying = false;
     flyDestination = null;
   };
@@ -428,11 +441,10 @@ function attachCampusMap() {
 
 async function boot(_container: HTMLElement) {
   const currentGeneration = generation;
-  const token = await getMapboxToken();
-  const mapboxgl = await loadMapboxGl();
+  const maplibregl = await loadMapLibre();
 
   if (currentGeneration !== generation) return;
-  mapboxglLib = mapboxgl;
+  maplibreLib = maplibregl;
 
   hostReady = true;
   notifyView();
@@ -443,11 +455,8 @@ async function boot(_container: HTMLElement) {
   // region-wide overview.
   const startCampus = selectedCampus();
 
-  mapboxgl.accessToken = token;
-
-  const instance = new mapboxgl.Map({
+  const instance = new maplibregl.Map({
     container: el,
-    style: "mapbox://styles/mapbox/standard",
     center: startCampus ? [startCampus.long, startCampus.lat] : INITIAL_CENTER,
     zoom: startCampus ? CAMPUS_FLY_ZOOM : INITIAL_ZOOM,
     minZoom: 8.5,
@@ -456,10 +465,18 @@ async function boot(_container: HTMLElement) {
     maxPitch: 70,
     pitchWithRotate: true,
     touchPitch: true,
-    logoPosition: "bottom-left",
+    // No `compact` makes it width-driven (icon badge at <= 640px, full text
+    // above), like Mapbox's — MapLibre's own default is `compact: true`, a
+    // badge even on desktop. The credit is pinned here too: MapLibre only
+    // lists a source's own attribution once it has marked that source as
+    // rendered, and intermittently never re-checks after, leaving the
+    // (license-required) OSM credit blank. Same string as the tiles' own
+    // TileJSON, so MapLibre dedupes the two when both show up.
+    attributionControl: { customAttribution: OPENFREEMAP_ATTRIBUTION },
   });
 
   map = instance;
+  applyTheme();
 
   // The constructor's own `center`/`zoom`/`pitch` above ignore `padding` —
   // only jumpTo/easeTo/flyTo actually offset `center` by it. Re-apply the
@@ -526,25 +543,24 @@ async function boot(_container: HTMLElement) {
     el.addEventListener("gestureend", (e) => e.preventDefault(), { signal: events.signal });
   }
 
-  const navControl = new mapboxgl.NavigationControl({ showZoom: false, showCompass: true });
+  const navControl = new maplibregl.NavigationControl({ showZoom: false, showCompass: true });
   instance.addControl(navControl, "top-right");
 
-  const geolocateControl = new mapboxgl.GeolocateControl({
+  const geolocateControl = new maplibregl.GeolocateControl({
     positionOptions: { enableHighAccuracy: true },
     trackUserLocation: true,
-    showUserHeading: true,
   });
 
   instance.addControl(geolocateControl, "top-right");
 
   // `liquid-glass` (components/liquid-glass.js) must go on the actual
-  // <button>, not the wrapping .mapboxgl-ctrl-group div: its delegated
+  // <button>, not the wrapping .maplibregl-ctrl-group div: its delegated
   // pointerdown handler treats any `<button>` under the pressed element as
   // an "inner control" and defers to it (that's what lets a link inside a
   // popover keep its own click instead of triggering the panel's deform) —
   // put the class on the group and every press on the real button is
   // silently ignored, which is why it looked completely inert. Only the
-  // geolocate button gets it, though: the compass button has Mapbox's own
+  // geolocate button gets it, though: the compass button has MapLibre's own
   // drag-to-rotate handler (NavigationControl's `rl` MouseRotateHandler)
   // bound directly to it, and liquid-glass's pointer-capture-on-press would
   // steal those pointer events out from under it. The compass gets a
@@ -559,47 +575,56 @@ async function boot(_container: HTMLElement) {
   // compass, and a plain two-triangle needle (red north tip) is clearer here
   // anyway.
 
-  // GeolocateControl builds its actual <button> asynchronously (behind a
-  // `navigator.permissions.query(...)` check), so it doesn't exist yet right
-  // after addControl() returns — watch for it instead of assuming it's there.
-  const geolocateObserver = new MutationObserver((_records, observer) => {
-    const button = geolocateControl._container.querySelector("button");
-
-    if (!button) return;
-    button.classList.add("liquid-glass");
-    const root = createRoot(button.querySelector(".mapboxgl-ctrl-icon")!);
-    controlRoots.push(root);
-    flushSync(() => root.render(<i className="hgi-stroke hgi-gps-01" aria-hidden="true" />));
-    observer.disconnect();
-  });
-
-  observers.push(geolocateObserver);
-  geolocateObserver.observe(geolocateControl._container, { childList: true });
+  // GeolocateControl builds its <button> synchronously in onAdd(), so it's
+  // already there once addControl() returns.
+  const geolocateButton = geolocateControl._geolocateButton;
+  geolocateButton.classList.add("liquid-glass");
+  const geolocateRoot = createRoot(geolocateButton.querySelector(".maplibregl-ctrl-icon")!);
+  controlRoots.push(geolocateRoot);
+  flushSync(() => geolocateRoot.render(<i className="hgi-stroke hgi-gps-01" aria-hidden="true" />));
 
   // Same glass + liquid-glass treatment for the attribution control's
-  // compact toggle badge (campus-map.css). Mapbox adds this control itself
-  // (there's no explicit instance to hold onto like NavigationControl/
-  // GeolocateControl above), so watch the whole map container for its
-  // button to show up instead.
-  const attributionObserver = new MutationObserver((_records, observer) => {
-    const button = instance.getContainer().querySelector(".mapboxgl-ctrl-attrib-button");
+  // compact toggle badge (campus-map.css). MapLibre adds this control itself
+  // in the Map constructor, so its toggle — a bare <summary>, no inner icon
+  // span — is already in the DOM here.
+  const attributionButton = instance
+    .getContainer()
+    .querySelector<HTMLElement>(".maplibregl-ctrl-attrib-button");
 
-    if (!button) return;
-    button.classList.add("liquid-glass");
-    const root = createRoot(button.querySelector(".mapboxgl-ctrl-icon")!);
+  if (attributionButton) {
+    attributionButton.classList.add("liquid-glass");
+    const root = createRoot(attributionButton);
     controlRoots.push(root);
     flushSync(() =>
       root.render(<i className="hgi-stroke hgi-information-circle" aria-hidden="true" />),
     );
-    observer.disconnect();
-  });
+  }
 
-  observers.push(attributionObserver);
-  attributionObserver.observe(instance.getContainer(), { childList: true, subtree: true });
+  // MapLibre opens a compact (narrow-viewport) attribution expanded the
+  // first time it switches to compact — once the sources report their
+  // attribution, after "load". Start it as the plain "i" badge instead, same
+  // as the Mapbox control did; a tap still expands it.
+  const attribution = attributionButton?.parentElement;
 
-  // Match the map's daylight to the app theme (Standard style only).
-  instance.on("style.load", applyLightPreset);
-  darkScheme.addEventListener("change", applyLightPreset, { signal: events.signal });
+  if (attribution) {
+    const collapseObserver = new MutationObserver((_records, observer) => {
+      if (!attribution.classList.contains("maplibregl-compact-show")) return;
+      attribution.classList.remove("maplibregl-compact-show");
+      observer.disconnect();
+    });
+
+    observers.push(collapseObserver);
+    collapseObserver.observe(attribution, { attributes: true, attributeFilter: ["class"] });
+    // A tap before that first switch means the user wants it open — stop
+    // collapsing.
+    attributionButton!.addEventListener("click", () => collapseObserver.disconnect(), {
+      once: true,
+      signal: events.signal,
+    });
+  }
+
+  // Match the map to the app theme.
+  darkScheme.addEventListener("change", applyTheme, { signal: events.signal });
 
   instance.on("load", () => {
     // If the tab was switched away (unmounting CampusMap → map.remove())
@@ -608,8 +633,8 @@ async function boot(_container: HTMLElement) {
     if (currentGeneration !== generation) return;
     instance.resize();
 
-    if (startCampus) showBuildingMarkers(mapboxgl, startCampus);
-    else showCampusMarkers(mapboxgl);
+    if (startCampus) showBuildingMarkers(maplibregl, startCampus);
+    else showCampusMarkers(maplibregl);
   });
 
   // Zoom back out past a campus → return to the campus overview.
@@ -620,7 +645,7 @@ async function boot(_container: HTMLElement) {
       // clearSelectedBuildingSilently()'s own note on why this doesn't just
       // dispatch 'buildingchange' like every other path here does).
       clearSelectedBuildingSilently();
-      showCampusMarkers(mapboxgl);
+      showCampusMarkers(maplibregl);
 
       if (instance.getPitch() > 0)
         instance.easeTo({ pitch: 0, duration: reduceMotion.matches ? 0 : 600 });
@@ -634,7 +659,7 @@ async function boot(_container: HTMLElement) {
   // Re-check "shifted" (see updateShifted() above) after every settle —
   // covers every way the camera can end up off the auto-centered view (pan,
   // zoom, rotate, pitch), from any source (drag, wheel/trackpad, a control
-  // button), including Mapbox-native interactions like the NavigationControl
+  // button), including MapLibre-native interactions like the NavigationControl
   // compass's own drag-to-rotate/click-to-reset-north.
   instance.on("moveend", updateShifted);
 
@@ -684,44 +709,33 @@ function panBackInBounds() {
   });
 }
 
-function loadMapboxGl() {
-  if (window.mapboxgl) return Promise.resolve(window.mapboxgl);
+// Lazy-loaded so the Campus tab's ~1MB renderer stays out of the main bundle.
+//
+// MapLibre's ESM build finds its tile worker next to itself at runtime
+// (`new URL("./maplibre-gl-worker.mjs", import.meta.url)`), a path neither
+// Vite's dep pre-bundling nor its production build knows to emit — the worker
+// 404s (or comes back with no MIME type) and no tiles ever load. `?worker&url`
+// has Vite bundle that worker, with the shared chunk it imports, into one file
+// and hands back its URL instead.
+async function loadMapLibre(): Promise<MapLibreLibrary> {
+  const [lib, { default: workerUrl }] = await Promise.all([
+    import("maplibre-gl"),
+    import("maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url"),
+    import("maplibre-gl/dist/maplibre-gl.css"),
+  ]);
 
-  const base = `https://api.mapbox.com/mapbox-gl-js/v${MAPBOX_VERSION}`;
+  lib.setWorkerUrl(workerUrl);
 
-  const css = new Promise<void>((resolve) => {
-    const link = document.createElement("link");
-    link.rel = "stylesheet";
-    link.href = `${base}/mapbox-gl.css`;
-    // Non-fatal if it fails — the map still renders, controls just sit slightly off.
-    link.onload = () => resolve();
-    link.onerror = () => resolve();
-    document.head.appendChild(link);
-  });
-
-  const js = new Promise<void>((resolve, reject) => {
-    const script = document.createElement("script");
-    script.src = `${base}/mapbox-gl.js`;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error("Failed to load mapbox-gl.js"));
-    document.head.appendChild(script);
-  });
-
-  return Promise.all([css, js]).then(() => {
-    if (!window.mapboxgl) throw new Error("mapbox-gl.js loaded but window.mapboxgl is missing");
-
-    return window.mapboxgl;
-  });
+  return lib;
 }
 
-function applyLightPreset() {
-  if (!map || !map.setConfigProperty) return;
-
-  try {
-    map.setConfigProperty("basemap", "lightPreset", darkScheme.matches ? "night" : "day");
-  } catch {
-    /* style not ready or not the Standard style — ignore */
-  }
+// Re-applies the style with or without the dark remap (Mapbox Standard's
+// `lightPreset` has no OpenFreeMap equivalent). Same style URL both ways, so
+// MapLibre diffs it into paint-property updates instead of a full reload.
+// Markers are DOM overlays, so they're untouched either way.
+function applyTheme() {
+  if (!map) return;
+  map.setStyle(STYLE_URL, { transformStyle: darkScheme.matches ? toDarkStyle : undefined });
 }
 
 function campuses() {
@@ -825,9 +839,9 @@ function startFly(destination: CameraOptions, mobileHeightOverride?: number) {
 
 // Flies to a campus and swaps to its building markers — shared by a marker
 // tap and either picker's 'campuschange' (see initCampusMap()).
-function flyToCampus(mapboxgl: MapboxLibrary, campus: Campus) {
+function flyToCampus(maplibregl: MapLibreLibrary, campus: Campus) {
   if (!hasCoordinates(campus)) return;
-  showBuildingMarkers(mapboxgl, campus);
+  showBuildingMarkers(maplibregl, campus);
   // `bearing: 0` resets any rotation too — see updateShifted()'s facingNorth
   // check, and moveend re-derives `shifted` once this settles.
   startFly({ center: [campus.long, campus.lat], zoom: CAMPUS_FLY_ZOOM, pitch: 55, bearing: 0 });
@@ -837,7 +851,7 @@ function flyToCampus(mapboxgl: MapboxLibrary, campus: Campus) {
 // the building markers themselves don't change (every building in the
 // campus stays visible and tappable, see the sheet's own back-button note),
 // only the camera moves.
-function flyToBuilding(_mapboxgl: MapboxLibrary, building: Building) {
+function flyToBuilding(_maplibregl: MapLibreLibrary, building: Building) {
   if (!hasCoordinates(building)) return;
   // Selecting a building auto-expands a collapsed sheet (campus-sheet.js's
   // own 'buildingpageopen' listener), running concurrently with this fly —
@@ -855,7 +869,7 @@ function flyToBuilding(_mapboxgl: MapboxLibrary, building: Building) {
 // its campus) as the sheet resizes, so the focused marker never ends up
 // hidden behind a sheet that grew out from under it.
 function followSheetResize() {
-  if (!map || !mapboxglLib || desktopMQ.matches) return;
+  if (!map || !maplibreLib || desktopMQ.matches) return;
 
   if (autoFlying) {
     // A flyTo is mid-flight (see startFly()) — its own padding was only a
@@ -894,7 +908,7 @@ function buildingLabel(b: Building) {
   return alt || `${t("building.prefix")} ${b.name}`;
 }
 
-function showCampusMarkers(mapboxgl: MapboxLibrary) {
+function showCampusMarkers(maplibregl: MapLibreLibrary) {
   if (!map) return;
   clearMarkers();
   mode = "campus";
@@ -920,18 +934,18 @@ function showCampusMarkers(mapboxgl: MapboxLibrary) {
     el.addEventListener(
       "click",
       () => {
-        flyToCampus(mapboxgl, campus);
+        flyToCampus(maplibregl, campus);
       },
       { signal: markerEvents.signal },
     );
 
     markers.push(
-      new mapboxgl.Marker({ element: el, anchor: "bottom" }).setLngLat([long, lat]).addTo(map),
+      new maplibregl.Marker({ element: el, anchor: "bottom" }).setLngLat([long, lat]).addTo(map),
     );
   }
 }
 
-function showBuildingMarkers(mapboxgl: MapboxLibrary, campus: Campus) {
+function showBuildingMarkers(maplibregl: MapLibreLibrary, campus: Campus) {
   if (!map) return;
   clearMarkers();
   mode = "buildings";
@@ -972,7 +986,7 @@ function showBuildingMarkers(mapboxgl: MapboxLibrary, campus: Campus) {
     );
 
     markers.push(
-      new mapboxgl.Marker({ element: el, anchor: "bottom" }).setLngLat([long, lat]).addTo(map),
+      new maplibregl.Marker({ element: el, anchor: "bottom" }).setLngLat([long, lat]).addTo(map),
     );
   }
 }
