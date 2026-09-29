@@ -153,7 +153,11 @@
 }
 
 .room-card__name {
+  max-width: 100%;
   padding-right: 32px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 17px;
   font-weight: 700;
   letter-spacing: -0.01em;

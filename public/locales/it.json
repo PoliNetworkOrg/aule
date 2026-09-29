@@ -1,20 +1,14 @@
 {
   "app.name": "Aule",
   "app.fullName": "PoliNetwork Aule",
-
   "header.home": "PoliNetwork Aule, home",
   "header.info": "Informazioni",
-  "header.switchLanguage": "Switch to English",
-
   "campus.label": "Campus",
+  "campus.choose": "Scegli il campus",
+  "header.language": "Lingua",
   "campus.otherCities": "Altre città",
-
   "search.label": "Cerca aule, edifici, corsi o docenti",
   "search.placeholder": "Cerca aula, edificio, corso o docente…",
-  "search.hint": "Prova:",
-  "search.example.room": "T.1.2",
-  "search.example.course": "Analisi",
-  "search.example.professor": "Rossi",
   "search.clear": "Cancella ricerca",
   "search.rooms": "Aule",
   "search.professors": "Docenti",
@@ -24,33 +18,29 @@
   "search.emptyTitle": "Nessun risultato per «{query}»",
   "search.emptyText": "Controlla l'ortografia o prova con il nome dell'aula, dell'edificio, del corso o del docente.",
   "search.loadingLessons": "Sto ancora caricando lezioni ed esami: riprova tra un attimo.",
-
   "when.title": "Quando",
   "when.day": "Giorno",
   "when.today": "Oggi",
   "when.from": "Dalle",
   "when.to": "Alle",
   "when.now": "Adesso",
-
   "filters.title": "Filtri",
-  "filters.fullyFree": "Libere per tutto l'orario",
-  "filters.sockets": "Prese elettriche",
+  "filters.fullyFree": "Sempre libere",
+  "filters.sockets": "Prese",
   "filters.accessible": "Accessibili",
   "filters.more": "Altri filtri",
-  "filters.reset": "Azzera filtri",
+  "filters.reset": "Azzera",
   "filters.resetCount": "Azzera {n} filtri",
   "filters.seats": "Posti a sedere",
   "filters.any": "Tutte",
   "filters.building": "Edificio",
-  "filters.allBuildings": "Tutti gli edifici",
+  "filters.allBuildings": "Tutti",
   "filters.equipment": "Dotazioni",
   "filters.network": "Presa di rete",
-
   "favourites.title": "Preferite",
   "favourites.empty": "Tocca ☆ su un'aula per ritrovarla qui.",
   "favourites.add": "Aggiungi {name} alle preferite",
   "favourites.remove": "Rimuovi {name} dalle preferite",
-
   "results.title": "Aule libere",
   "results.rooms": "{n} aule libere",
   "results.oneRoom": "1 aula libera",
@@ -65,23 +55,17 @@
   "results.emptyTitle": "Nessuna aula libera",
   "results.emptyText": "Prova a cambiare giorno, orario o campus.",
   "results.emptyFiltered": "Nessuna aula corrisponde ai filtri attivi in questo orario.",
-
   "status.free": "Libera",
   "status.partial": "In parte libera",
   "status.occupied": "Occupata",
-
   "building.prefix": "Edificio",
-
   "map.hint": "Tocca un edificio per vedere le aule libere",
   "map.noRooms": "Nessuna aula libera in questo edificio per l'orario scelto.",
   "map.error": "Impossibile caricare la mappa.",
-
   "data.error": "Non riesco a scaricare le occupazioni delle aule.",
   "data.retry": "Riprova",
   "data.stale": "I dati potrebbero non essere aggiornati a oggi.",
-
   "common.close": "Chiudi",
-
   "classroom.back": "Aule libere",
   "classroom.backHome": "Torna alle aule libere",
   "classroom.notFound": "Aula non trovata",
@@ -91,13 +75,11 @@
   "classroom.groundFloor": "Terra",
   "classroom.features": "Dotazioni",
   "classroom.directions": "Indicazioni",
-
   "now.free": "Libera ora",
   "now.busy": "Occupata ora",
   "now.freeUntil": "fino alle {time}",
   "now.freeFrom": "si libera alle {time}",
   "now.freeRestOfDay": "per il resto della giornata",
-
   "schedule.title": "Orario dell'aula",
   "schedule.days": "Giorni",
   "schedule.free": "Libera",
@@ -111,7 +93,6 @@
   "schedule.selected": "Lezione cercata: {range}",
   "schedule.loading": "Caricamento dell'orario…",
   "schedule.noData": "Orario non disponibile.",
-
   "features.sockets": "Prese elettriche",
   "features.network": "Presa di rete",
   "features.accessible": "Posti accessibili",
@@ -121,7 +102,6 @@
   "features.mic": "Microfono",
   "features.dimmable": "Oscurabile",
   "features.videoconf": "Videoconferenza",
-
   "info.intro": "Trova in pochi secondi un'aula libera al Politecnico di Milano per studiare, lavorare in gruppo o aspettare la prossima lezione.",
   "info.howTitle": "Come funziona",
   "info.howSearch": "Cerca un'aula, un edificio, un corso o un docente dalla barra in alto: vedi subito dove e quando si tengono le lezioni.",
@@ -138,5 +118,7 @@
   "info.creditsTitle": "Crediti",
   "info.credits": "Un progetto di <strong>PoliNetwork</strong>, basato su <a href='https://github.com/SummaCristian/PoliAule' target='_blank'>PoliAule</a> di Cristian Summa (licenza MIT).",
   "info.reportIssue": "Segnala un problema",
-  "info.disclaimer": "Progetto di studenti, non affiliato al Politecnico di Milano."
+  "info.disclaimer": "Progetto di studenti, non affiliato al Politecnico di Milano.",
+  "filters.clearMore": "Azzera questi",
+  "filters.done": "Fatto"
 }

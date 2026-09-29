@@ -1,120 +1,98 @@
 import { useSyncExternalStore } from "react";
 import { fetchJson } from "../lib/query";
-// i18n.ts — lightweight localization module
 
-const SUPPORTED = ["en", "it"];
+// Lightweight localisation. Every supported locale is loaded up front (a few KB
+// each) so that <Stable> labels can reserve the width of their longest
+// translation: switching language never resizes buttons, chips or boxes.
+
+export const LOCALES = ["it", "en"] as const;
+
+export type Locale = (typeof LOCALES)[number];
 
 const STORAGE_KEY = "poliAule_locale";
 
-let translations: Record<string, string> = {};
+const bundles = new Map<Locale, Record<string, string>>();
 
-let currentLocale = "en";
+let currentLocale: Locale = "it";
 
-let translationVersion = 0;
+let version = 0;
 
-const switchCallbacks: ((lang: string) => void)[] = [];
+const listeners = new Set<() => void>();
 
-const translationListeners = new Set<() => void>();
+function isLocale(value: string | null): value is Locale {
+  return LOCALES.some((locale) => locale === value);
+}
 
-export function onTranslationChange(listener: () => void) {
-  translationListeners.add(listener);
+function subscribe(listener: () => void) {
+  listeners.add(listener);
 
   return () => {
-    translationListeners.delete(listener);
+    listeners.delete(listener);
   };
 }
 
-function notifyTranslations() {
-  translationVersion++;
-  translationListeners.forEach((listener) => listener());
+function getVersion() {
+  return version;
+}
+
+function apply(locale: Locale) {
+  currentLocale = locale;
+  document.documentElement.lang = locale;
+  version++;
+  listeners.forEach((listener) => listener());
 }
 
 export async function initI18n() {
   const saved = localStorage.getItem(STORAGE_KEY);
   const detected = navigator.language.slice(0, 2).toLowerCase();
-  currentLocale =
-    saved !== null && SUPPORTED.includes(saved)
-      ? saved
-      : SUPPORTED.includes(detected)
-        ? detected
-        : "en";
-  await loadLocale(currentLocale);
-  notifyTranslations();
+  const initial: Locale = isLocale(saved) ? saved : isLocale(detected) ? detected : "it";
+
+  const loaded = await Promise.allSettled(
+    LOCALES.map(async (locale) => {
+      bundles.set(locale, await fetchJson<Record<string, string>>(`/locales/${locale}.json`));
+    }),
+  );
+
+  if (loaded.every((result) => result.status === "rejected"))
+    throw new Error("i18n: no locale could be loaded");
+
+  apply(bundles.has(initial) ? initial : (LOCALES.find((locale) => bundles.has(locale)) ?? "it"));
 }
 
-// Returns whether the load succeeded. On failure, deliberately leaves
-// `translations`/`currentLocale` untouched — the previous (working) locale
-// keeps rendering instead of every string falling back to its raw key.
-async function loadLocale(lang: string): Promise<boolean> {
-  try {
-    translations = await fetchJson<Record<string, string>>(`/locales/${lang}.json`);
-    currentLocale = lang;
-    document.documentElement.lang = lang;
+/** `key` in `locale`, falling back to the key itself so missing strings are visible. */
+export function translate(locale: Locale, key: string, values?: Record<string, string | number>) {
+  const text = bundles.get(locale)?.[key] ?? key;
 
-    return true;
-  } catch (e) {
-    console.warn(`i18n: failed to load locale "${lang}"`, e);
+  if (!values) return text;
 
-    return false;
-  }
-}
-
-// Synchronous key lookup — call only after initI18n() resolves.
-// Falls back to the key name itself so missing strings are visible.
-export function t(key: string) {
-  return translations[key] ?? key;
-}
-
-/** Re-renders the calling component on every language switch and returns the locale. */
-export function useLocale() {
-  useSyncExternalStore(onTranslationChange, getTranslationVersion);
-
-  return currentLocale;
-}
-
-/** Looks up `key` and replaces each `{name}` placeholder with its value. */
-export function tf(key: string, values: Record<string, string | number>) {
-  return t(key).replace(/\{(\w+)\}/g, (match, name: string) =>
+  return text.replace(/\{(\w+)\}/g, (match, name: string) =>
     name in values ? String(values[name]) : match,
   );
 }
 
-export function getTranslationVersion() {
-  return translationVersion;
+export function t(key: string) {
+  return translate(currentLocale, key);
+}
+
+/** Looks up `key` and replaces each `{name}` placeholder with its value. */
+export function tf(key: string, values: Record<string, string | number>) {
+  return translate(currentLocale, key, values);
 }
 
 export function getLocale() {
   return currentLocale;
 }
 
-// Register a callback to be invoked after every locale switch.
-// Measured view controllers rebuild their React content after a locale change.
-export function onLanguageSwitch(cb: (lang: string) => void) {
-  switchCallbacks.push(cb);
+/** Re-renders the calling component on every language switch and returns the locale. */
+export function useLocale() {
+  useSyncExternalStore(subscribe, getVersion);
 
-  return () => {
-    const index = switchCallbacks.indexOf(cb);
-
-    if (index >= 0) switchCallbacks.splice(index, 1);
-  };
+  return currentLocale;
 }
 
-// Returns whether the switch actually happened, so callers that optimistically
-// moved a UI control (see settings.tsx's changeLanguage) can put it back when
-// the locale couldn't be loaded.
-export async function setLocale(lang: string): Promise<boolean> {
-  if (!SUPPORTED.includes(lang)) return false;
+export function setLocale(locale: Locale) {
+  if (locale === currentLocale || !bundles.has(locale)) return;
 
-  if (lang === currentLocale) return true;
-  // Only persist/notify on success — a failed fetch shouldn't both wipe the
-  // working translations *and* commit the broken language as the user's
-  // saved preference (which initI18n() would then retry on every load).
-  const ok = await loadLocale(lang);
-
-  if (!ok) return false;
-  localStorage.setItem(STORAGE_KEY, lang);
-  notifyTranslations();
-  switchCallbacks.forEach((cb) => cb(lang));
-
-  return true;
+  localStorage.setItem(STORAGE_KEY, locale);
+  apply(locale);
 }

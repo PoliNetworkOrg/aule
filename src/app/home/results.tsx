@@ -14,6 +14,7 @@ import {
 import { capitalise, formatRange, parseIsoDate, romeTodayIso } from "../state/time";
 import { Icon } from "../ui/icon";
 import { RoomCard } from "./room-card";
+import { StableText } from "../ui/stable";
 
 const CampusMap = lazy(() => import("./campus-map"));
 
@@ -35,8 +36,8 @@ function ViewSwitch() {
   const view = useStore((state) => state.view);
 
   const options: { value: ResultsView; icon: string; label: string }[] = [
-    { value: "list", icon: "list-view", label: t("results.list") },
-    { value: "map", icon: "maps", label: t("results.map") },
+    { value: "list", icon: "list-view", label: "results.list" },
+    { value: "map", icon: "maps", label: "results.map" },
   ];
 
   return (
@@ -50,7 +51,7 @@ function ViewSwitch() {
           onClick={() => setView(option.value)}
         >
           <Icon name={option.icon} />
-          <span>{option.label}</span>
+          <StableText k={option.label} />
         </button>
       ))}
     </div>

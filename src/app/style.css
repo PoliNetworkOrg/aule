@@ -390,6 +390,11 @@ mark {
   color: var(--accent);
 }
 
+.chip--active {
+  border-color: var(--accent-soft-border);
+  color: var(--accent-text);
+}
+
 .chip__badge {
   display: inline-grid;
   place-items: center;
@@ -444,29 +449,13 @@ mark {
   box-shadow: var(--shadow-sm);
 }
 
-.select {
-  position: relative;
+.segmented--fill {
   display: flex;
 }
 
-.select__native {
-  width: 100%;
-  min-height: 40px;
-  padding: 0 36px 0 12px;
-  appearance: none;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-  font-size: 14px;
-}
-
-.select__chevron {
-  position: absolute;
-  right: 12px;
-  top: 50%;
-  translate: 0 -50%;
-  pointer-events: none;
-  color: var(--text-subtle);
+.segmented--fill .segmented__option {
+  flex: 1;
+  padding: 0 6px;
 }
 
 .field {
@@ -693,6 +682,160 @@ mark {
   to {
     background-position: 0 0;
   }
+}
+
+/* ---------- Stable labels: sized for the longest translation ---------- */
+
+.stable {
+  display: inline-grid;
+}
+
+.stable__text {
+  grid-area: 1 / 1;
+  text-align: inherit;
+}
+
+.stable__text--ghost {
+  visibility: hidden;
+}
+
+/* ---------- Popups: anchored panel on desktop, bottom sheet on phones ---------- */
+
+.popup-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+}
+
+.popup-backdrop {
+  position: absolute;
+  inset: 0;
+}
+
+.popup-layer--sheet .popup-backdrop {
+  background: rgb(15 23 42 / 40%);
+  animation: fade-in 0.15s ease-out;
+}
+
+.popup {
+  position: fixed;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  animation: popup-in 0.14s ease-out;
+}
+
+.popup--sheet {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-height: 80dvh;
+  border-radius: 18px 18px 0 0;
+  border-bottom: 0;
+  padding-bottom: env(safe-area-inset-bottom);
+  animation: sheet-in 0.2s ease-out;
+}
+
+.popup__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 10px 6px 16px;
+}
+
+.popup__title {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.popup__body {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px 16px 16px;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes popup-in {
+  from {
+    opacity: 0;
+    translate: 0 -4px;
+  }
+}
+
+@keyframes sheet-in {
+  from {
+    translate: 0 100%;
+  }
+}
+
+.option-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.option-list__group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.option-list__label {
+  padding: 0 10px 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-subtle);
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 6px 10px;
+  border-radius: var(--radius);
+  text-align: left;
+}
+
+.option:hover {
+  background: var(--surface-muted);
+}
+
+.option[aria-pressed="true"] {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.option__text {
+  display: flex;
+  flex-direction: column;
+}
+
+.option__label {
+  font-weight: 600;
+}
+
+.option__description {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.option__check {
+  margin-left: auto;
+  font-size: 18px;
+  color: var(--accent);
 }
 
 /* ---------- Splash (shown until translations and directory load) ---------- */

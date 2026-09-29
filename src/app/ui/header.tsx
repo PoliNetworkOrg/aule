@@ -1,70 +1,82 @@
 import { closePage } from "../../lib/navigation";
 import { leavePage, openInApp } from "../state/navigation-context";
-import { setLocale, t, useLocale } from "../i18n";
+import { useCallback, useRef, useState } from "react";
+import { LOCALES, setLocale, t, useLocale } from "../i18n";
 import { campuses } from "../state/availability";
 import { setCampus, useStore } from "../state/store";
 import { Icon } from "./icon";
+import { OptionList, Popup, type MenuGroup } from "./popup";
 
 function CampusSelect() {
   useLocale();
   const campusId = useStore((state) => state.campusId);
   const ready = useStore((state) => state.directory === "ready");
+  const trigger = useRef<HTMLButtonElement>(null);
+  const [open, setOpen] = useState(false);
+  const close = useCallback(() => setOpen(false), []);
   const list = ready ? campuses() : [];
   const current = list.find((campus) => campus.id === campusId);
-  const cities = new Map<string, typeof list>();
+  const groups = new Map<string, MenuGroup>();
 
   for (const campus of list) {
-    const city = campus.group ? (campus.city ?? "") : t("campus.otherCities");
+    const label = campus.group ? (campus.city ?? "") : t("campus.otherCities");
+    const group = groups.get(label) ?? { label, options: [] };
 
-    const group = cities.get(city) ?? [];
-
-    group.push(campus);
-    cities.set(city, group);
+    group.options.push({ value: campus.id, label: campus.name, description: campus.group });
+    groups.set(label, group);
   }
 
   return (
-    <label className="campus-select">
-      <Icon name="location-01" className="campus-select__icon" />
-      <span className="campus-select__text">
-        <span className="campus-select__label">{t("campus.label")}</span>
-        <span className="campus-select__value">{current?.name ?? "…"}</span>
-      </span>
-      <Icon name="arrow-down-01" className="campus-select__chevron" />
-      <select
-        className="campus-select__native"
-        value={campusId}
-        aria-label={t("campus.label")}
+    <>
+      <button
+        ref={trigger}
+        type="button"
+        className="campus-select"
+        aria-haspopup="dialog"
+        aria-expanded={open}
         disabled={!ready}
-        onChange={(event) => setCampus(event.target.value)}
+        onClick={() => setOpen(!open)}
       >
-        {[...cities].map(([city, group]) => (
-          <optgroup key={city} label={city}>
-            {group.map((campus) => (
-              <option key={campus.id} value={campus.id}>
-                {campus.group ? `${campus.name} · ${campus.group}` : campus.name}
-              </option>
-            ))}
-          </optgroup>
-        ))}
-      </select>
-    </label>
+        <Icon name="location-01" className="campus-select__icon" />
+        <span className="campus-select__text">
+          <span className="campus-select__label">{t("campus.label")}</span>
+          <span className="campus-select__value">{current?.name ?? "…"}</span>
+        </span>
+        <Icon name="arrow-down-01" className="campus-select__chevron" />
+      </button>
+      <Popup open={open} anchor={trigger} title={t("campus.choose")} onClose={close}>
+        <OptionList
+          groups={[...groups.values()]}
+          value={campusId}
+          onSelect={(value) => {
+            setCampus(value);
+            close();
+          }}
+        />
+      </Popup>
+    </>
   );
 }
 
 function LanguageToggle() {
   const locale = useLocale();
-  const next = locale === "it" ? "en" : "it";
 
   return (
-    <button
-      type="button"
-      className="icon-button icon-button--text"
-      aria-label={t("header.switchLanguage")}
-      title={t("header.switchLanguage")}
-      onClick={() => void setLocale(next)}
-    >
-      {next.toUpperCase()}
-    </button>
+    <div className="lang-toggle" role="group" aria-label={t("header.language")}>
+      {LOCALES.map((option) => (
+        <button
+          key={option}
+          type="button"
+          className="lang-toggle__option"
+          aria-pressed={option === locale}
+          lang={option}
+          aria-label={option === "it" ? "Italiano" : "English"}
+          onClick={() => setLocale(option)}
+        >
+          {option.toUpperCase()}
+        </button>
+      ))}
+    </div>
   );
 }
 

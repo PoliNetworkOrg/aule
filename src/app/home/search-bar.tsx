@@ -3,8 +3,6 @@ import { t, useLocale } from "../i18n";
 import { setQuery, useStore } from "../state/store";
 import { Icon } from "../ui/icon";
 
-const EXAMPLES = ["search.example.room", "search.example.course", "search.example.professor"];
-
 function isTypingTarget(target: EventTarget | null) {
   return (
     target instanceof HTMLElement &&
@@ -63,7 +61,7 @@ export function SearchBar() {
   }
 
   return (
-    <div className="search">
+    <div>
       <form
         className="search__field"
         role="search"
@@ -81,7 +79,6 @@ export function SearchBar() {
           value={draft}
           placeholder={t("search.placeholder")}
           aria-label={t("search.label")}
-          aria-describedby="search-hint"
           autoComplete="off"
           spellCheck={false}
           enterKeyHint="search"
@@ -108,22 +105,6 @@ export function SearchBar() {
           </kbd>
         )}
       </form>
-      <p className="search__hint" id="search-hint">
-        <span>{t("search.hint")}</span>
-        {EXAMPLES.map((key) => (
-          <button
-            key={key}
-            type="button"
-            className="search__example"
-            onClick={() => {
-              setDraft(t(key));
-              setQuery(t(key));
-            }}
-          >
-            {t(key)}
-          </button>
-        ))}
-      </p>
     </div>
   );
 }

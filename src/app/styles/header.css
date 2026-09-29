@@ -59,8 +59,10 @@
   align-items: center;
   gap: 8px;
   min-width: 0;
+  width: 168px;
   height: 40px;
-  padding: 0 10px 0 10px;
+  padding: 0 10px;
+  text-align: left;
   margin-right: 4px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -69,13 +71,8 @@
 }
 
 .campus-select:hover,
-.campus-select:focus-within {
-  border-color: var(--accent-soft-border);
-}
-
-.campus-select:focus-within {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+.campus-select[aria-expanded="true"] {
+  border-color: var(--accent);
 }
 
 .campus-select__icon {
@@ -107,17 +104,45 @@
 }
 
 .campus-select__chevron {
+  margin-left: auto;
   color: var(--text-subtle);
 }
 
-/* The native select covers the whole pill: native picker on phones, keyboard support everywhere. */
-.campus-select__native {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  opacity: 0;
-  cursor: pointer;
-  appearance: none;
+.lang-toggle {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+}
+
+.lang-toggle__option {
+  width: 34px;
+  height: 28px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  transition:
+    background-color 0.15s,
+    color 0.15s;
+}
+
+.lang-toggle__option:hover {
+  color: var(--text);
+}
+
+.lang-toggle__option[aria-pressed="true"] {
+  background: var(--surface);
+  color: var(--accent-text);
+  box-shadow: var(--shadow-sm);
+}
+
+@media (max-width: 419px) {
+  .brand__product {
+    display: none;
+  }
 }
 
 @media (max-width: 479px) {
@@ -130,7 +155,15 @@
     font-weight: 700;
   }
 
+  .campus-select {
+    width: 160px;
+  }
+
   .campus-select__label {
     display: none;
+  }
+
+  .app-header__inner {
+    gap: 8px;
   }
 }

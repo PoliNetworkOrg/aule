@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { t, tf, useLocale } from "../i18n";
 import { findCampus } from "../state/availability";
 import {
   countActiveFilters,
   countAdvancedFilters,
+  DEFAULT_FILTERS,
   resetFilters,
   setFilters,
   useStore,
@@ -11,6 +12,8 @@ import {
   type SeatsFilter,
 } from "../state/store";
 import { Icon } from "../ui/icon";
+import { Popup } from "../ui/popup";
+import { StableText } from "../ui/stable";
 
 const SEAT_OPTIONS: SeatsFilter[] = [0, 30, 60, 100, 200];
 
@@ -28,20 +31,21 @@ function ToggleChip({
   return (
     <button type="button" className="chip" aria-pressed={active} onClick={onToggle}>
       <Icon name={active ? "checkmark-circle-02" : icon} />
-      {label}
+      <StableText k={label} />
     </button>
   );
 }
 
-function MoreFilters({ filters }: { filters: FilterState }) {
+function MoreFilters({ filters, onDone }: { filters: FilterState; onDone: () => void }) {
+  useLocale();
   const campusId = useStore((state) => state.campusId);
   const buildings = findCampus(campusId)?.buildings ?? [];
 
   return (
-    <div className="more-filters" id="more-filters">
+    <div className="more-filters">
       <fieldset className="field">
         <legend className="field__label">{t("filters.seats")}</legend>
-        <div className="segmented" role="group" aria-label={t("filters.seats")}>
+        <div className="segmented segmented--fill" role="group" aria-label={t("filters.seats")}>
           {SEAT_OPTIONS.map((seats) => (
             <button
               key={seats}
@@ -50,31 +54,40 @@ function MoreFilters({ filters }: { filters: FilterState }) {
               className="segmented__option"
               onClick={() => setFilters({ minSeats: seats })}
             >
-              {seats ? `${seats}+` : t("filters.any")}
+              {seats ? `${seats}+` : <StableText k="filters.any" />}
             </button>
           ))}
         </div>
       </fieldset>
 
-      <label className="field">
-        <span className="field__label">{t("filters.building")}</span>
-        <span className="select">
-          <select
-            className="select__native"
-            value={filters.building}
-            onChange={(event) => setFilters({ building: event.target.value })}
+      <fieldset className="field">
+        <legend className="field__label">{t("filters.building")}</legend>
+        <div className="choice-grid" role="group" aria-label={t("filters.building")}>
+          <button
+            type="button"
+            className="choice choice--wide"
+            aria-pressed={filters.building === ""}
+            onClick={() => setFilters({ building: "" })}
           >
-            <option value="">{t("filters.allBuildings")}</option>
-            {buildings.map((building) => (
-              <option key={building.name} value={building.name}>
-                {t("building.prefix")} {building.name}
-                {building.altName ? ` · ${building.altName}` : ""}
-              </option>
-            ))}
-          </select>
-          <Icon name="arrow-down-01" className="select__chevron" />
-        </span>
-      </label>
+            <StableText k="filters.allBuildings" />
+          </button>
+          {buildings.map((building) => (
+            <button
+              key={building.name}
+              type="button"
+              className="choice"
+              aria-pressed={filters.building === building.name}
+              aria-label={`${t("building.prefix")} ${building.name}`}
+              title={building.altName || undefined}
+              onClick={() =>
+                setFilters({ building: filters.building === building.name ? "" : building.name })
+              }
+            >
+              {building.name}
+            </button>
+          ))}
+        </div>
+      </fieldset>
 
       <fieldset className="field">
         <legend className="field__label">{t("filters.equipment")}</legend>
@@ -82,11 +95,31 @@ function MoreFilters({ filters }: { filters: FilterState }) {
           <ToggleChip
             active={filters.network}
             icon="cable"
-            label={t("filters.network")}
+            label="filters.network"
             onToggle={() => setFilters({ network: !filters.network })}
           />
         </div>
       </fieldset>
+
+      <div className="more-filters__actions">
+        <button
+          type="button"
+          className="button button--ghost"
+          disabled={countAdvancedFilters(filters) === 0}
+          onClick={() =>
+            setFilters({
+              minSeats: DEFAULT_FILTERS.minSeats,
+              building: DEFAULT_FILTERS.building,
+              network: DEFAULT_FILTERS.network,
+            })
+          }
+        >
+          <StableText k="filters.clearMore" />
+        </button>
+        <button type="button" className="button button--primary" onClick={onDone}>
+          <StableText k="filters.done" />
+        </button>
+      </div>
     </div>
   );
 }
@@ -94,7 +127,9 @@ function MoreFilters({ filters }: { filters: FilterState }) {
 export function Filters() {
   useLocale();
   const filters = useStore((state) => state.filters);
-  const [open, setOpen] = useState(() => countAdvancedFilters(filters) > 0);
+  const [open, setOpen] = useState(false);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const close = useCallback(() => setOpen(false), []);
   const advanced = countAdvancedFilters(filters);
   const active = countActiveFilters(filters);
 
@@ -104,30 +139,31 @@ export function Filters() {
         <ToggleChip
           active={filters.fullyFree}
           icon="time-quarter-pass"
-          label={t("filters.fullyFree")}
+          label="filters.fullyFree"
           onToggle={() => setFilters({ fullyFree: !filters.fullyFree })}
         />
         <ToggleChip
           active={filters.sockets}
           icon="plug-socket"
-          label={t("filters.sockets")}
+          label="filters.sockets"
           onToggle={() => setFilters({ sockets: !filters.sockets })}
         />
         <ToggleChip
           active={filters.accessible}
           icon="wheelchair"
-          label={t("filters.accessible")}
+          label="filters.accessible"
           onToggle={() => setFilters({ accessible: !filters.accessible })}
         />
         <button
+          ref={trigger}
           type="button"
-          className="chip"
+          className={`chip${advanced > 0 ? " chip--active" : ""}`}
+          aria-haspopup="dialog"
           aria-expanded={open}
-          aria-controls="more-filters"
           onClick={() => setOpen(!open)}
         >
           <Icon name="filter-horizontal" />
-          {t("filters.more")}
+          <StableText k="filters.more" />
           {advanced > 0 && <span className="chip__badge">{advanced}</span>}
         </button>
         {active > 0 && (
@@ -137,11 +173,14 @@ export function Filters() {
             aria-label={tf("filters.resetCount", { n: active })}
             onClick={resetFilters}
           >
-            {t("filters.reset")}
+            <Icon name="cancel-01" />
+            <StableText k="filters.reset" />
           </button>
         )}
       </div>
-      {open && <MoreFilters filters={filters} />}
+      <Popup open={open} anchor={trigger} title={t("filters.more")} onClose={close} minWidth={340}>
+        <MoreFilters filters={filters} onDone={close} />
+      </Popup>
     </div>
   );
 }

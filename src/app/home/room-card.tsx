@@ -94,7 +94,9 @@ export function RoomCard({
         className="room-card__main"
         onClick={() => entry && openClassroom(entry, { date, from, to, highlight: false })}
       >
-        <span className="room-card__name">{room.name}</span>
+        <span className="room-card__name" title={room.name}>
+          {room.name}
+        </span>
         <span className="room-card__meta">
           {room.seats ? (
             <span>

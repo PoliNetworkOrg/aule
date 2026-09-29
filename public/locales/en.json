@@ -1,20 +1,14 @@
 {
   "app.name": "Aule",
   "app.fullName": "PoliNetwork Aule",
-
   "header.home": "PoliNetwork Aule, home",
   "header.info": "About",
-  "header.switchLanguage": "Passa all'italiano",
-
   "campus.label": "Campus",
+  "campus.choose": "Choose a campus",
+  "header.language": "Language",
   "campus.otherCities": "Other cities",
-
   "search.label": "Search rooms, buildings, courses or professors",
   "search.placeholder": "Search a room, building, course or professor…",
-  "search.hint": "Try:",
-  "search.example.room": "T.1.2",
-  "search.example.course": "Analisi",
-  "search.example.professor": "Rossi",
   "search.clear": "Clear search",
   "search.rooms": "Rooms",
   "search.professors": "Professors",
@@ -24,33 +18,29 @@
   "search.emptyTitle": "No results for “{query}”",
   "search.emptyText": "Check the spelling or try a room, building, course or professor name.",
   "search.loadingLessons": "Lessons and exams are still loading: try again in a moment.",
-
   "when.title": "When",
   "when.day": "Day",
   "when.today": "Today",
   "when.from": "From",
   "when.to": "To",
   "when.now": "Now",
-
   "filters.title": "Filters",
-  "filters.fullyFree": "Free the whole time",
-  "filters.sockets": "Power sockets",
+  "filters.fullyFree": "Free throughout",
+  "filters.sockets": "Sockets",
   "filters.accessible": "Accessible",
   "filters.more": "More filters",
-  "filters.reset": "Clear filters",
+  "filters.reset": "Clear",
   "filters.resetCount": "Clear {n} filters",
   "filters.seats": "Seats",
   "filters.any": "Any",
   "filters.building": "Building",
-  "filters.allBuildings": "All buildings",
+  "filters.allBuildings": "All",
   "filters.equipment": "Equipment",
   "filters.network": "Network socket",
-
   "favourites.title": "Favourites",
   "favourites.empty": "Tap ☆ on a room to keep it here.",
   "favourites.add": "Add {name} to favourites",
   "favourites.remove": "Remove {name} from favourites",
-
   "results.title": "Free rooms",
   "results.rooms": "{n} free rooms",
   "results.oneRoom": "1 free room",
@@ -65,23 +55,17 @@
   "results.emptyTitle": "No free rooms",
   "results.emptyText": "Try another day, time or campus.",
   "results.emptyFiltered": "No room matches the active filters at this time.",
-
   "status.free": "Free",
   "status.partial": "Partly free",
   "status.occupied": "Occupied",
-
   "building.prefix": "Building",
-
   "map.hint": "Tap a building to see its free rooms",
   "map.noRooms": "No free rooms in this building at the chosen time.",
   "map.error": "Couldn't load the map.",
-
   "data.error": "Couldn't download room occupancy.",
   "data.retry": "Retry",
   "data.stale": "Data may not be up to date for today.",
-
   "common.close": "Close",
-
   "classroom.back": "Free rooms",
   "classroom.backHome": "Back to free rooms",
   "classroom.notFound": "Room not found",
@@ -91,13 +75,11 @@
   "classroom.groundFloor": "Ground",
   "classroom.features": "Equipment",
   "classroom.directions": "Directions",
-
   "now.free": "Free now",
   "now.busy": "Occupied now",
   "now.freeUntil": "until {time}",
   "now.freeFrom": "free from {time}",
   "now.freeRestOfDay": "for the rest of the day",
-
   "schedule.title": "Room schedule",
   "schedule.days": "Days",
   "schedule.free": "Free",
@@ -111,7 +93,6 @@
   "schedule.selected": "Searched session: {range}",
   "schedule.loading": "Loading schedule…",
   "schedule.noData": "Schedule not available.",
-
   "features.sockets": "Power sockets",
   "features.network": "Network socket",
   "features.accessible": "Accessible seats",
@@ -121,7 +102,6 @@
   "features.mic": "Microphone",
   "features.dimmable": "Dimmable",
   "features.videoconf": "Videoconference",
-
   "info.intro": "Find a free room at Politecnico di Milano in seconds, to study, work in a group or wait for your next lesson.",
   "info.howTitle": "How it works",
   "info.howSearch": "Search a room, building, course or professor from the top bar to see where and when lessons take place.",
@@ -138,5 +118,7 @@
   "info.creditsTitle": "Credits",
   "info.credits": "A <strong>PoliNetwork</strong> project, based on <a href='https://github.com/SummaCristian/PoliAule' target='_blank'>PoliAule</a> by Cristian Summa (MIT licence).",
   "info.reportIssue": "Report an issue",
-  "info.disclaimer": "A student project, not affiliated with Politecnico di Milano."
+  "info.disclaimer": "A student project, not affiliated with Politecnico di Milano.",
+  "filters.clearMore": "Clear these",
+  "filters.done": "Done"
 }
