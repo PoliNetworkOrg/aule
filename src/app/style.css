@@ -192,11 +192,11 @@ img {
   max-width: 100%;
 }
 
+/* Search matches: accent-coloured and bold, no box (it clashed with chips and links). */
 mark {
-  background: color-mix(in srgb, var(--blue-300) 40%, transparent);
-  color: inherit;
-  border-radius: 3px;
-  padding: 0 1px;
+  background: none;
+  color: var(--accent-text);
+  font-weight: 700;
 }
 
 [hidden] {
