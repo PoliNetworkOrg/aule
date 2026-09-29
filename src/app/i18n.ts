@@ -1,3 +1,4 @@
+import { useSyncExternalStore } from "react";
 import { fetchJson } from "../lib/query";
 // i18n.ts — lightweight localization module
 
@@ -64,10 +65,18 @@ export function t(key: string) {
   return translations[key] ?? key;
 }
 
-export function animateI18nElement(el: HTMLElement) {
-  el.classList.remove("i18n-animate");
-  void el.offsetWidth; // force reflow — restarts animation on repeated switches
-  el.classList.add("i18n-animate");
+/** Re-renders the calling component on every language switch and returns the locale. */
+export function useLocale() {
+  useSyncExternalStore(onTranslationChange, getTranslationVersion);
+
+  return currentLocale;
+}
+
+/** Looks up `key` and replaces each `{name}` placeholder with its value. */
+export function tf(key: string, values: Record<string, string | number>) {
+  return t(key).replace(/\{(\w+)\}/g, (match, name: string) =>
+    name in values ? String(values[name]) : match,
+  );
 }
 
 export function getTranslationVersion() {

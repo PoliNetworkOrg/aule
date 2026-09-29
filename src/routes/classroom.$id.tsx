@@ -1,10 +1,13 @@
+import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { ApplicationRoute } from "../Application";
+import { ClassroomPage } from "../app/classroom/classroom-page";
+import { takeClassroomContext } from "../app/state/navigation-context";
 
-function ClassroomPage() {
+function ClassroomById() {
   const { id } = Route.useParams();
+  const [context] = useState(takeClassroomContext);
 
-  return <ApplicationRoute page="classroom" id={id} />;
+  return <ClassroomPage key={id} id={id} context={context} />;
 }
 
-export const Route = createFileRoute("/classroom/$id")({ component: ClassroomPage });
+export const Route = createFileRoute("/classroom/$id")({ component: ClassroomById });
