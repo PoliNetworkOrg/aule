@@ -40,7 +40,14 @@ export function Header({ page }: { page: "home" | "classroom" | "info" }) {
             closePage();
           }}
         >
-          <img className="brand__logo" src="/brand/logo.svg" alt="" width="40" height="40" />
+          <img
+            className="brand__logo"
+            src="/brand/logo-40.png"
+            srcSet="/brand/logo-40.png 1x, /brand/logo-80.png 2x, /brand/logo-120.png 3x"
+            alt=""
+            width="40"
+            height="40"
+          />
           <span className="brand__name">PoliNetwork</span>
           <span className="brand__product">{t("app.name")}</span>
         </a>
