@@ -138,17 +138,24 @@ export function DateStrip() {
 function TimePickerButton({
   field,
   value,
+  after,
   onChange,
 }: {
   field: "from" | "to";
   value: string;
+  /** Only offer times after this one (the end must follow the start). */
+  after?: string;
   onChange: (value: string) => void;
 }) {
   useLocale();
   const trigger = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   const close = useCallback(() => setOpen(false), []);
-  const options = field === "from" ? TIME_OPTIONS.slice(0, -1) : TIME_OPTIONS.slice(1);
+
+  const options = (field === "from" ? TIME_OPTIONS.slice(0, -1) : TIME_OPTIONS.slice(1)).filter(
+    (option) => !after || option > after,
+  );
+
   const key = field === "from" ? "when.from" : "when.to";
 
   return (
