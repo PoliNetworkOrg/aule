@@ -1,4 +1,4 @@
-import type { Building, OccupancyDay, OpeningHours } from "./types";
+import type { Building, HolidayPeriod, OccupancyDay, OpeningHours } from "./types";
 import { fetchJson } from "../lib/query";
 import { getApiBase } from "./config.ts";
 
@@ -75,6 +75,22 @@ export function romeMinutesOfDay() {
 // one entry per day inside the array, starting with 0 = today.
 export const classroomsData: OccupancyDay[] = [];
 
+// The last opening hours that loaded. Holiday closures apply to every building
+// at once, so they live here rather than on building.hours; kept between
+// reloads so a failed refresh doesn't make every building look open again.
+let lastOpeningHours: OpeningHours | null = null;
+
+let holidayPeriods: HolidayPeriod[] = [];
+
+/** False until /v1/opening-hours has loaded once: closures are then unknown, not absent. */
+export function hasOpeningHours() {
+  return lastOpeningHours !== null;
+}
+
+export function getHolidayPeriods() {
+  return holidayPeriods;
+}
+
 // Day of the week to skip. If one of the next 7 days is a
 // day listed here, skip to the next day.
 // This mirrors what happens in the backend.
@@ -106,6 +122,18 @@ function resolveBuildingHours(building: Building, campusId: string, openingHours
   return openingHours.default_hours;
 }
 
+// Stamps every building of `days` with its resolved hours and remembers the
+// holiday periods.
+export function applyOpeningHours(days: OccupancyDay[], openingHours: OpeningHours) {
+  lastOpeningHours = openingHours;
+  holidayPeriods = openingHours.holiday_periods ?? [];
+
+  for (const day of days)
+    for (const campus of day.campuses)
+      for (const building of campus.buildings)
+        building.hours = resolveBuildingHours(building, campus.id, openingHours);
+}
+
 // Fetches the classrooms data from the server and
 // stores it in classroomsData.
 export async function fetchClassroomsData() {
@@ -130,15 +158,11 @@ export async function fetchClassroomsData() {
       }),
     ]);
 
-    if (openingHours) {
-      for (const day of results) {
-        for (const campus of day.campuses) {
-          for (const building of campus.buildings) {
-            building.hours = resolveBuildingHours(building, campus.id, openingHours);
-          }
-        }
-      }
-    }
+    // A failed refresh keeps the hours we already had; only a first-ever failure
+    // leaves buildings without hours (see hasOpeningHours).
+    const knownHours = openingHours ?? lastOpeningHours;
+
+    if (knownHours) applyOpeningHours(results, knownHours);
 
     // Merge per date rather than replacing the array wholesale: a partial
     // outage (some per-date fetches rejected, others fine) would otherwise

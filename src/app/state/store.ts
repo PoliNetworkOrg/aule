@@ -36,6 +36,8 @@ export interface Filters {
 export interface AppState {
   directory: LoadStatus;
   occupancy: LoadStatus;
+  /** False when /v1/opening-hours never loaded: closed buildings can't be told apart. */
+  openingHours: boolean;
   /** Bumped whenever occupancy data is (re)loaded, so derived data recomputes. */
   dataRevision: number;
   generatedAt: Date | null;
@@ -125,6 +127,7 @@ const initialWindow = defaultWindow(false);
 let state: AppState = {
   directory: "loading",
   occupancy: "loading",
+  openingHours: true,
   dataRevision: 0,
   generatedAt: null,
   campusId: readInitialCampus(),

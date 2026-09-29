@@ -5,12 +5,12 @@ import { t, tf, useLocale } from "../i18n";
 import {
   findClassroom,
   findClassroomBySlug,
-  roomOccupancy,
+  roomNowStatus,
   type ClassroomEntry,
 } from "../state/availability";
 import { leavePage, type ClassroomContext } from "../state/navigation-context";
 import { useStore } from "../state/store";
-import { DAY_END, DAY_START, formatTime, fromMinutes, romeTodayIso } from "../state/time";
+import { formatTime, romeTodayIso } from "../state/time";
 import { fetchPhotoUrl } from "../utils/photo";
 import { FavouriteButton } from "../home/room-card";
 import { Icon } from "../ui/icon";
@@ -35,7 +35,7 @@ function useEntry(id?: string, campus?: string, name?: string) {
   return campus && name ? findClassroomBySlug(campus, name) : null;
 }
 
-/** "Free now, until 14:15" / "Occupied now, free from 13:15" for today. */
+/** "Free now, until 14:15" / "Occupied now, free from 13:15" / "Closed now, opens at 8:00" for today. */
 function NowStatus({ entry }: { entry: ClassroomEntry }) {
   useLocale();
   useStore((state) => state.dataRevision);
@@ -48,33 +48,19 @@ function NowStatus({ entry }: { entry: ClassroomEntry }) {
     return () => window.clearInterval(timer);
   }, []);
 
-  const occupancy = roomOccupancy(entry.room.id, romeTodayIso());
-  const now = formatRomeHHMM(new Date());
+  const status = roomNowStatus(entry.room.id, romeTodayIso(), formatRomeHHMM(new Date()));
 
-  if (!occupancy || now < fromMinutes(DAY_START) || now >= fromMinutes(DAY_END)) return null;
-
-  const sorted = [...occupancy].sort((a, b) => a.inizio.localeCompare(b.inizio));
-  const busy = sorted.some((slot) => slot.inizio <= now && slot.fine > now);
-  let detail: string;
-
-  if (busy) {
-    // Back-to-back lessons count as one busy stretch.
-    let end = now;
-
-    for (const slot of sorted) if (slot.inizio <= end && slot.fine > end) end = slot.fine;
-
-    detail = tf("now.freeFrom", { time: formatTime(end) });
-  } else {
-    const next = sorted.find((slot) => slot.inizio > now);
-
-    detail = next ? tf("now.freeUntil", { time: formatTime(next.inizio) }) : t("now.freeRestOfDay");
-  }
+  if (!status) return null;
 
   return (
-    <p className={`now-status now-status--${busy ? "busy" : "free"}`}>
+    <p className={`now-status now-status--${status.state}`}>
       <span className="status-dot" aria-hidden="true" />
-      <strong>{t(busy ? "now.busy" : "now.free")}</strong>
-      <span>{detail}</span>
+      <strong>{t(`now.${status.state}`)}</strong>
+      {status.detail && (
+        <span>
+          {tf(`now.${status.detail}`, { time: status.time ? formatTime(status.time) : "" })}
+        </span>
+      )}
     </p>
   );
 }

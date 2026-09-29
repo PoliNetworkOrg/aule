@@ -50,6 +50,8 @@ export function StatusTag({
 }) {
   useLocale();
 
+  if (status === "closed") return <span className="tag tag--closed">{t("status.closed")}</span>;
+
   if (status === "occupied")
     return <span className="tag tag--occupied">{t("status.occupied")}</span>;
 

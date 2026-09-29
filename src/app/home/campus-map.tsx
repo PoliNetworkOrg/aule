@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { t, tf, useLocale } from "../i18n";
 import { isNumber } from "../../lib/guards";
 import type { BuildingAvailability } from "../state/availability";
-import { findCampus } from "../state/availability";
+import { closedBuildings, findCampus } from "../state/availability";
 import { setMapBuilding, useStore } from "../state/store";
 import type { Building } from "../types";
 import type { Map as MapLibreMap, Marker as MapLibreMarker } from "maplibre-gl";
@@ -118,7 +118,9 @@ function BuildingPanel({
   const date = useStore((state) => state.date);
   const from = useStore((state) => state.from);
   const to = useStore((state) => state.to);
+  const campusId = useStore((state) => state.campusId);
   const rooms = group?.rooms ?? [];
+  const closed = !!date && closedBuildings(campusId, date, from, to).has(building.name);
 
   return (
     <aside className="map-panel" aria-label={`${t("building.prefix")} ${building.name}`}>
@@ -128,9 +130,11 @@ function BuildingPanel({
             {t("building.prefix")} {building.name}
           </h3>
           <p className="map-panel__subtitle">
-            {tf(rooms.length === 1 ? "results.oneAvailable" : "results.available", {
-              n: rooms.length,
-            })}
+            {closed
+              ? t("map.closed")
+              : tf(rooms.length === 1 ? "results.oneAvailable" : "results.available", {
+                  n: rooms.length,
+                })}
             {building.address ? ` · ${building.address}` : ""}
           </p>
         </div>
@@ -150,7 +154,7 @@ function BuildingPanel({
           ))}
         </ul>
       ) : (
-        <p className="map-panel__empty">{t("map.noRooms")}</p>
+        <p className="map-panel__empty">{t(closed ? "map.closedNote" : "map.noRooms")}</p>
       )}
     </aside>
   );
@@ -166,6 +170,9 @@ export default function CampusMap({ results }: { results: BuildingAvailability[]
   const [error, setError] = useState(false);
   const campusId = useStore((state) => state.campusId);
   const selected = useStore((state) => state.mapBuilding);
+  const date = useStore((state) => state.date);
+  const from = useStore((state) => state.from);
+  const to = useStore((state) => state.to);
   const campus = findCampus(campusId);
   const selectedBuilding = campus?.buildings.find((building) => building.name === selected) ?? null;
 
@@ -271,6 +278,8 @@ export default function CampusMap({ results }: { results: BuildingAvailability[]
     markers.current.forEach((marker) => marker.remove());
     markers.current = [];
 
+    const closed = date ? closedBuildings(campus.id, date, from, to) : new Set<string>();
+
     for (const building of campus.buildings) {
       if (!hasCoordinates(building)) continue;
 
@@ -281,12 +290,17 @@ export default function CampusMap({ results }: { results: BuildingAvailability[]
       const label = document.createElement("span");
       const count = document.createElement("span");
 
+      const isClosed = closed.has(building.name);
+
       element.type = "button";
-      element.className = `map-marker${free ? "" : " map-marker--none"}${building.name === selected ? " map-marker--selected" : ""}`;
+      element.className = `map-marker${free ? "" : " map-marker--none"}${isClosed ? " map-marker--closed" : ""}${building.name === selected ? " map-marker--selected" : ""}`;
       element.setAttribute(
         "aria-label",
-        `${t("building.prefix")} ${building.name}: ${tf("results.available", { n: free })}`,
+        `${t("building.prefix")} ${building.name}: ${isClosed ? t("map.closed") : tf("results.available", { n: free })}`,
       );
+
+      if (isClosed) element.title = t("map.closed");
+
       label.className = "map-marker__label";
       label.textContent = building.altName || building.name;
       count.className = "map-marker__count";
@@ -301,7 +315,7 @@ export default function CampusMap({ results }: { results: BuildingAvailability[]
           .addTo(map),
       );
     }
-  }, [library, campus, results, selected]);
+  }, [library, campus, results, selected, date, from, to]);
 
   return (
     <div className={`campus-map${selectedBuilding ? " campus-map--panel" : ""}`}>

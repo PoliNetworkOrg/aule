@@ -1,4 +1,8 @@
-import { classroomsData as occupancyDays, fetchClassroomsData } from "./available-rooms-script";
+import {
+  classroomsData as occupancyDays,
+  fetchClassroomsData,
+  hasOpeningHours,
+} from "./available-rooms-script";
 import { ensureClassroomDirectory } from "./classroom-search-data";
 import { initI18n } from "./i18n";
 import { availableDates, findCampus, campuses } from "./state/availability";
@@ -79,6 +83,7 @@ function applyOccupancy() {
     ...patch,
     date,
     occupancy: dates.length ? "ready" : "error",
+    openingHours: hasOpeningHours(),
     generatedAt: oldestGeneratedAt(),
     dataRevision: readState().dataRevision + 1,
   });

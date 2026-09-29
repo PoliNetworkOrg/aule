@@ -11,6 +11,7 @@
     "lint": "oxlint --max-warnings 0 && oxfmt --check",
     "lint:fix": "oxlint --fix && oxfmt --write",
     "format": "oxfmt --write",
+    "test": "vp test run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

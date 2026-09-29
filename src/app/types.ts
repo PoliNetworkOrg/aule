@@ -62,8 +62,15 @@ export interface OccupancyDay {
   campuses: Campus<Classroom & { occupancy: Occupation[] }>[];
 }
 
+export interface HolidayPeriod {
+  /** Inclusive ISO dates, "YYYY-MM-DD". */
+  start: string;
+  end: string;
+}
+
 export interface OpeningHours {
   buildings: Record<string, BuildingHours>;
   campus_defaults: Record<string, BuildingHours>;
   default_hours: BuildingHours;
+  holiday_periods?: HolidayPeriod[];
 }

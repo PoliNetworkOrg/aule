@@ -3,6 +3,7 @@ import { formatRomeYYYYMMDD } from "../available-rooms-script";
 import { reloadOccupancy } from "../boot";
 import { t, tf, useLocale } from "../i18n";
 import {
+  campusClosed,
   countRooms,
   filterImpact,
   findAvailability,
@@ -135,6 +136,7 @@ function Summary({ results }: { results: BuildingAvailability[] }) {
 function DataNotice() {
   const generatedAt = useStore((state) => state.generatedAt);
   const occupancy = useStore((state) => state.occupancy);
+  const openingHours = useStore((state) => state.openingHours);
 
   if (occupancy === "error")
     return (
@@ -156,6 +158,23 @@ function DataNotice() {
       <div className="notice notice--warning">
         <Icon name="alert-02" />
         <span>{t("data.stale")}</span>
+      </div>
+    );
+
+  // Occupancy loaded but opening hours did not: rooms are listed as if every
+  // building were open, so say so and let the user retry.
+  if (occupancy === "ready" && !openingHours)
+    return (
+      <div className="notice notice--warning">
+        <Icon name="alert-02" />
+        <span>{t("data.hoursUnavailable")}</span>
+        <button
+          type="button"
+          className="button button--ghost"
+          onClick={() => void reloadOccupancy()}
+        >
+          {t("data.retry")}
+        </button>
       </div>
     );
 
@@ -284,7 +303,12 @@ function ResultsList({
 }) {
   const occupancy = useStore((state) => state.occupancy);
   const filters = useStore((state) => state.filters);
+  const campusId = useStore((state) => state.campusId);
+  const date = useStore((state) => state.date);
+  const from = useStore((state) => state.from);
+  const to = useStore((state) => state.to);
   const shown = countRooms(results);
+  const allClosed = !!date && campusClosed(campusId, date, from, to);
 
   if (occupancy === "loading" && !all.length)
     return (
@@ -310,9 +334,15 @@ function ResultsList({
       ) : (
         <div className="empty-state">
           <Icon name="door-01" className="empty-state__icon" />
-          <p className="empty-state__title">{t("results.emptyTitle")}</p>
+          <p className="empty-state__title">
+            {t(allClosed ? "results.closedTitle" : "results.emptyTitle")}
+          </p>
           <p className="empty-state__text">
-            {countActiveFilters(filters) ? t("results.emptyFiltered") : t("results.emptyText")}
+            {allClosed
+              ? t("results.closedText")
+              : countActiveFilters(filters)
+                ? t("results.emptyFiltered")
+                : t("results.emptyText")}
           </p>
           {countActiveFilters(filters) > 0 && (
             <button type="button" className="button button--ghost" onClick={resetFilters}>
