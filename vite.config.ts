@@ -49,4 +49,8 @@ export default defineConfig(({ mode }) => ({
     target: "es2020",
     cssCodeSplit: false,
   },
+  test: {
+    // The API worker has its own node:test suite.
+    exclude: ["**/node_modules/**", "workers/**"],
+  },
 }));
