@@ -15,13 +15,13 @@ pnpm lint
 
 `pnpm preview` serves the production build. `pnpm build:beta` uses the beta API preconnect with the same branding as the production build. `pnpm lint:fix` applies Oxlint fixes and Oxfmt formatting; `pnpm format` only formats. Build includes TypeScript checking. There is no new test suite: upstream has no application tests to port.
 
-The frontend uses the existing hosted APIs. Production hosts use the stable backend; other hosts default to beta and expose a switch on the info page. The 3D map gets its public Mapbox token from `/v1/config`. Google Fonts (DM Sans), Mapbox resources and classroom photos are the only third-party requests.
+The frontend uses the existing hosted APIs. Production hosts use the stable backend; other hosts default to beta and expose a switch on the info page. The 3D campus map renders with MapLibre GL JS over OpenFreeMap's keyless vector tiles (no token or usage caps). Google Fonts (DM Sans), OpenFreeMap tiles and classroom photos are the only third-party requests.
 
 ## Structure
 
 - `src/routes/` — TanStack file routes. The root layout renders the header and keeps the home mounted (hidden) under the classroom and info pages, so its inputs and scroll position survive a round trip.
 - `src/app/state/` — the home store (campus, day, time window, filters, query, view), time helpers (Europe/Rome, 07:15–20:15 grid), availability queries and navigation context.
-- `src/app/home/` — search bar and results, date strip, time range, filters, favourites, results list and the lazily loaded 3D campus map (Mapbox GL, token from `/v1/config`).
+- `src/app/home/` — search bar and results, date strip, time range, filters, favourites, results list and the lazily loaded 3D campus map (MapLibre GL over OpenFreeMap).
 - `src/app/classroom/` — classroom page and its schedule (day tabs, day bar, agenda of busy/free intervals).
 - `src/app/info/` — about/data page; on non-production hosts it also exposes the beta-backend switch.
 - `src/app/style.css` holds the design tokens (DM Sans, slate neutrals, PoliNetwork blue, dark mode) and shared controls; `src/app/styles/` the per-area styles. Plain CSS, no glass effects.

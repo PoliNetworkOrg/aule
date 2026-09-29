@@ -1,21 +1,31 @@
 import { useEffect, useRef, useState } from "react";
-import { getMapboxToken } from "../config";
 import { t, tf, useLocale } from "../i18n";
 import { isNumber } from "../../lib/guards";
 import type { BuildingAvailability } from "../state/availability";
 import { findCampus } from "../state/availability";
 import { setMapBuilding, useStore } from "../state/store";
 import type { Building } from "../types";
-import type { LngLat, MapboxLibrary, MapboxMap, MapboxMarker } from "./mapbox";
+import type { Map as MapLibreMap, Marker as MapLibreMarker } from "maplibre-gl";
 import { Icon } from "../ui/icon";
 import { getTheme, useTheme } from "../theme";
+import { DARK_THEME, LIGHT_THEME, themedStyle } from "./map-theme";
 import { RoomCard } from "./room-card";
 
-// The campus in 3D (Mapbox Standard), shown in place of the results list. Each
+type MapLibreLibrary = typeof import("maplibre-gl");
+
+type LngLat = [number, number];
+
+// The campus in 3D (MapLibre over OpenFreeMap), shown in place of the results list. Each
 // building gets a marker with its number of free rooms for the current search;
 // picking one lists those rooms in a panel next to (or, on phones, under) the map.
 
-const MAPBOX_VERSION = "3.9.1";
+// OpenFreeMap (openfreemap.org): free, keyless, no usage caps. Liberty is the
+// only one of its styles with 3D buildings; both themes repaint it at load
+// time (see map-theme.ts).
+const STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
+
+const OPENFREEMAP_ATTRIBUTION =
+  '<a href="https://openfreemap.org" target="_blank">OpenFreeMap</a> <a href="https://www.openmaptiles.org/" target="_blank">&copy; OpenMapTiles</a> Data from <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>';
 
 const CAMPUS_ZOOM = 16.5;
 
@@ -32,41 +42,59 @@ function hasCoordinates(value: {
   return isNumber(value.lat) && isNumber(value.long);
 }
 
-let mapboxPromise: Promise<MapboxLibrary> | null = null;
+let mapLibrePromise: Promise<MapLibreLibrary> | null = null;
 
-function loadMapbox() {
-  if (window.mapboxgl) return Promise.resolve(window.mapboxgl);
+// MapLibre's worker and stylesheet are loaded by URL (`?worker&url`, `?url`):
+// the library's own `new URL("./maplibre-gl-worker.mjs", import.meta.url)` is a
+// path Vite neither pre-bundles nor emits, and with `cssCodeSplit: false` a
+// plain stylesheet import would fold into the shell CSS every page loads.
+function loadMapLibre() {
+  mapLibrePromise ??= Promise.all([
+    import("maplibre-gl"),
+    import("maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url"),
+    import("maplibre-gl/dist/maplibre-gl.css?url"),
+  ])
+    .then(async ([lib, { default: workerUrl }, { default: cssUrl }]) => {
+      lib.setWorkerUrl(workerUrl);
+      await loadStylesheet(cssUrl);
 
-  mapboxPromise ??= new Promise<MapboxLibrary>((resolve, reject) => {
-    const base = `https://api.mapbox.com/mapbox-gl-js/v${MAPBOX_VERSION}`;
+      return lib;
+    })
+    .catch((reason: Error) => {
+      mapLibrePromise = null;
+      throw reason;
+    });
+
+  return mapLibrePromise;
+}
+
+// Non-fatal if it fails: the map still renders, the controls just sit off.
+// Reused across remounts rather than appended again.
+function loadStylesheet(href: string) {
+  if (document.querySelector("link[data-maplibre-css]")) return Promise.resolve();
+
+  return new Promise<void>((resolve) => {
     const link = document.createElement("link");
-    const script = document.createElement("script");
 
     link.rel = "stylesheet";
-    link.href = `${base}/mapbox-gl.css`;
-    script.src = `${base}/mapbox-gl.js`;
-    script.onload = () =>
-      window.mapboxgl ? resolve(window.mapboxgl) : reject(new Error("mapboxgl missing"));
-    script.onerror = () => {
-      mapboxPromise = null;
-      reject(new Error("Failed to load mapbox-gl.js"));
-    };
-
-    document.head.append(link, script);
+    link.href = href;
+    link.dataset.maplibreCss = "";
+    link.onload = () => resolve();
+    link.onerror = () => resolve();
+    document.head.append(link);
   });
-
-  return mapboxPromise;
 }
 
-function applyLightPreset(map: MapboxMap) {
-  try {
-    map.setConfigProperty("basemap", "lightPreset", getTheme() === "dark" ? "night" : "day");
-  } catch {
-    /* style not loaded yet */
-  }
+// OpenFreeMap's styles have no built-in light/dark switch, so the style is
+// re-applied with the current palette. Same style URL both ways, so MapLibre
+// diffs it into paint-property updates instead of a full reload.
+function applyTheme(map: MapLibreMap) {
+  map.setStyle(STYLE_URL, {
+    transformStyle: themedStyle(getTheme() === "dark" ? DARK_THEME : LIGHT_THEME),
+  });
 }
 
-function flyTo(map: MapboxMap, target: { lat: number; long: number }, zoom: number) {
+function flyTo(map: MapLibreMap, target: { lat: number; long: number }, zoom: number) {
   const center: LngLat = [target.long, target.lat];
 
   map.flyTo({
@@ -132,9 +160,9 @@ export default function CampusMap({ results }: { results: BuildingAvailability[]
   useLocale();
   const theme = useTheme();
   const host = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<MapboxMap | null>(null);
-  const markers = useRef<MapboxMarker[]>([]);
-  const [library, setLibrary] = useState<MapboxLibrary | null>(null);
+  const mapRef = useRef<MapLibreMap | null>(null);
+  const markers = useRef<MapLibreMarker[]>([]);
+  const [library, setLibrary] = useState<MapLibreLibrary | null>(null);
   const [error, setError] = useState(false);
   const campusId = useStore((state) => state.campusId);
   const selected = useStore((state) => state.mapBuilding);
@@ -145,17 +173,14 @@ export default function CampusMap({ results }: { results: BuildingAvailability[]
   useEffect(() => {
     let disposed = false;
 
-    Promise.all([getMapboxToken(), loadMapbox()])
-      .then(([token, mapboxgl]) => {
+    loadMapLibre()
+      .then((maplibregl) => {
         if (disposed || !host.current) return;
 
         const start = campus && hasCoordinates(campus) ? campus : { lat: 45.488, long: 9.195 };
 
-        mapboxgl.accessToken = token;
-
-        const map = new mapboxgl.Map({
+        const map = new maplibregl.Map({
           container: host.current,
-          style: "mapbox://styles/mapbox/standard",
           center: [start.long, start.lat],
           zoom: campus ? CAMPUS_ZOOM : 11.3,
           minZoom: 8.5,
@@ -164,24 +189,43 @@ export default function CampusMap({ results }: { results: BuildingAvailability[]
           maxPitch: 70,
           pitchWithRotate: true,
           touchPitch: true,
-          logoPosition: "bottom-left",
+          // MapLibre only lists a source's attribution once it has marked that
+          // source as rendered and can skip the re-check, leaving the
+          // license-required OSM credit blank, so pin it (same string as the
+          // tiles' TileJSON; MapLibre dedupes the two).
+          attributionControl: { customAttribution: OPENFREEMAP_ATTRIBUTION },
         });
 
         map.addControl(
-          new mapboxgl.NavigationControl({ showZoom: true, showCompass: true }),
+          new maplibregl.NavigationControl({ showZoom: true, showCompass: true }),
           "top-right",
         );
         map.addControl(
-          new mapboxgl.GeolocateControl({
+          new maplibregl.GeolocateControl({
             positionOptions: { enableHighAccuracy: true },
             trackUserLocation: true,
-            showUserHeading: true,
           }),
           "top-right",
         );
-        map.on("style.load", () => applyLightPreset(map));
+
+        // setStyle() reports a failed style request (OpenFreeMap down, offline)
+        // through the `error` event rather than throwing. Any error before the
+        // first style load is that failure; later ones (a missed tile or
+        // sprite) are routine and leave the map usable.
+        let styleLoaded = false;
+
+        map.once("style.load", () => {
+          styleLoaded = true;
+        });
+        map.on("error", (event) => {
+          if (styleLoaded || disposed) return;
+
+          console.error("Campus map style failed to load", event.error);
+          setError(true);
+        });
+        applyTheme(map);
         mapRef.current = map;
-        setLibrary(mapboxgl);
+        setLibrary(maplibregl);
       })
       .catch((reason: Error) => {
         console.error("Campus map failed to load", reason);
@@ -201,7 +245,7 @@ export default function CampusMap({ results }: { results: BuildingAvailability[]
   }, []);
 
   useEffect(() => {
-    if (mapRef.current) applyLightPreset(mapRef.current);
+    if (mapRef.current) applyTheme(mapRef.current);
   }, [theme]);
 
   // Follow the campus and building selection. The building panel has just

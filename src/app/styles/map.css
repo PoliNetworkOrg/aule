@@ -139,8 +139,8 @@
   border-color: var(--accent);
 }
 
-/* Mapbox controls, flattened to match the rest of the UI. */
-.campus-map .mapboxgl-ctrl-group {
+/* MapLibre controls, flattened to match the rest of the UI. */
+.campus-map .maplibregl-ctrl-group {
   border-radius: var(--radius);
   border: 1px solid var(--border);
   box-shadow: var(--shadow-sm);
@@ -148,6 +148,6 @@
   overflow: hidden;
 }
 
-.campus-map .mapboxgl-ctrl-group button + button {
+.campus-map .maplibregl-ctrl-group button + button {
   border-top-color: var(--border);
 }
