@@ -241,17 +241,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-.day-tabs__load {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--busy);
-}
-
-.day-tabs__load--none {
-  background: var(--free);
-}
-
 .day-tabs__tab[aria-pressed="true"] {
   background: var(--accent);
   border-color: var(--accent);

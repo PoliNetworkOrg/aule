@@ -45,7 +45,6 @@ export function DateStrip() {
           <button
             key={date}
             type="button"
-
             aria-pressed={date === selected}
             className="date-strip__day"
             onClick={() => setDate(date)}

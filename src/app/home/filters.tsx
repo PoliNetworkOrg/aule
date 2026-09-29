@@ -46,7 +46,6 @@ function MoreFilters({ filters }: { filters: FilterState }) {
             <button
               key={seats}
               type="button"
-
               aria-pressed={filters.minSeats === seats}
               className="segmented__option"
               onClick={() => setFilters({ minSeats: seats })}

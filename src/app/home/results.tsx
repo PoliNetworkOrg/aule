@@ -45,7 +45,6 @@ function ViewSwitch() {
         <button
           key={option.value}
           type="button"
-
           aria-pressed={view === option.value}
           className="segmented__option"
           onClick={() => setView(option.value)}

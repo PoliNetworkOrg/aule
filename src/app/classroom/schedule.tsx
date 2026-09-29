@@ -253,13 +253,10 @@ export function Schedule({
     <div className="schedule" data-revision={revision}>
       <div className="day-tabs" role="group" aria-label={t("schedule.days")}>
         {dates.map((date) => {
-          const busy = (roomOccupancy(roomId, date) ?? []).length;
-
           return (
             <button
               key={date}
               type="button"
-
               aria-pressed={date === day}
               className="day-tabs__tab"
               onClick={() => setSelected(date)}
@@ -270,10 +267,6 @@ export function Schedule({
                   : capitalise(weekday.format(parseIsoDate(date)).replace(/\.$/, ""), locale)}
               </span>
               <span className="day-tabs__number">{parseIsoDate(date).getDate()}</span>
-              <span
-                className={`day-tabs__load${busy ? "" : " day-tabs__load--none"}`}
-                aria-hidden="true"
-              />
             </button>
           );
         })}
