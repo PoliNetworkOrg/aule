@@ -55,6 +55,7 @@
   --partial: #a16207;
   --partial-soft: #fef8e7;
   --partial-border: #f6dc9a;
+  --on-partial: #ffffff;
   --busy: #b42318;
   --busy-soft: #fef1f0;
   --busy-border: #f9c9c4;
@@ -95,6 +96,7 @@
   --partial: #facc15;
   --partial-soft: rgb(250 204 21 / 10%);
   --partial-border: rgb(250 204 21 / 30%);
+  --on-partial: var(--slate-950);
   --busy: #f87171;
   --busy-soft: rgb(248 113 113 / 10%);
   --busy-border: rgb(248 113 113 / 32%);
