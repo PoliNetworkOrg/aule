@@ -1,6 +1,7 @@
 import { closePage } from "../../lib/navigation";
 import { leavePage, openInApp } from "../state/navigation-context";
 import { LOCALES, setLocale, t, useLocale } from "../i18n";
+import { setTheme, useTheme } from "../theme";
 import { Icon } from "./icon";
 
 function LanguageToggle() {
@@ -27,6 +28,8 @@ function LanguageToggle() {
 
 export function Header({ page }: { page: "home" | "classroom" | "info" }) {
   useLocale();
+  const theme = useTheme();
+  const themeLabel = t(theme === "dark" ? "header.lightMode" : "header.darkMode");
 
   return (
     <header className="app-header">
@@ -54,6 +57,15 @@ export function Header({ page }: { page: "home" | "classroom" | "info" }) {
 
         <div className="app-header__actions">
           <LanguageToggle />
+          <button
+            type="button"
+            className="icon-button"
+            aria-label={themeLabel}
+            title={themeLabel}
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+          >
+            <Icon name={theme === "dark" ? "sun-01" : "moon-01"} />
+          </button>
           <button
             type="button"
             className="icon-button"

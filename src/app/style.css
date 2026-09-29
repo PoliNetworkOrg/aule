@@ -5,7 +5,7 @@
    ========================================================================== */
 
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
 
   --font-sans: "DM Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 
@@ -33,11 +33,11 @@
   --slate-950: #020617;
 
   /* Semantic */
-  --bg: #ffffff;
+  --bg: #f5f7fb;
   --surface: #ffffff;
-  --surface-muted: var(--slate-100);
-  --border: var(--slate-200);
-  --border-strong: var(--slate-300);
+  --surface-muted: #edf2f8;
+  --border: #d3deeb;
+  --border-strong: #b8c9dc;
   --text: var(--slate-900);
   --text-muted: var(--slate-600);
   --text-subtle: var(--slate-500);
@@ -72,38 +72,37 @@
   --content-width: 1440px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #131c2e;
-    --surface: #182236;
-    --surface-muted: #222d44;
-    --border: #2c3850;
-    --border-strong: var(--slate-700);
-    --text: var(--slate-100);
-    --text-muted: var(--slate-400);
-    --text-subtle: #7f8ca3;
-    --accent: #5b9cf0;
-    --accent-hover: #7db1f4;
-    --accent-soft: rgb(91 156 240 / 12%);
-    --accent-soft-border: rgb(91 156 240 / 45%);
-    --accent-text: #8cbcf6;
-    --on-accent: var(--slate-950);
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #131c2e;
+  --surface: #182236;
+  --surface-muted: #222d44;
+  --border: #2c3850;
+  --border-strong: var(--slate-700);
+  --text: var(--slate-100);
+  --text-muted: var(--slate-400);
+  --text-subtle: #7f8ca3;
+  --accent: #5b9cf0;
+  --accent-hover: #7db1f4;
+  --accent-soft: rgb(91 156 240 / 12%);
+  --accent-soft-border: rgb(91 156 240 / 45%);
+  --accent-text: #8cbcf6;
+  --on-accent: var(--slate-950);
 
-    --free: #4ade80;
-    --free-soft: rgb(74 222 128 / 10%);
-    --free-border: rgb(74 222 128 / 30%);
-    --partial: #facc15;
-    --partial-soft: rgb(250 204 21 / 10%);
-    --partial-border: rgb(250 204 21 / 30%);
-    --busy: #f87171;
-    --busy-soft: rgb(248 113 113 / 10%);
-    --busy-border: rgb(248 113 113 / 32%);
-    --exam: #c4b5fd;
-    --exam-soft: rgb(196 181 253 / 12%);
+  --free: #4ade80;
+  --free-soft: rgb(74 222 128 / 10%);
+  --free-border: rgb(74 222 128 / 30%);
+  --partial: #facc15;
+  --partial-soft: rgb(250 204 21 / 10%);
+  --partial-border: rgb(250 204 21 / 30%);
+  --busy: #f87171;
+  --busy-soft: rgb(248 113 113 / 10%);
+  --busy-border: rgb(248 113 113 / 32%);
+  --exam: #c4b5fd;
+  --exam-soft: rgb(196 181 253 / 12%);
 
-    --shadow-sm: 0 1px 2px rgb(0 0 0 / 40%);
-    --shadow: 0 8px 24px rgb(0 0 0 / 40%);
-  }
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 40%);
+  --shadow: 0 8px 24px rgb(0 0 0 / 40%);
 }
 
 @media (min-width: 768px) {

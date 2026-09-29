@@ -8,6 +8,7 @@ import { setMapBuilding, useStore } from "../state/store";
 import type { Building } from "../types";
 import type { LngLat, MapboxLibrary, MapboxMap, MapboxMarker } from "./mapbox";
 import { Icon } from "../ui/icon";
+import { getTheme, useTheme } from "../theme";
 import { RoomCard } from "./room-card";
 
 // The campus in 3D (Mapbox Standard), shown in place of the results list. Each
@@ -23,8 +24,6 @@ const BUILDING_ZOOM = 18;
 const PITCH = 55;
 
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
-
-const darkScheme = matchMedia("(prefers-color-scheme: dark)");
 
 function hasCoordinates(value: {
   lat?: number;
@@ -61,7 +60,7 @@ function loadMapbox() {
 
 function applyLightPreset(map: MapboxMap) {
   try {
-    map.setConfigProperty("basemap", "lightPreset", darkScheme.matches ? "night" : "day");
+    map.setConfigProperty("basemap", "lightPreset", getTheme() === "dark" ? "night" : "day");
   } catch {
     /* style not loaded yet */
   }
@@ -131,6 +130,7 @@ function BuildingPanel({
 
 export default function CampusMap({ results }: { results: BuildingAvailability[] }) {
   useLocale();
+  const theme = useTheme();
   const host = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapboxMap | null>(null);
   const markers = useRef<MapboxMarker[]>([]);
@@ -189,13 +189,8 @@ export default function CampusMap({ results }: { results: BuildingAvailability[]
         if (!disposed) setError(true);
       });
 
-    const onScheme = () => mapRef.current && applyLightPreset(mapRef.current);
-
-    darkScheme.addEventListener("change", onScheme);
-
     return () => {
       disposed = true;
-      darkScheme.removeEventListener("change", onScheme);
       markers.current.forEach((marker) => marker.remove());
       markers.current = [];
       mapRef.current?.remove();
@@ -204,6 +199,10 @@ export default function CampusMap({ results }: { results: BuildingAvailability[]
     // The map is created once; campus changes fly the existing camera below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (mapRef.current) applyLightPreset(mapRef.current);
+  }, [theme]);
 
   // Follow the campus and building selection. The building panel has just
   // shrunk (or grown) the canvas, so resize before aiming the camera.

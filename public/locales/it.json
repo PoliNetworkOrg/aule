@@ -3,6 +3,8 @@
   "app.fullName": "PoliNetwork Aule",
   "header.home": "PoliNetwork Aule, home",
   "header.info": "Informazioni",
+  "header.lightMode": "Attiva modalità chiara",
+  "header.darkMode": "Attiva modalità scura",
   "campus.label": "Campus",
   "campus.choose": "Scegli il campus",
   "header.language": "Lingua",
