@@ -1,4 +1,3 @@
-import { fetchJson } from "../lib/query";
 // Production hosts always talk to the stable API — no override possible.
 // Every other origin (beta.poliaule.com, localhost, etc.) can toggle between
 // the beta and stable API via the "Use Beta Backend" setting (default: on).
@@ -19,31 +18,4 @@ export function getApiBase() {
   const useBeta = saved === null ? true : saved === "true";
 
   return useBeta ? BETA_API_BASE : STABLE_API_BASE;
-}
-
-// Mapbox GL JS access token for the Campus tab map.
-//
-// Not committed: the frontend fetches it from the API (`GET /v1/config`, backed
-// by the worker's MAPBOX_TOKEN secret) so the token never lands in this public
-// repo. It is a URL-restricted public (`pk.`) token — safe in the browser, just
-// not in git. Fetched once and memoised; a failed fetch isn't cached.
-let _mapboxTokenPromise: Promise<string> | null = null;
-
-export function getMapboxToken() {
-  if (!_mapboxTokenPromise) {
-    // Only the validated token promise is reusable; an incomplete response
-    // must be fetched again when the next call retries after a failure.
-    _mapboxTokenPromise = fetchJson<{ mapboxToken?: string }>(`${getApiBase()}/v1/config`)
-      .then((cfg) => {
-        if (!cfg?.mapboxToken) throw new Error("/v1/config returned no mapboxToken");
-
-        return cfg.mapboxToken;
-      })
-      .catch((err) => {
-        _mapboxTokenPromise = null; // don't cache the failure — allow a retry
-        throw err;
-      });
-  }
-
-  return _mapboxTokenPromise;
 }

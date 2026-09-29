@@ -88,7 +88,7 @@ export function DataFetchCard() {
 
     popup.inner.appendChild(container);
 
-    const stopGlass = attachLiquidGlass(popup.panel);
+    attachLiquidGlass(popup.panel);
     const events = new AbortController();
 
     trigger.addEventListener("click", () => popup.toggle(), { signal: events.signal });
@@ -106,7 +106,6 @@ export function DataFetchCard() {
     return () => {
       events.abort();
       container.remove();
-      stopGlass();
       popup.destroy();
     };
   }, [container]);

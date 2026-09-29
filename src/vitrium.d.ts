@@ -30,10 +30,11 @@ declare module "vitrium" {
   export function hideInnerBoxInstantly(el: HTMLElement): void;
   export function unhideInnerBox(el: HTMLElement): void;
 
+  // Returns nothing: the listener lives on `el` itself and goes with it.
   export function attachLiquidGlass(
     el: HTMLElement,
     options?: { from?: string; exclude?: string },
-  ): () => void;
+  ): void;
   export function initLiquidGlass(): (() => void) | undefined;
 
   export interface PillDragCore {
