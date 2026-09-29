@@ -161,8 +161,8 @@ body[data-page="home"] #root {
     display: flex;
     align-items: center;
     gap: 10px;
-    margin: 12px var(--page-gutter) 10px;
-    padding: 10px 14px;
+    margin: 8px var(--page-gutter);
+    padding: 8px 14px;
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     background: var(--surface);
@@ -239,19 +239,26 @@ body[data-page="home"] #root {
 .search__input {
   width: 100%;
   height: 48px;
-  padding: 0 48px 0 46px;
+  /* Room on the right only for the clear button or the "/" hint (fine pointers). */
+  padding: 0 16px 0 46px;
   border: 1.5px solid var(--border-strong);
   border-radius: var(--radius-lg);
   background: var(--surface);
   font-size: 16px;
+  text-overflow: ellipsis;
   appearance: none;
   transition:
     border-color 0.15s,
     box-shadow 0.15s;
 }
 
+.search__input:not(:placeholder-shown) {
+  padding-right: 48px;
+}
+
 .search__input::placeholder {
   color: var(--text-subtle);
+  text-overflow: ellipsis;
 }
 
 .search__input::-webkit-search-cancel-button {
@@ -298,6 +305,10 @@ body[data-page="home"] #root {
 }
 
 @media (pointer: fine) {
+  .search__input {
+    padding-right: 48px;
+  }
+
   .search__kbd {
     display: grid;
   }

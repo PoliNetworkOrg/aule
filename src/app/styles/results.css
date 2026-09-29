@@ -125,18 +125,17 @@ button.summary__partial[aria-pressed="true"] {
 
 .building-group__header {
   position: sticky;
-  top: 0;
+  /* Stick 8px above the scrollport with 8px of extra top padding: the header's
+     own background covers the edge, where the scrollport's fractional offset
+     (and iOS momentum scrolling) would otherwise leave a sliver of rows. */
+  top: -8px;
   z-index: 1;
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-inline: calc(var(--page-gutter) * -1);
-  padding: 8px var(--page-gutter);
+  margin: -8px calc(var(--page-gutter) * -1) 0;
+  padding: 16px var(--page-gutter) 8px;
   background: var(--surface);
-  /* Bleed the background upwards: the scrollport often starts at a fractional
-     offset, and the snapped sticky header can leave a sliver of rows showing
-     above it on high-DPR screens. */
-  box-shadow: 0 -8px 0 var(--surface);
 }
 
 .building-group__title {
@@ -284,26 +283,35 @@ button.summary__partial[aria-pressed="true"] {
   }
 }
 
-@media (max-width: 359px) {
+/* Phones: campus, day and time are right above in the controls summary, so the
+   toolbar fits one row: count, partial toggle and an icon-only view switch. */
+@media (max-width: 639px) {
+  .results__toolbar {
+    padding-block: 6px;
+  }
+
+  .summary__context {
+    display: none;
+  }
+
+  .summary__count {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+  }
+
+  .summary__partial {
+    margin-left: 0;
+    font-size: 13px;
+  }
+
   .segmented--icons .segmented__option span {
     display: none;
   }
 
   .segmented--icons .segmented__option {
     padding: 0 10px;
-    font-size: 16px;
-  }
-}
-
-/* Phones: campus, day and time are right above in the controls; keep the summary to two lines. */
-@media (max-width: 639px) {
-  .summary__context {
-    display: none;
-  }
-
-  .summary__partial {
-    display: block;
-    margin-left: 0;
-    font-size: 13px;
+    font-size: 18px;
   }
 }

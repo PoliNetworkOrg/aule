@@ -811,6 +811,14 @@ mark {
   visibility: hidden;
 }
 
+/* Centred controls: keep the reserved width but centre the visible text in it. */
+.date-strip__weekday .stable,
+.segmented__option .stable,
+.choice .stable,
+.button .stable {
+  justify-items: center;
+}
+
 /* ---------- Popups: anchored panel on desktop, bottom sheet on phones ---------- */
 
 .popup-layer {

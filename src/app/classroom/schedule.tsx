@@ -102,7 +102,8 @@ function DayTimeline({
       <div className="timeline__ticks">
         {TICKS.map((hour) => (
           <span key={hour} className="timeline__tick" style={tickStyle(hour)}>
-            {hour}:00
+            {hour}
+            <span className="timeline__tick-minutes">:00</span>
           </span>
         ))}
       </div>
