@@ -151,7 +151,6 @@
   "classroom.enlarge": "Ingrandisci",
   "classroom.photoOf": "Foto dell'aula {name}",
   "classroom.closePhoto": "Chiudi la foto",
-  "when.commonTimesHint": "Le lezioni cambiano più spesso al minuto :15.",
-  "when.everyQuarter": "Mostra tutti i quarti d'ora",
-  "when.commonTimes": "Mostra gli orari più comuni"
+  "when.earlier": "15 minuti prima",
+  "when.later": "15 minuti dopo"
 }

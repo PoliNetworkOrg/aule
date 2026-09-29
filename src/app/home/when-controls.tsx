@@ -10,7 +10,7 @@ import {
 import { romeMinutesOfDay } from "../available-rooms-script";
 import { LOCALES, t, translate, useLocale, type Locale } from "../i18n";
 import { availableDates } from "../state/availability";
-import { setDate, setDuration, setState, setWindow, useStore } from "../state/store";
+import { readState, setDate, setDuration, setState, setWindow, useStore } from "../state/store";
 import {
   capitalise,
   DAY_END,
@@ -150,17 +150,29 @@ function TimePickerButton({
   useLocale();
   const trigger = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
-  const [showEveryQuarter, setShowEveryQuarter] = useState(false);
+
+  const gesture = useRef<{ pointerId: number; x: number; minutes: number; moved: boolean } | null>(
+    null,
+  );
+
+  const suppressClick = useRef(false);
   const close = useCallback(() => setOpen(false), []);
 
   const options = (field === "from" ? TIME_OPTIONS.slice(0, -1) : TIME_OPTIONS.slice(1)).filter(
     (option) => !after || option > after,
   );
 
-  const commonOptions = options.filter((option) => option.endsWith(":15") || option === value);
-  const visibleOptions = showEveryQuarter ? options : commonOptions;
+  const visibleOptions = options.filter((option) => option.endsWith(":15") || option === value);
 
   const key = field === "from" ? "when.from" : "when.to";
+  const min = field === "to" && after ? toMinutes(after) + STEP_MINUTES : DAY_START;
+  const max = field === "from" ? DAY_END - STEP_MINUTES : DAY_END;
+
+  function changeBy(steps: number, origin = toMinutes(value)) {
+    const next = fromMinutes(clamp(origin + steps * STEP_MINUTES, min, max));
+
+    if (next !== readState()[field]) onChange(next);
+  }
 
   return (
     <>
@@ -172,18 +184,84 @@ function TimePickerButton({
         aria-expanded={open}
         aria-label={`${t(key)} ${formatTime(value)}`}
         onClick={() => {
-          setShowEveryQuarter(false);
+          if (suppressClick.current) {
+            suppressClick.current = false;
+
+            return;
+          }
+
           setOpen(!open);
+        }}
+        onPointerDown={(event) => {
+          suppressClick.current = false;
+
+          if ((event.pointerType !== "mouse" && event.pointerType !== "pen") || event.button !== 0)
+            return;
+
+          gesture.current = {
+            pointerId: event.pointerId,
+            x: event.clientX,
+            minutes: toMinutes(value),
+            moved: false,
+          };
+          event.currentTarget.setPointerCapture(event.pointerId);
+        }}
+        onPointerMove={(event) => {
+          const drag = gesture.current;
+
+          if (!drag || event.pointerId !== drag.pointerId) return;
+
+          const steps = Math.round((event.clientX - drag.x) / 28);
+
+          if (steps === 0 && !drag.moved) return;
+
+          if (steps !== 0) drag.moved = true;
+
+          changeBy(steps, drag.minutes);
+        }}
+        onPointerUp={(event) => {
+          if (gesture.current?.pointerId !== event.pointerId) return;
+
+          suppressClick.current = gesture.current.moved;
+          gesture.current = null;
+        }}
+        onPointerCancel={() => {
+          gesture.current = null;
+        }}
+        onKeyDown={(event) => {
+          if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+
+          event.preventDefault();
+          changeBy(event.key === "ArrowRight" ? 1 : -1);
         }}
       >
         <span className="time-value__label">
           <StableText k={key} />
         </span>
         <span className="time-value__time">{formatTime(value)}</span>
+        <Icon name="arrow-down-01" className="time-value__chevron" />
       </button>
       <Popup open={open} anchor={trigger} title={t(key)} onClose={close} minWidth={288}>
         <div className="time-picker">
-          <p className="time-picker__hint">{t("when.commonTimesHint")}</p>
+          <div className="time-picker__adjust" role="group" aria-label={t(key)}>
+            <button
+              type="button"
+              aria-label={t("when.earlier")}
+              disabled={toMinutes(value) <= min}
+              onClick={() => changeBy(-1)}
+            >
+              <Icon name="remove-01" />
+            </button>
+            <strong>{formatTime(value)}</strong>
+            <button
+              type="button"
+              aria-label={t("when.later")}
+              disabled={toMinutes(value) >= max}
+              onClick={() => changeBy(1)}
+            >
+              <Icon name="add-01" />
+            </button>
+          </div>
           <div className="time-grid">
             {visibleOptions.map((option) => (
               <button
@@ -200,15 +278,6 @@ function TimePickerButton({
               </button>
             ))}
           </div>
-          <button
-            type="button"
-            className="time-picker__toggle"
-            aria-expanded={showEveryQuarter}
-            onClick={() => setShowEveryQuarter(!showEveryQuarter)}
-          >
-            {t(showEveryQuarter ? "when.commonTimes" : "when.everyQuarter")}
-            <Icon name={showEveryQuarter ? "arrow-up-01" : "arrow-down-01"} />
-          </button>
         </div>
       </Popup>
     </>

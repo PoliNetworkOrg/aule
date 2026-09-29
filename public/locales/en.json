@@ -151,7 +151,6 @@
   "classroom.enlarge": "Enlarge",
   "classroom.photoOf": "Photo of room {name}",
   "classroom.closePhoto": "Close photo",
-  "when.commonTimesHint": "Class schedules most often change at :15.",
-  "when.everyQuarter": "Show every quarter hour",
-  "when.commonTimes": "Show common times"
+  "when.earlier": "15 minutes earlier",
+  "when.later": "15 minutes later"
 }

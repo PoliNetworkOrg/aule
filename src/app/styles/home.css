@@ -369,16 +369,19 @@ body[data-page="home"] #root {
 }
 
 .time-value {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   justify-content: center;
-  width: 84px;
+  width: 90px;
   height: 46px;
-  padding: 0 12px;
+  padding: 0 10px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);
+  user-select: none;
+  -webkit-user-select: none;
   transition: border-color 0.15s;
 }
 
@@ -401,6 +404,20 @@ body[data-page="home"] #root {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   line-height: 1.2;
+}
+
+.time-value__chevron {
+  position: absolute;
+  right: 7px;
+  bottom: 9px;
+  color: var(--text-subtle);
+  font-size: 12px;
+}
+
+@media (pointer: fine) {
+  .time-value {
+    cursor: ew-resize;
+  }
 }
 
 .time-range__arrow {
@@ -438,25 +455,33 @@ body[data-page="home"] #root {
   gap: 12px;
 }
 
-.time-picker__hint {
-  color: var(--text-muted);
-  font-size: 13px;
-}
-
-.time-picker__toggle {
+.time-picker__adjust {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-height: 42px;
-  border-top: 1px solid var(--border);
-  color: var(--accent-text);
-  font-size: 14px;
-  font-weight: 700;
+  justify-content: space-between;
+  height: 48px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-muted);
 }
 
-.time-picker__toggle .icon {
-  font-size: 16px;
+.time-picker__adjust button {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 46px;
+  color: var(--accent-text);
+  font-size: 18px;
+}
+
+.time-picker__adjust button:disabled {
+  color: var(--text-subtle);
+  opacity: 0.45;
+}
+
+.time-picker__adjust strong {
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Duration stepper */
