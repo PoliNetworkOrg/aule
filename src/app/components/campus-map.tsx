@@ -465,8 +465,8 @@ async function boot(_container: HTMLElement) {
     pitchWithRotate: true,
     touchPitch: true,
     // No `compact` makes it width-driven (icon badge at <= 640px, full text
-    // above), like Mapbox's — MapLibre's own default is `compact: true`, a
-    // badge even on desktop. The credit is pinned here too: MapLibre only
+    // above) — MapLibre's own default is `compact: true`, a badge even on
+    // desktop. The credit is pinned here too: MapLibre only
     // lists a source's own attribution once it has marked that source as
     // rendered, and intermittently never re-checks after, leaving the
     // (license-required) OSM credit blank. Same string as the tiles' own
@@ -601,8 +601,8 @@ async function boot(_container: HTMLElement) {
 
   // MapLibre opens a compact (narrow-viewport) attribution expanded the
   // first time it switches to compact — once the sources report their
-  // attribution, after "load". Start it as the plain "i" badge instead, same
-  // as the Mapbox control did; a tap still expands it.
+  // attribution, after "load". Start it as the plain "i" badge instead, so it
+  // doesn't cover the map on phones; a tap still expands it.
   const attribution = attributionButton?.parentElement;
 
   if (attribution) {
@@ -728,8 +728,8 @@ async function loadMapLibre(): Promise<MapLibreLibrary> {
   return lib;
 }
 
-// Re-applies the style with the current theme's palette (Mapbox Standard's
-// `lightPreset` has no OpenFreeMap equivalent). Same style URL both ways, so
+// Re-applies the style with the current theme's palette (OpenFreeMap styles
+// have no built-in light/dark switch). Same style URL both ways, so
 // MapLibre diffs it into paint-property updates instead of a full reload.
 // Markers are DOM overlays, so they're untouched either way.
 function applyTheme() {
