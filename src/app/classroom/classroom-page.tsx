@@ -216,18 +216,28 @@ export function ClassroomPage({
 
             <NowStatus entry={entry} />
 
+            {/* Icons label the values; the text stays for screen readers and as a tooltip. */}
             <dl className="room-stats">
-              <div>
-                <dt>{t("classroom.seats")}</dt>
+              <div title={t("classroom.seats")}>
+                <dt>
+                  <Icon name="user-multiple" />
+                  <span className="visually-hidden">{t("classroom.seats")}</span>
+                </dt>
                 <dd>{room.seats ?? "—"}</dd>
               </div>
-              <div>
-                <dt>{t("classroom.accessibleSeats")}</dt>
+              <div title={t("classroom.accessibleSeats")}>
+                <dt>
+                  <Icon name="wheelchair" />
+                  <span className="visually-hidden">{t("classroom.accessibleSeats")}</span>
+                </dt>
                 <dd>{room.accessible_seats ?? 0}</dd>
               </div>
               {room.floor !== undefined && (
-                <div>
-                  <dt>{t("classroom.floor")}</dt>
+                <div title={t("classroom.floor")}>
+                  <dt>
+                    <Icon name="stairs-01" />
+                    <span className="visually-hidden">{t("classroom.floor")}</span>
+                  </dt>
                   <dd>{room.floor === 0 ? t("classroom.groundFloor") : room.floor}</dd>
                 </div>
               )}

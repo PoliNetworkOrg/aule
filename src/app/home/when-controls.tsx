@@ -559,7 +559,7 @@ function NowButton() {
       }}
     >
       <Icon name="clock-01" />
-      <StableText k="when.now" />
+      {t("when.now")}
     </button>
   );
 }

@@ -192,11 +192,11 @@ img {
   max-width: 100%;
 }
 
+/* Search matches: accent-coloured and bold, no box (it clashed with chips and links). */
 mark {
-  background: color-mix(in srgb, var(--blue-300) 40%, transparent);
-  color: inherit;
-  border-radius: 3px;
-  padding: 0 1px;
+  background: none;
+  color: var(--accent-text);
+  font-weight: 700;
 }
 
 [hidden] {
@@ -809,6 +809,14 @@ mark {
 
 .stable__text--ghost {
   visibility: hidden;
+}
+
+/* Centred controls: keep the reserved width but centre the visible text in it. */
+.date-strip__weekday .stable,
+.segmented__option .stable,
+.choice .stable,
+.button .stable {
+  justify-items: center;
 }
 
 /* ---------- Popups: anchored panel on desktop, bottom sheet on phones ---------- */

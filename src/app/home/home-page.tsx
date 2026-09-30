@@ -1,7 +1,6 @@
 import { t, tf, useLocale } from "../i18n";
 import { capitalise, formatRange, parseIsoDate, romeTodayIso } from "../state/time";
 import { Icon } from "../ui/icon";
-import { StableText } from "../ui/stable";
 import { countActiveFilters, setControlsCollapsed, useStore } from "../state/store";
 import { Favourites } from "./favourites";
 import { Filters } from "./filters";
@@ -24,14 +23,13 @@ function ControlsSummary() {
   const active = countActiveFilters(filters);
   const campus = findCampus(useStore((state) => state.campusId));
 
+  // Weekday and day formatted apart: en-US would otherwise order them "30 Wed".
   const day =
     date === romeTodayIso()
       ? t("when.today")
       : date
         ? capitalise(
-            new Intl.DateTimeFormat(locale, { weekday: "short", day: "numeric" }).format(
-              parseIsoDate(date),
-            ),
+            `${new Intl.DateTimeFormat(locale, { weekday: "short" }).format(parseIsoDate(date))} ${parseIsoDate(date).getDate()}`,
             locale,
           )
         : "";
@@ -52,7 +50,7 @@ function ControlsSummary() {
         )}
       </span>
       <span className="controls-summary__edit">
-        <StableText k="filters.edit" />
+        {t("filters.edit")}
         <Icon name="arrow-down-01" />
       </span>
     </button>

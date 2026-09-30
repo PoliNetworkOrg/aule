@@ -29,7 +29,7 @@ function ToggleChip({
   return (
     <button type="button" className="chip" aria-pressed={active} onClick={onToggle}>
       <Icon name={active ? "checkmark-circle-02" : icon} />
-      <StableText k={label} />
+      {t(label)}
     </button>
   );
 }
@@ -124,7 +124,7 @@ export function Filters() {
           onClick={resetFilters}
         >
           <Icon name="cancel-01" />
-          <StableText k="filters.reset" />
+          {t("filters.reset")}
           <span className="action-link__count">{active}</span>
         </button>
       </div>
@@ -163,7 +163,7 @@ export function Filters() {
           }}
         >
           <Icon name="filter-horizontal" />
-          <StableText k="filters.more" />
+          {t("filters.more")}
           {advanced > 0 && <span className="chip__badge">{advanced}</span>}
           <Icon
             name="arrow-down-01"
