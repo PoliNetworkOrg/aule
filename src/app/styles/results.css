@@ -45,15 +45,27 @@
 }
 
 /* Off (grey) while partly free rooms are hidden, lit in the partial colour once listed. */
+/* Dashed edge, like the other chips that add or drop results (.chip--impact,
+   .chip--reset), so it reads as a toggle and not a count label. */
 button.summary__partial {
-  padding: 2px 8px;
+  padding: 1px 8px;
+  border: 1px dashed color-mix(in srgb, currentcolor 45%, transparent);
   border-radius: 999px;
   background: var(--surface-muted);
   color: var(--text-muted);
   font-weight: 700;
+  transition:
+    border-color 0.15s,
+    color 0.15s;
+}
+
+button.summary__partial:hover {
+  border-color: var(--partial);
+  color: var(--partial);
 }
 
 button.summary__partial[aria-pressed="true"] {
+  border-color: var(--partial-border);
   background: var(--partial-soft);
   color: var(--partial);
 }
