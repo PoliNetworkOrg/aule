@@ -7,8 +7,12 @@ import {
   type RefObject,
 } from "react";
 import { createPortal } from "react-dom";
+import { cn } from "../../lib/cn";
 import { t, useLocale } from "../i18n";
+import { IconButton } from "./button";
+import { insetFocus } from "./focus";
 import { Icon } from "./icon";
+import { pressable } from "./motion";
 
 // One primitive for every picker: a panel anchored under its trigger on
 // desktop, a bottom sheet on phones. Escape, a click outside or the close
@@ -76,6 +80,8 @@ export function Popup({
   useLocale();
   const sheet = useIsSheet();
   const panel = useRef<HTMLDivElement>(null);
+  const header = useRef<HTMLDivElement>(null);
+  const body = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState<Position | null>(null);
 
   useLayoutEffect(() => {
@@ -84,9 +90,7 @@ export function Popup({
     const target = anchor.current;
 
     const update = () => {
-      const header = panel.current?.querySelector<HTMLElement>(".popup__header");
-      const body = panel.current?.querySelector<HTMLElement>(".popup__body");
-      const content = (header?.offsetHeight ?? 0) + (body?.scrollHeight ?? 0) + 2;
+      const content = (header.current?.offsetHeight ?? 0) + (body.current?.scrollHeight ?? 0) + 2;
 
       setPosition(anchorPosition(target, minWidth, content));
     };
@@ -144,28 +148,43 @@ export function Popup({
         };
 
   return createPortal(
-    <div className={`popup-layer${sheet ? " popup-layer--sheet" : ""}`}>
-      <div className="popup-backdrop" onClick={onClose} />
+    <div className="fixed inset-0 z-50">
+      <div
+        className={cn(
+          "absolute inset-0",
+          sheet && "bg-scrim/40 transition-opacity duration-150 ease-smooth-out starting:opacity-0",
+        )}
+        onClick={onClose}
+      />
       <div
         ref={panel}
-        className={`popup${sheet ? " popup--sheet" : ""}`}
+        className={cn(
+          "fixed flex flex-col overflow-hidden rounded-lg border border-border bg-surface shadow-md",
+          // Closing (unmount) is instant, as closes should get out of the way.
+          "duration-250 ease-smooth-out starting:opacity-0",
+          sheet
+            ? // Rises a short way rather than the full sheet height: a nudge, not a drawer.
+              "right-0 bottom-0 left-0 max-h-[80dvh] rounded-t-xl rounded-b-none border-b-0 pb-[env(safe-area-inset-bottom)] transition-[opacity,translate] starting:translate-y-2"
+            : // Fades and grows out of its trigger's edge (transformOrigin, below).
+              "transition-[opacity,scale] starting:scale-97",
+        )}
         role="dialog"
         aria-modal="true"
         aria-label={title}
         style={style}
       >
-        <div className="popup__header">
-          <span className="popup__title">{title}</span>
-          <button
-            type="button"
-            className="icon-button icon-button--small"
-            aria-label={t("common.close")}
-            onClick={onClose}
-          >
+        <div
+          ref={header}
+          className="flex items-center justify-between gap-2 pt-2.5 pr-2.5 pb-1.5 pl-4"
+        >
+          <span className="text-15 font-bold">{title}</span>
+          <IconButton size="small" aria-label={t("common.close")} onClick={onClose}>
             <Icon name="cancel-01" />
-          </button>
+          </IconButton>
         </div>
-        <div className="popup__body">{children}</div>
+        <div ref={body} className="overflow-y-auto overscroll-contain px-4 pt-1 pb-4">
+          {children}
+        </div>
       </div>
     </div>,
     document.body,
@@ -194,30 +213,41 @@ export function OptionList({
   onSelect: (value: string) => void;
 }) {
   return (
-    <div className="option-list">
+    <div className="flex flex-col gap-3">
       {groups.map((group, index) => (
         <div
           key={group.label ?? index}
-          className="option-list__group"
+          className="flex flex-col gap-0.5"
           role="group"
           aria-label={group.label}
         >
-          {group.label && <p className="option-list__label">{group.label}</p>}
+          {group.label && (
+            <p className="px-2.5 pb-1 text-11 font-bold tracking-widest text-subtle uppercase">
+              {group.label}
+            </p>
+          )}
           {group.options.map((option) => (
             <button
               key={option.value}
               type="button"
-              className="option"
+              className={cn(
+                "flex min-h-11 items-center gap-2 rounded-md px-2.5 py-1.5 text-left transition-[background-color,scale]",
+                pressable,
+                "hover:bg-surface-muted aria-pressed:bg-accent-soft aria-pressed:text-accent-strong",
+                insetFocus,
+              )}
               aria-pressed={option.value === value}
               onClick={() => onSelect(option.value)}
             >
-              <span className="option__text">
-                <span className="option__label">{option.label}</span>
+              <span className="flex flex-col">
+                <span className="font-semibold">{option.label}</span>
                 {option.description && (
-                  <span className="option__description">{option.description}</span>
+                  <span className="text-13 text-muted">{option.description}</span>
                 )}
               </span>
-              {option.value === value && <Icon name="tick-02" className="option__check" />}
+              {option.value === value && (
+                <Icon name="tick-02" className="ml-auto text-18 text-accent" />
+              )}
             </button>
           ))}
         </div>

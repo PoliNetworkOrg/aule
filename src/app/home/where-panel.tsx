@@ -1,9 +1,13 @@
 import { useCallback, useRef, useState } from "react";
+import { cn } from "../../lib/cn";
 import { t, useLocale } from "../i18n";
 import { campuses } from "../state/availability";
 import { setCampus, useStore } from "../state/store";
 import { Icon } from "../ui/icon";
+import { pressableLarge } from "../ui/motion";
+import { Panel, PanelHeader, PanelTitle } from "../ui/panel";
 import { OptionList, Popup, type MenuGroup } from "../ui/popup";
+import { hiddenByMoreFilters } from "./filters";
 
 /** "Where": the campus, first of the search parameters. */
 export function WherePanel() {
@@ -26,30 +30,34 @@ export function WherePanel() {
   }
 
   return (
-    <section className="panel" aria-labelledby="where-title">
-      <div className="panel__header">
-        <h2 className="panel__title" id="where-title">
+    <Panel className={hiddenByMoreFilters} aria-labelledby="where-title">
+      <PanelHeader>
+        <PanelTitle id="where-title">
           <Icon name="location-01" />
           {t("where.title")}
-        </h2>
-      </div>
+        </PanelTitle>
+      </PanelHeader>
       <button
         ref={trigger}
         type="button"
-        className="campus-select"
+        className={cn(
+          "flex min-h-13 w-full items-center gap-3 rounded-md border border-border-strong bg-surface px-3.5 py-1.5 text-left",
+          "transition-[border-color,scale] hover:border-accent aria-expanded:border-accent",
+          pressableLarge,
+        )}
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-label={`${t("campus.label")}: ${current?.name ?? ""}`}
         disabled={!ready}
         onClick={() => setOpen(!open)}
       >
-        <span className="campus-select__text">
-          <span className="campus-select__value">{current?.name ?? "…"}</span>
-          <span className="campus-select__label">
+        <span className="flex min-w-0 flex-1 flex-col leading-tight">
+          <span className="text-17 font-bold">{current?.name ?? "…"}</span>
+          <span className="text-13 text-muted">
             {current ? [current.group, current.city].filter(Boolean).join(" · ") : ""}
           </span>
         </span>
-        <span className="campus-select__change">
+        <span className="inline-flex items-center gap-1 text-13 font-bold text-accent-strong">
           {t("where.change")}
           <Icon name="arrow-down-01" />
         </span>
@@ -64,6 +72,6 @@ export function WherePanel() {
           }}
         />
       </Popup>
-    </section>
+    </Panel>
   );
 }

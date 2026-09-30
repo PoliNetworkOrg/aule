@@ -1,8 +1,10 @@
 import type {
+  ExpressionSpecification,
   LayerSpecification,
   LightSpecification,
   SkySpecification,
   StyleSpecification,
+  SymbolLayerSpecification,
 } from "maplibre-gl";
 
 // Apple Maps–leaning light and dark themes, painted over OpenFreeMap's Liberty
@@ -236,12 +238,70 @@ function themedLayer(layer: LayerSpecification, t: MapTheme): LayerSpecification
   return { ...layer, paint: { ...layer.paint, ...paint } } as LayerSpecification;
 }
 
+const IS_TOILET: ExpressionSpecification = ["==", ["get", "class"], "toilets"];
+
+// Parking is hidden on purpose. Most car parking mapped on campus (e.g.
+// between Leonardo's buildings 1–9) is reserved for Politecnico staff, which
+// would mislead students. Bike and motorbike parking have no sprite icon and
+// only surface as names.
+const IS_PARKING: ExpressionSpecification = [
+  "match",
+  ["get", "class"],
+  ["parking", "bicycle_parking", "motorcycle_parking"],
+  true,
+  false,
+];
+
+// Liberty's own POI layers (poi_r1/poi_r7/poi_r20) do draw toilets, but only
+// from zoom 16–17 and ranked against every bar and shop, so collision drops
+// nearly all of them. They get a layer of their own instead, stacked above
+// the other POIs so their icons win the collision (road and place labels,
+// further up, still do). Unnamed icons only: the few names are noise
+// ("Stazione FFSS"), and indoor toilets mapped per floor collapse into one.
+const TOILETS_LAYER: LayerSpecification = {
+  id: "poi_toilets",
+  type: "symbol",
+  source: "openmaptiles",
+  "source-layer": "poi",
+  minzoom: 16,
+  filter: ["all", ["match", ["geometry-type"], ["MultiPoint", "Point"], true, false], IS_TOILET],
+  layout: {
+    "icon-image": "toilets",
+    "icon-size": ["interpolate", ["linear"], ["zoom"], 16, 0.85, 18, 1],
+  },
+};
+
+function isRankedPoi(layer: LayerSpecification): layer is SymbolLayerSpecification {
+  return layer.type === "symbol" && /^poi_r\d+$/.test(layer.id);
+}
+
+function withPoiTweaks(layers: LayerSpecification[]) {
+  const lastPoi = layers.length - 1 - [...layers].reverse().findIndex(isRankedPoi);
+
+  if (lastPoi === layers.length) return layers;
+
+  const tweaked = layers.map((layer): LayerSpecification => {
+    if (!isRankedPoi(layer)) return layer;
+
+    const keep: ExpressionSpecification = ["!", ["any", IS_TOILET, IS_PARKING]];
+    // SAFETY: Liberty writes every filter as an expression, never the legacy
+    // array syntax (which "all" couldn't mix with one).
+    const filter = layer.filter as ExpressionSpecification | undefined;
+
+    return { ...layer, filter: filter ? ["all", filter, keep] : keep };
+  });
+
+  tweaked.splice(lastPoi + 1, 0, TOILETS_LAYER);
+
+  return tweaked;
+}
+
 // MapLibre `transformStyle` hook — see maplibre.ts's applyMapTheme().
 export function themedStyle(t: MapTheme) {
   return (_previous: StyleSpecification | undefined, next: StyleSpecification) => ({
     ...next,
     light: t.light,
     sky: t.sky,
-    layers: next.layers.map((layer) => themedLayer(layer, t)),
+    layers: withPoiTweaks(next.layers).map((layer) => themedLayer(layer, t)),
   });
 }

@@ -7,6 +7,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
+import { cn } from "../../lib/cn";
 import { romeMinutesOfDay } from "../available-rooms-script";
 import { LOCALES, t, translate, useLocale, type Locale } from "../i18n";
 import { availableDates } from "../state/availability";
@@ -25,9 +26,13 @@ import {
   TIME_OPTIONS,
   toMinutes,
 } from "../state/time";
+import { centreStable, insetFocus } from "../ui/focus";
+import { pressable } from "../ui/motion";
 import { Icon } from "../ui/icon";
+import { Panel, PanelHeader, PanelTitle } from "../ui/panel";
 import { Popup } from "../ui/popup";
 import { Stable, StableText } from "../ui/stable";
+import { hiddenByMoreFilters } from "./filters";
 
 type DaysStyle = CSSProperties & { "--days": number };
 
@@ -58,6 +63,26 @@ function monthName(locale: Locale, date: Date, month: "long" | "short" = "long")
 
 // ---------- Day ----------
 
+/** One column per available day (`--days`, set on the strip), for months and days alike. */
+export const dateColumns = "grid grid-cols-[repeat(var(--days,6),minmax(0,1fr))] gap-1.5";
+
+/** A day of the strip (an aria-pressed button); the room schedule picks its day with these too. */
+export const dateDay = cn(
+  "group flex h-11.5 flex-col items-center justify-center gap-px rounded-md bg-surface-muted leading-[1.1]",
+  "transition-[background-color,color,scale] hover:bg-accent-soft aria-pressed:bg-accent aria-pressed:text-on-accent",
+  pressable,
+  insetFocus,
+);
+
+/** The weekday above a day's number, dimmed unless the day is picked. */
+export const dateWeekday = cn(
+  "text-11 font-semibold text-muted",
+  "group-aria-pressed:text-inherit group-aria-pressed:opacity-85",
+  centreStable,
+);
+
+export const dateNumber = "text-16 font-bold tabular-nums";
+
 export function DateStrip() {
   const locale = useLocale();
   const selected = useStore((state) => state.date);
@@ -71,10 +96,10 @@ export function DateStrip() {
 
   if (!dates.length)
     return (
-      <div className="date-strip" aria-busy={status === "loading"}>
-        <div className="date-strip__days">
+      <div className="grid gap-1" aria-busy={status === "loading"}>
+        <div className={dateColumns}>
           {Array.from({ length: 6 }, (_, index) => (
-            <span key={index} className="date-strip__skeleton" />
+            <span key={index} className="h-11.5 rounded-md bg-surface-muted" />
           ))}
         </div>
       </div>
@@ -100,8 +125,8 @@ export function DateStrip() {
   const format = [...spans.values()].includes(1) ? "short" : "long";
 
   return (
-    <div className="date-strip" style={style}>
-      <div className="date-strip__months" aria-hidden="true">
+    <div className="grid gap-1" style={style}>
+      <div className={cn(dateColumns, "min-h-4")} aria-hidden="true">
         {days.map((day, index) => {
           const span = spans.get(index);
 
@@ -110,7 +135,7 @@ export function DateStrip() {
           return (
             <span
               key={dates[index]}
-              className="date-strip__month"
+              className="row-start-1 text-11 font-bold tracking-widest whitespace-nowrap text-muted uppercase"
               style={{ gridColumn: `${index + 1} / span ${span}` }}
             >
               <Stable
@@ -121,7 +146,7 @@ export function DateStrip() {
           );
         })}
       </div>
-      <div className="date-strip__days" role="group" aria-label={t("when.day")}>
+      <div className={dateColumns} role="group" aria-label={t("when.day")}>
         {dates.map((date, index) => {
           const day = days[index];
 
@@ -135,10 +160,10 @@ export function DateStrip() {
                 day: "numeric",
                 month: "long",
               }).format(day)}
-              className="date-strip__day"
+              className={dateDay}
               onClick={() => setDate(date)}
             >
-              <span className="date-strip__weekday">
+              <span className={dateWeekday}>
                 <Stable
                   variants={LOCALES.map((variant) =>
                     date === today ? translate(variant, "when.today") : shortWeekday(variant, day),
@@ -146,7 +171,7 @@ export function DateStrip() {
                   current={current}
                 />
               </span>
-              <span className="date-strip__number">{day.getDate()}</span>
+              <span className={dateNumber}>{day.getDate()}</span>
             </button>
           );
         })}
@@ -156,6 +181,10 @@ export function DateStrip() {
 }
 
 // ---------- Time ----------
+
+/** The earlier/later buttons of the time picker. */
+const adjustButton =
+  "grid h-11.5 w-12 place-items-center text-18 text-accent-strong disabled:text-subtle disabled:opacity-45";
 
 function TimePickerButton({
   field,
@@ -201,7 +230,13 @@ function TimePickerButton({
       <button
         ref={trigger}
         type="button"
-        className="time-value"
+        className={cn(
+          // Shares the row with the stepper instead of leaving a gap before it.
+          "relative flex h-11.5 min-w-0 flex-[1_1_90px] flex-col items-start justify-center rounded-md border border-border-strong bg-surface px-2.5",
+          "transition-[border-color] select-none hover:border-accent aria-expanded:border-accent",
+          // Mice and pens can drag it sideways to change the time.
+          "pointer-fine:cursor-ew-resize max-3xs:h-13 max-3xs:w-full",
+        )}
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-label={`${t(key)} ${formatTime(value)}`}
@@ -257,26 +292,35 @@ function TimePickerButton({
           changeBy(event.key === "ArrowRight" ? 1 : -1);
         }}
       >
-        <span className="time-value__label">
+        <span className="text-10 leading-[1.2] font-bold tracking-widest text-subtle uppercase">
           <StableText k={key} />
         </span>
-        <span className="time-value__time">{formatTime(value)}</span>
-        <Icon name="arrow-down-01" className="time-value__chevron" />
+        <span className="text-18 leading-[1.2] font-bold tabular-nums">{formatTime(value)}</span>
+        <Icon
+          name="arrow-down-01"
+          className="absolute right-1.75 bottom-2.25 text-12 text-subtle"
+        />
       </button>
       <Popup open={open} anchor={trigger} title={t(key)} onClose={close} minWidth={288}>
-        <div className="time-picker">
-          <div className="time-picker__adjust" role="group" aria-label={t(key)}>
+        <div className="grid gap-3">
+          <div
+            className="flex h-12 items-center justify-between rounded-md border border-border bg-surface-muted"
+            role="group"
+            aria-label={t(key)}
+          >
             <button
               type="button"
+              className={adjustButton}
               aria-label={t("when.earlier")}
               disabled={toMinutes(value) <= min}
               onClick={() => changeBy(-1)}
             >
               <Icon name="remove-01" />
             </button>
-            <strong>{formatTime(value)}</strong>
+            <strong className="text-20 tabular-nums">{formatTime(value)}</strong>
             <button
               type="button"
+              className={adjustButton}
               aria-label={t("when.later")}
               disabled={toMinutes(value) >= max}
               onClick={() => changeBy(1)}
@@ -284,12 +328,17 @@ function TimePickerButton({
               <Icon name="add-01" />
             </button>
           </div>
-          <div className="time-grid">
+          <div className="grid grid-cols-4 gap-1.5">
             {visibleOptions.map((option) => (
               <button
                 key={option}
                 type="button"
-                className="time-grid__option"
+                className={cn(
+                  "min-h-11 rounded-sm bg-surface-muted text-15 font-semibold tabular-nums transition-[background-color,color,scale]",
+                  pressable,
+                  "hover:bg-accent-soft hover:text-accent-strong aria-pressed:bg-accent aria-pressed:text-on-accent",
+                  insetFocus,
+                )}
                 aria-pressed={option === value}
                 onClick={() => {
                   onChange(option);
@@ -339,6 +388,9 @@ function hitTest(x: number, fromX: number, toX: number): DragMode | "jump" {
 
   return x > fromX && x < toX ? "move" : "jump";
 }
+
+const sliderFocus =
+  "focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-focus-ring";
 
 /** Drag either end, or the whole window, across the 07:15–20:15 day. */
 function RangeSlider() {
@@ -439,6 +491,7 @@ function RangeSlider() {
   }
 
   const showNow = date === romeTodayIso() && now > DAY_START && now < DAY_END;
+  const pointerMode = dragging ?? hover;
 
   const handles: { mode: DragMode; value: number; label: string }[] = [
     { mode: "from", value: from, label: t("when.from") },
@@ -446,10 +499,20 @@ function RangeSlider() {
   ];
 
   return (
-    <div className={`range range--${dragging ?? hover}${dragging ? " range--dragging" : ""}`}>
+    <div className="select-none">
       <div
         ref={track}
-        className="range__track"
+        className={cn(
+          "relative h-9 touch-none rounded-md bg-surface-muted",
+          // The cursor shows what a press would do: resize, move or jump.
+          pointerMode === "jump"
+            ? "cursor-pointer"
+            : pointerMode === "move"
+              ? dragging
+                ? "cursor-grabbing"
+                : "cursor-grab"
+              : "cursor-ew-resize",
+        )}
         onPointerDown={start}
         onPointerMove={move}
         onPointerUp={end}
@@ -457,11 +520,25 @@ function RangeSlider() {
         onPointerLeave={() => setHover("jump")}
       >
         {SLIDER_TICKS.map((hour) => (
-          <span key={hour} className="range__gridline" style={{ left: percentOf(hour * 60) }} />
+          <span
+            key={hour}
+            className="absolute top-3 bottom-3 w-px bg-border-strong"
+            style={{ left: percentOf(hour * 60) }}
+          />
         ))}
-        {showNow && <span className="range__now" style={{ left: percentOf(now) }} />}
+        {showNow && (
+          <span
+            className="pointer-events-none absolute -top-1 -bottom-1 z-2 -ml-px w-0.5 rounded-[1px] bg-accent"
+            style={{ left: percentOf(now) }}
+          />
+        )}
         <span
-          className="range__selection"
+          className={cn(
+            // Concentric with the track it sits in.
+            "absolute top-1 bottom-1 z-1 min-w-1 rounded-[calc(var(--radius-md)-3px)] shadow-[inset_0_0_0_1.5px_var(--color-accent)]",
+            "bg-[color-mix(in_srgb,var(--color-accent)_28%,var(--color-surface))]",
+            sliderFocus,
+          )}
           style={{ left: percentOf(from), width: `calc(${percentOf(to)} - ${percentOf(from)})` }}
           role="slider"
           tabIndex={0}
@@ -475,7 +552,12 @@ function RangeSlider() {
         {handles.map(({ mode, value, label }) => (
           <span
             key={mode}
-            className="range__handle"
+            className={cn(
+              "pointer-events-none absolute top-1/2 z-3 size-5.5 -translate-1/2 rounded-full border-2 border-accent bg-surface shadow-sm",
+              // Filled while it's being dragged.
+              dragging === mode && "bg-accent",
+              sliderFocus,
+            )}
             style={{ left: percentOf(value) }}
             role="slider"
             tabIndex={0}
@@ -488,9 +570,13 @@ function RangeSlider() {
           />
         ))}
       </div>
-      <div className="range__ticks" aria-hidden="true">
+      <div className="relative mt-1 h-4" aria-hidden="true">
         {SLIDER_TICKS.map((hour) => (
-          <span key={hour} className="range__tick" style={{ left: percentOf(hour * 60) }}>
+          <span
+            key={hour}
+            className="absolute -translate-x-1/2 text-11 text-muted tabular-nums"
+            style={{ left: percentOf(hour * 60) }}
+          >
             {hour}
           </span>
         ))}
@@ -498,6 +584,11 @@ function RangeSlider() {
     </div>
   );
 }
+
+const stepperButton = cn(
+  "grid h-full w-8.5 place-items-center text-16 text-muted transition-[background-color,color] first:rounded-l-md last:rounded-r-md disabled:opacity-35",
+  "hover:not-disabled:bg-accent-soft hover:not-disabled:text-accent-strong",
+);
 
 function DurationStepper() {
   useLocale();
@@ -513,22 +604,30 @@ function DurationStepper() {
   const longer = Math.floor(length / DURATION_STEP) * DURATION_STEP + DURATION_STEP;
 
   return (
-    <div className="stepper" role="group" aria-label={t("when.duration")}>
+    <div
+      className={cn(
+        "ml-1 inline-flex h-11.5 flex-none items-center rounded-md border border-border-strong bg-surface",
+        // Narrow phones: a full row under the two times.
+        "max-3xs:col-span-full max-3xs:ml-0 max-3xs:h-10 max-3xs:justify-between",
+      )}
+      role="group"
+      aria-label={t("when.duration")}
+    >
       <button
         type="button"
-        className="stepper__button"
+        className={stepperButton}
         aria-label={t("when.shorter")}
         disabled={length <= DURATION_STEP}
         onClick={() => setDuration(shorter)}
       >
         <Icon name="remove-01" />
       </button>
-      <span className="stepper__value" aria-live="polite">
+      <span className="min-w-14 text-center text-14 font-bold tabular-nums" aria-live="polite">
         {formatDuration(length)}
       </span>
       <button
         type="button"
-        className="stepper__button"
+        className={stepperButton}
         aria-label={t("when.longer")}
         disabled={to >= DAY_END}
         onClick={() => setDuration(longer)}
@@ -556,7 +655,13 @@ function NowButton() {
   return (
     <button
       type="button"
-      className="now-button"
+      // Highlighted while the window starts now.
+      className={cn(
+        "inline-flex h-7.5 items-center gap-1.5 rounded-full border border-border bg-surface pr-3 pl-2.5",
+        "text-13 leading-none font-semibold text-muted icon:text-15 disabled:opacity-45",
+        "transition-[background-color,border-color,color] hover:not-disabled:border-accent hover:not-disabled:text-accent-strong",
+        "aria-pressed:border-accent-soft-border aria-pressed:bg-accent-soft aria-pressed:text-accent-strong",
+      )}
       aria-pressed={active}
       disabled={!hasToday}
       onClick={() => {
@@ -582,23 +687,27 @@ export function WhenPanel() {
   const to = useStore((state) => state.to);
 
   return (
-    <section className="panel" aria-labelledby="when-title">
-      <div className="panel__header">
-        <h2 className="panel__title" id="when-title">
+    <Panel
+      // Divided from the panel above.
+      className={cn("border-t border-t-border pt-3", hiddenByMoreFilters)}
+      aria-labelledby="when-title"
+    >
+      <PanelHeader>
+        <PanelTitle id="when-title">
           <Icon name="calendar-03" />
           {t("when.title")}
-        </h2>
+        </PanelTitle>
         <NowButton />
-      </div>
+      </PanelHeader>
       <DateStrip />
-      <div className="time-range">
-        <div className="time-range__row">
+      <div className="mt-2 flex flex-col gap-2.5">
+        <div className="flex items-center gap-1.5 max-3xs:grid max-3xs:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
           <TimePickerButton
             field="from"
             value={from}
             onChange={(value) => setWindow(value, to, "from")}
           />
-          <Icon name="arrow-right-02" className="time-range__arrow" />
+          <Icon name="arrow-right-02" className="text-18 text-subtle" />
           <TimePickerButton
             field="to"
             value={to}
@@ -609,6 +718,6 @@ export function WhenPanel() {
         </div>
         <RangeSlider />
       </div>
-    </section>
+    </Panel>
   );
 }

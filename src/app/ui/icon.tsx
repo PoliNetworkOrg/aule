@@ -1,4 +1,13 @@
+import { cn } from "../../lib/cn";
+
 // HugeIcons stroke-rounded glyphs from the self-hosted icon font (public/fonts/hugeicons).
-export function Icon({ name, className = "" }: { name: string; className?: string }) {
-  return <i className={`hgi-stroke hgi-${name} icon ${className}`.trim()} aria-hidden="true" />;
+// Parents style the icons inside them with the `icon:` variant (src/styles.css).
+export function Icon({ name, className }: { name: string; className?: string }) {
+  return (
+    <i
+      data-slot="icon"
+      className={cn(`hgi-stroke hgi-${name}`, "flex-none text-[1.15em] leading-none", className)}
+      aria-hidden="true"
+    />
+  );
 }

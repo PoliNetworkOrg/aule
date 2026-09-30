@@ -5,12 +5,15 @@ import { closedBuildings, findCampus } from "../state/availability";
 import { setMapBuilding, useStore } from "../state/store";
 import type { Building } from "../types";
 import type { Map as MapLibreMap, Marker as MapLibreMarker } from "maplibre-gl";
+import { cn } from "../../lib/cn";
+import { IconButton } from "../ui/button";
 import { Icon } from "../ui/icon";
 import { useTheme } from "../theme";
 import {
   applyMapTheme,
   hasCoordinates,
   loadMapLibre,
+  MAP_CONTROLS,
   mapControlsLocale,
   onStyleFailure,
   OPENFREEMAP_ATTRIBUTION,
@@ -18,7 +21,7 @@ import {
   toLngLat,
   type MapLibreLibrary,
 } from "../map/maplibre";
-import { RoomCard } from "./room-card";
+import { RoomCard, roomGrid } from "./room-card";
 
 // The campus in 3D (MapLibre over OpenFreeMap), shown in place of the results list. Each
 // building gets a marker with its number of free rooms for the current search;
@@ -57,13 +60,19 @@ function BuildingPanel({
   const closed = !!date && closedBuildings(campusId, date, from, to).has(building.name);
 
   return (
-    <aside className="map-panel" aria-label={`${t("building.prefix")} ${building.name}`}>
-      <header className="map-panel__header">
+    <aside
+      className={cn(
+        "flex w-[340px] flex-none flex-col gap-2.5 overflow-y-auto border-l border-border bg-surface p-3.5",
+        "max-md:max-h-[48%] max-md:w-auto max-md:border-t max-md:border-l-0",
+      )}
+      aria-label={`${t("building.prefix")} ${building.name}`}
+    >
+      <header className="flex items-start justify-between gap-2">
         <div>
-          <h3 className="map-panel__title">
+          <h3 className="text-17 font-bold">
             {t("building.prefix")} {building.name}
           </h3>
-          <p className="map-panel__subtitle">
+          <p className="text-13 text-muted">
             {closed
               ? t("map.closed")
               : tf(rooms.length === 1 ? "results.oneAvailable" : "results.available", {
@@ -72,23 +81,34 @@ function BuildingPanel({
             {building.address ? ` · ${building.address}` : ""}
           </p>
         </div>
-        <button
-          type="button"
-          className="icon-button icon-button--small"
+        <IconButton
+          size="small"
           aria-label={t("common.close")}
           onClick={() => setMapBuilding(null)}
         >
           <Icon name="cancel-01" />
-        </button>
+        </IconButton>
       </header>
       {rooms.length ? (
-        <ul className="room-grid room-grid--single">
+        <ul
+          className={cn(
+            roomGrid,
+            "grid-cols-[1fr] max-md:grid-cols-[repeat(auto-fill,minmax(150px,1fr))] md:gap-1.5",
+          )}
+        >
           {rooms.map((result) => (
-            <RoomCard key={result.room.id} result={result} date={date} from={from} to={to} />
+            <RoomCard
+              key={result.room.id}
+              result={result}
+              date={date}
+              from={from}
+              to={to}
+              layout="row"
+            />
           ))}
         </ul>
       ) : (
-        <p className="map-panel__empty">{t(closed ? "map.closedNote" : "map.noRooms")}</p>
+        <p className="text-14 text-muted">{t(closed ? "map.closedNote" : "map.noRooms")}</p>
       )}
     </aside>
   );
@@ -125,7 +145,12 @@ export default function CampusMap({ results }: { results: BuildingAvailability[]
           center: [start.long, start.lat],
           zoom: campus ? CAMPUS_ZOOM : 11.3,
           minZoom: 8.5,
-          maxZoom: 18.5,
+          // Whole number on purpose: MapLibre caps vector tiles at
+          // maxZoom − zoomLevelsToOverscale (4), and a fractional cap (18.5 →
+          // 14.5) fetches z15 tiles OpenFreeMap doesn't serve and skips
+          // overscaling, dropping every layer with minzoom ≥ 16 (toilets,
+          // most POIs).
+          maxZoom: 19,
           pitch: campus ? PITCH : 0,
           maxPitch: 70,
           pitchWithRotate: true,
@@ -215,7 +240,13 @@ export default function CampusMap({ results }: { results: BuildingAvailability[]
       const isClosed = closed.has(building.name);
 
       element.type = "button";
-      element.className = `map-marker${free ? "" : " map-marker--none"}${isClosed ? " map-marker--closed" : ""}${building.name === selected ? " map-marker--selected" : ""}`;
+      // MapLibre adds its own classes (position, transform) to the element.
+      element.className = cn(
+        "inline-flex h-[30px] items-center gap-1.5 rounded-full border border-border bg-surface pr-1 pl-2.5",
+        "font-sans text-13 font-bold whitespace-nowrap text-foreground shadow-md hover:border-accent",
+        isClosed && "border-dashed text-muted",
+        building.name === selected && "border-accent bg-accent text-on-accent",
+      );
       element.setAttribute(
         "aria-label",
         `${t("building.prefix")} ${building.name}: ${isClosed ? t("map.closed") : tf("results.available", { n: free })}`,
@@ -223,9 +254,11 @@ export default function CampusMap({ results }: { results: BuildingAvailability[]
 
       if (isClosed) element.title = t("map.closed");
 
-      label.className = "map-marker__label";
       label.textContent = building.altName || building.name;
-      count.className = "map-marker__count";
+      count.className = cn(
+        "inline-grid h-[22px] min-w-[22px] place-items-center rounded-full bg-free px-1.5 text-12 text-on-status",
+        !free && "bg-surface-muted text-muted",
+      );
       count.textContent = String(free);
       element.append(label, count);
       element.addEventListener("click", () =>
@@ -240,20 +273,24 @@ export default function CampusMap({ results }: { results: BuildingAvailability[]
   }, [library, campus, results, selected, date, from, to]);
 
   return (
-    <div className={`campus-map${selectedBuilding ? " campus-map--panel" : ""}`}>
+    <div className={cn("relative flex min-h-0 flex-1 max-md:flex-col", MAP_CONTROLS)}>
       <div
-        className="campus-map__canvas"
+        className="min-w-0 flex-1 bg-surface-muted"
         ref={host}
         role="application"
         aria-label={t("results.map")}
       />
       {error && (
-        <div className="campus-map__error">
+        <div className="absolute inset-0 flex items-center justify-center gap-2 text-muted">
           <Icon name="alert-02" />
           {t("map.error")}
         </div>
       )}
-      {!selectedBuilding && !error && <p className="campus-map__hint">{t("map.hint")}</p>}
+      {!selectedBuilding && !error && (
+        <p className="pointer-events-none absolute bottom-7 left-1/2 -translate-x-1/2 rounded-full border border-border bg-surface px-3 py-1.5 text-13 whitespace-nowrap text-muted shadow-sm">
+          {t("map.hint")}
+        </p>
+      )}
       {selectedBuilding && (
         <BuildingPanel
           building={selectedBuilding}

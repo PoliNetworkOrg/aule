@@ -1,9 +1,12 @@
 import { useState } from "react";
+import { cn } from "../../lib/cn";
 import { reloadOccupancy } from "../boot";
 import { IS_STABLE_BUILD, USE_BETA_BACKEND_KEY } from "../config";
 import { t, useLocale } from "../i18n";
 import { leavePage } from "../state/navigation-context";
 import { useStore } from "../state/store";
+import { Button, buttonVariants } from "../ui/button";
+import { Card, SectionTitle } from "../ui/card";
 import { RichText } from "../ui/rich-text";
 import { Icon } from "../ui/icon";
 
@@ -26,20 +29,19 @@ function DataStatus() {
     : "—";
 
   return (
-    <div className="data-status">
+    <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-md bg-surface-muted px-3.5 py-3">
       <p>
-        <span className="data-status__label">{t("info.updated")}</span>
+        <span className="block text-12 text-muted">{t("info.updated")}</span>
         <strong>{when}</strong>
       </p>
-      <button
-        type="button"
-        className="button button--ghost"
+      <Button
+        variant="ghost"
         disabled={occupancy === "loading"}
         onClick={() => void reloadOccupancy()}
       >
-        <Icon name="refresh" className={occupancy === "loading" ? "icon--spin" : ""} />
+        <Icon name="refresh" className={cn(occupancy === "loading" && "animate-spin")} />
         {occupancy === "loading" ? t("info.reloading") : t("info.reload")}
-      </button>
+      </Button>
     </div>
   );
 }
@@ -48,14 +50,20 @@ function BetaBackendToggle() {
   const [beta, setBeta] = useState(() => localStorage.getItem(USE_BETA_BACKEND_KEY) !== "false");
 
   return (
-    <label className="switch-row">
+    <label className="flex items-center justify-between gap-3 rounded-md border border-dashed border-border-strong px-3.5 py-3">
       <span>
         <strong>{t("info.betaBackend")}</strong>
-        <span className="switch-row__hint">{t("info.betaBackendHint")}</span>
+        <span className="block text-13 text-muted">{t("info.betaBackendHint")}</span>
       </span>
+      {/* A switch: the checkbox drawn as the track, its ::after as the knob. */}
       <input
         type="checkbox"
-        className="switch"
+        className={cn(
+          "relative m-0 h-[26px] w-11 flex-none cursor-pointer appearance-none rounded-full bg-border-strong",
+          "transition-[background-color] checked:bg-accent",
+          "after:absolute after:top-[3px] after:left-[3px] after:size-5 after:rounded-full after:bg-white after:shadow-sm after:content-['']",
+          "after:transition-[translate] checked:after:translate-x-[18px]",
+        )}
         checked={beta}
         onChange={(event) => {
           setBeta(event.target.checked);
@@ -71,49 +79,53 @@ export function InfoPage() {
   useLocale();
 
   return (
-    <main className="page info-page">
-      <button type="button" className="back-link" onClick={leavePage}>
+    <main className="mx-auto w-full max-w-[800px] px-gutter pt-3 pb-12">
+      <button
+        type="button"
+        className="mb-2 -ml-1.5 inline-flex min-h-10 items-center gap-1.5 rounded-md pr-2.5 pl-1.5 text-14 font-semibold text-muted hover:bg-accent-soft hover:text-accent-strong"
+        onClick={leavePage}
+      >
         <Icon name="arrow-left-01" />
         {t("classroom.back")}
       </button>
 
-      <section className="card info-card">
-        <h1 className="page-title">{t("app.fullName")}</h1>
-        <p className="lead">{t("info.intro")}</p>
+      <Card className="flex flex-col gap-3.5 p-6">
+        <h1 className="text-28 font-bold tracking-tighter">{t("app.fullName")}</h1>
+        <p className="text-17 text-muted">{t("info.intro")}</p>
 
-        <h2 className="section-title">{t("info.howTitle")}</h2>
-        <ul className="info-list">
-          <li>
+        <SectionTitle className="mt-2.5">{t("info.howTitle")}</SectionTitle>
+        <ul className="grid gap-2.5 icon:mt-0.5 icon:text-accent">
+          <li className="flex gap-2.5">
             <Icon name="search-01" />
             <span>{t("info.howSearch")}</span>
           </li>
-          <li>
+          <li className="flex gap-2.5">
             <Icon name="filter-horizontal" />
             <span>{t("info.howFilters")}</span>
           </li>
-          <li>
+          <li className="flex gap-2.5">
             <Icon name="star" />
             <span>{t("info.howFavourites")}</span>
           </li>
-          <li>
+          <li className="flex gap-2.5">
             <Icon name="maps" />
             <span>{t("info.howMap")}</span>
           </li>
         </ul>
 
-        <h2 className="section-title">{t("info.dataTitle")}</h2>
+        <SectionTitle className="mt-2.5">{t("info.dataTitle")}</SectionTitle>
         <p>{t("info.dataText")}</p>
         <DataStatus />
 
         {!IS_STABLE_BUILD && <BetaBackendToggle />}
 
-        <h2 className="section-title">{t("info.creditsTitle")}</h2>
+        <SectionTitle className="mt-2.5">{t("info.creditsTitle")}</SectionTitle>
         <p>
           <RichText text={t("info.credits")} />
         </p>
-        <div className="button-row">
+        <div className="flex flex-wrap gap-2">
           <a
-            className="button button--primary"
+            className={buttonVariants({ variant: "primary" })}
             href={REPOSITORY}
             target="_blank"
             rel="noopener noreferrer"
@@ -122,7 +134,7 @@ export function InfoPage() {
             GitHub
           </a>
           <a
-            className="button button--ghost"
+            className={buttonVariants({ variant: "ghost" })}
             href={`${REPOSITORY}/issues/new`}
             target="_blank"
             rel="noopener noreferrer"
@@ -130,8 +142,8 @@ export function InfoPage() {
             {t("info.reportIssue")}
           </a>
         </div>
-        <p className="fine-print">{t("info.disclaimer")}</p>
-      </section>
+        <p className="mt-2 text-13 text-subtle">{t("info.disclaimer")}</p>
+      </Card>
     </main>
   );
 }
