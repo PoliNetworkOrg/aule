@@ -1,31 +1,28 @@
 import { useEffect, useRef, useState } from "react";
 import { t, tf, useLocale } from "../i18n";
-import { isNumber } from "../../lib/guards";
 import type { BuildingAvailability } from "../state/availability";
 import { closedBuildings, findCampus } from "../state/availability";
 import { setMapBuilding, useStore } from "../state/store";
 import type { Building } from "../types";
 import type { Map as MapLibreMap, Marker as MapLibreMarker } from "maplibre-gl";
 import { Icon } from "../ui/icon";
-import { getTheme, useTheme } from "../theme";
-import { DARK_THEME, LIGHT_THEME, themedStyle } from "./map-theme";
+import { useTheme } from "../theme";
+import {
+  applyMapTheme,
+  hasCoordinates,
+  loadMapLibre,
+  mapControlsLocale,
+  onStyleFailure,
+  OPENFREEMAP_ATTRIBUTION,
+  reduceMotion,
+  toLngLat,
+  type MapLibreLibrary,
+} from "../map/maplibre";
 import { RoomCard } from "./room-card";
-
-type MapLibreLibrary = typeof import("maplibre-gl");
-
-type LngLat = [number, number];
 
 // The campus in 3D (MapLibre over OpenFreeMap), shown in place of the results list. Each
 // building gets a marker with its number of free rooms for the current search;
 // picking one lists those rooms in a panel next to (or, on phones, under) the map.
-
-// OpenFreeMap (openfreemap.org): free, keyless, no usage caps. Liberty is the
-// only one of its styles with 3D buildings; both themes repaint it at load
-// time (see map-theme.ts).
-const STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
-
-const OPENFREEMAP_ATTRIBUTION =
-  '<a href="https://openfreemap.org" target="_blank">OpenFreeMap</a> <a href="https://www.openmaptiles.org/" target="_blank">&copy; OpenMapTiles</a> Data from <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>';
 
 const CAMPUS_ZOOM = 16.5;
 
@@ -33,72 +30,9 @@ const BUILDING_ZOOM = 18;
 
 const PITCH = 55;
 
-const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
-
-function hasCoordinates(value: {
-  lat?: number;
-  long?: number;
-}): value is { lat: number; long: number } {
-  return isNumber(value.lat) && isNumber(value.long);
-}
-
-let mapLibrePromise: Promise<MapLibreLibrary> | null = null;
-
-// MapLibre's worker and stylesheet are loaded by URL (`?worker&url`, `?url`):
-// the library's own `new URL("./maplibre-gl-worker.mjs", import.meta.url)` is a
-// path Vite neither pre-bundles nor emits, and with `cssCodeSplit: false` a
-// plain stylesheet import would fold into the shell CSS every page loads.
-function loadMapLibre() {
-  mapLibrePromise ??= Promise.all([
-    import("maplibre-gl"),
-    import("maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url"),
-    import("maplibre-gl/dist/maplibre-gl.css?url"),
-  ])
-    .then(async ([lib, { default: workerUrl }, { default: cssUrl }]) => {
-      lib.setWorkerUrl(workerUrl);
-      await loadStylesheet(cssUrl);
-
-      return lib;
-    })
-    .catch((reason: Error) => {
-      mapLibrePromise = null;
-      throw reason;
-    });
-
-  return mapLibrePromise;
-}
-
-// Non-fatal if it fails: the map still renders, the controls just sit off.
-// Reused across remounts rather than appended again.
-function loadStylesheet(href: string) {
-  if (document.querySelector("link[data-maplibre-css]")) return Promise.resolve();
-
-  return new Promise<void>((resolve) => {
-    const link = document.createElement("link");
-
-    link.rel = "stylesheet";
-    link.href = href;
-    link.dataset.maplibreCss = "";
-    link.onload = () => resolve();
-    link.onerror = () => resolve();
-    document.head.append(link);
-  });
-}
-
-// OpenFreeMap's styles have no built-in light/dark switch, so the style is
-// re-applied with the current palette. Same style URL both ways, so MapLibre
-// diffs it into paint-property updates instead of a full reload.
-function applyTheme(map: MapLibreMap) {
-  map.setStyle(STYLE_URL, {
-    transformStyle: themedStyle(getTheme() === "dark" ? DARK_THEME : LIGHT_THEME),
-  });
-}
-
 function flyTo(map: MapLibreMap, target: { lat: number; long: number }, zoom: number) {
-  const center: LngLat = [target.long, target.lat];
-
   map.flyTo({
-    center,
+    center: toLngLat(target),
     zoom,
     pitch: PITCH,
     bearing: 0,
@@ -196,10 +130,7 @@ export default function CampusMap({ results }: { results: BuildingAvailability[]
           maxPitch: 70,
           pitchWithRotate: true,
           touchPitch: true,
-          // MapLibre only lists a source's attribution once it has marked that
-          // source as rendered and can skip the re-check, leaving the
-          // license-required OSM credit blank, so pin it (same string as the
-          // tiles' TileJSON; MapLibre dedupes the two).
+          locale: mapControlsLocale(),
           attributionControl: { customAttribution: OPENFREEMAP_ATTRIBUTION },
         });
 
@@ -215,22 +146,13 @@ export default function CampusMap({ results }: { results: BuildingAvailability[]
           "top-right",
         );
 
-        // setStyle() reports a failed style request (OpenFreeMap down, offline)
-        // through the `error` event rather than throwing. Any error before the
-        // first style load is that failure; later ones (a missed tile or
-        // sprite) are routine and leave the map usable.
-        let styleLoaded = false;
+        onStyleFailure(map, (reason) => {
+          if (disposed) return;
 
-        map.once("style.load", () => {
-          styleLoaded = true;
-        });
-        map.on("error", (event) => {
-          if (styleLoaded || disposed) return;
-
-          console.error("Campus map style failed to load", event.error);
+          console.error("Campus map style failed to load", reason);
           setError(true);
         });
-        applyTheme(map);
+        applyMapTheme(map);
         mapRef.current = map;
         setLibrary(maplibregl);
       })
@@ -252,7 +174,7 @@ export default function CampusMap({ results }: { results: BuildingAvailability[]
   }, []);
 
   useEffect(() => {
-    if (mapRef.current) applyTheme(mapRef.current);
+    if (mapRef.current) applyMapTheme(mapRef.current);
   }, [theme]);
 
   // Follow the campus and building selection. The building panel has just

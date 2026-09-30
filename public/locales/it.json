@@ -82,6 +82,9 @@
   "classroom.groundFloor": "Terra",
   "classroom.features": "Dotazioni",
   "classroom.directions": "Indicazioni",
+  "classroom.location": "Posizione",
+  "classroom.mapView": "Vista della mappa",
+  "classroom.mapOf": "Mappa di {building}",
   "now.free": "Libera ora",
   "now.busy": "Occupata ora",
   "now.closed": "Chiusa ora",
@@ -168,5 +171,16 @@
   "classroom.photoOf": "Foto dell'aula {name}",
   "classroom.closePhoto": "Chiudi la foto",
   "when.earlier": "15 minuti prima",
-  "when.later": "15 minuti dopo"
+  "when.later": "15 minuti dopo",
+  "maplibre.AttributionControl.ToggleAttribution": "Mostra o nascondi l'attribuzione",
+  "maplibre.FullscreenControl.Enter": "Schermo intero",
+  "maplibre.FullscreenControl.Exit": "Esci dallo schermo intero",
+  "maplibre.GeolocateControl.FindMyLocation": "Trova la mia posizione",
+  "maplibre.GeolocateControl.LocationNotAvailable": "Posizione non disponibile",
+  "maplibre.NavigationControl.ResetBearing": "Trascina per ruotare la mappa, clicca per tornare a nord",
+  "maplibre.NavigationControl.ZoomIn": "Ingrandisci",
+  "maplibre.NavigationControl.ZoomOut": "Riduci",
+  "maplibre.CooperativeGesturesHandler.WindowsHelpText": "Usa Ctrl + scorrimento per ingrandire la mappa",
+  "maplibre.CooperativeGesturesHandler.MacHelpText": "Usa ⌘ + scorrimento per ingrandire la mappa",
+  "maplibre.CooperativeGesturesHandler.MobileHelpText": "Usa due dita per spostare la mappa"
 }
