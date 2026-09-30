@@ -59,6 +59,7 @@
   "results.closedTitle": "Edifici chiusi",
   "results.closedText": "Gli edifici di questo campus sono chiusi nell'orario scelto. Prova un altro giorno o orario.",
   "status.free": "Libera",
+  "status.freeUntil": "Libera fino alle {time}",
   "status.partial": "In parte libera",
   "status.occupied": "Occupata",
   "status.closed": "Chiuso",

@@ -4,7 +4,7 @@ import { isFavourite, toggleFavourite } from "../utils/favourites";
 import type { FreeSlot, RoomAvailability, WindowStatus } from "../state/availability";
 import { findClassroom } from "../state/availability";
 import { openClassroom } from "../state/navigation-context";
-import { formatRange } from "../state/time";
+import { formatRange, formatTime } from "../state/time";
 import { Icon } from "../ui/icon";
 import { RoomThumbnail } from "./room-thumbnail";
 
@@ -43,10 +43,13 @@ export function FavouriteButton({ id, name }: { id: number; name: string }) {
 export function StatusTag({
   status,
   slots,
+  until,
   compact = false,
 }: {
   status: WindowStatus;
   slots: FreeSlot[];
+  /** Free rooms: when they stop being free, shown instead of a bare "Free". */
+  until?: string;
   compact?: boolean;
 }) {
   useLocale();
@@ -56,7 +59,12 @@ export function StatusTag({
   if (status === "occupied")
     return <span className="tag tag--occupied">{t("status.occupied")}</span>;
 
-  if (status === "free") return <span className="tag tag--free">{t("status.free")}</span>;
+  if (status === "free")
+    return (
+      <span className="tag tag--free">
+        {until && !compact ? tf("status.freeUntil", { time: formatTime(until) }) : t("status.free")}
+      </span>
+    );
 
   const [first, ...rest] = slots;
 
@@ -87,7 +95,7 @@ export function RoomCard({
   to: string;
 }) {
   useLocale();
-  const { room, status, slots } = result;
+  const { room, status, slots, freeUntil } = result;
   const entry = findClassroom(room.id);
 
   return (
@@ -121,7 +129,7 @@ export function RoomCard({
             </span>
           ) : null}
         </span>
-        <StatusTag status={status} slots={slots} />
+        <StatusTag status={status} slots={slots} until={freeUntil} />
       </button>
       <FavouriteButton id={room.id} name={room.name} />
     </li>

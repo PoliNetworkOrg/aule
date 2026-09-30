@@ -230,3 +230,33 @@ describe("a booked lesson inside closed time", () => {
     ]);
   });
 });
+
+describe("how long a free room stays free", () => {
+  function until(hours: BuildingHours, occupancy: Occupation[], from: string, to: string) {
+    seed(hours, [TUESDAY.replaceAll("-", "")], occupancy);
+
+    return search(TUESDAY, from, to)[0]?.rooms[0]?.freeUntil;
+  }
+
+  it("runs to the next lesson after the window", () => {
+    expect(
+      until(WEEKDAYS_ONLY, [lesson("08:00", "09:00"), lesson("13:15", "15:00")], "10:00", "12:00"),
+    ).toBe("13:15");
+  });
+
+  it("stops at the window's end when a lesson starts right then", () => {
+    expect(until(WEEKDAYS_ONLY, [lesson("12:00", "13:00")], "10:00", "12:00")).toBe("12:00");
+  });
+
+  it("stops at closing when no lesson comes first", () => {
+    expect(until(EARLY_CLOSING, [lesson("18:00", "19:00")], "10:00", "12:00")).toBe("17:00");
+  });
+
+  it("runs to the end of the day otherwise", () => {
+    expect(until(WEEKDAYS_ONLY, [], "10:00", "12:00")).toBe("20:15");
+  });
+
+  it("is left out for partly free rooms", () => {
+    expect(until(WEEKDAYS_ONLY, [lesson("11:00", "11:30")], "10:00", "12:00")).toBeUndefined();
+  });
+});

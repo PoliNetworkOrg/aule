@@ -48,6 +48,8 @@ export interface RoomAvailability {
   slots: FreeSlot[];
   /** Total free minutes inside the searched window. */
   freeMinutes: number;
+  /** Free rooms only: when the free stretch covering the window ends ("HH:MM"). */
+  freeUntil?: string;
 }
 
 interface WindowAvailability {
@@ -225,6 +227,20 @@ function windowAvailability(
   return { status: windowStatus(slots, from, to), slots };
 }
 
+/**
+ * When a room free from `to` stops being free: its next booking, the
+ * building's closing time or the end of the day, whichever comes first.
+ */
+export function freeUntil(occupancy: Occupation[], opening: BuildingOpening | null, to: string) {
+  let end = fromMinutes(DAY_END);
+
+  if (opening && !opening.closed && opening.closes < end) end = opening.closes;
+
+  for (const slot of occupancy) if (slot.inizio >= to && slot.inizio < end) end = slot.inizio;
+
+  return end;
+}
+
 function hasFeature(room: Classroom, ids: number[]) {
   return (room.features ?? []).some((feature) => ids.includes(feature.id));
 }
@@ -285,6 +301,7 @@ export function findAvailability(
         status,
         slots,
         freeMinutes: slotMinutes(slots),
+        freeUntil: status === "free" ? freeUntil(occupied.occupancy ?? [], opening, to) : undefined,
       });
     }
 

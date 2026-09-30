@@ -59,6 +59,7 @@
   "results.closedTitle": "Buildings closed",
   "results.closedText": "The buildings on this campus are closed at the chosen time. Try another day or time.",
   "status.free": "Free",
+  "status.freeUntil": "Free until {time}",
   "status.partial": "Partly free",
   "status.occupied": "Occupied",
   "status.closed": "Closed",
