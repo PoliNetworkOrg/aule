@@ -227,6 +227,11 @@ button.summary__partial[aria-pressed="true"] {
   margin: -10px -12px 6px;
 }
 
+/* Without a thumbnail, keep the content bottom-aligned with photo cards in the same row. */
+.room-card__name:first-child {
+  margin-top: auto;
+}
+
 .room-card__main:hover {
   border-color: var(--accent-soft-border);
   background: color-mix(in srgb, var(--accent-soft) 50%, var(--surface));
