@@ -456,7 +456,8 @@ mark {
 
 .chip__chevron {
   font-size: 14px;
-  transition: rotate 0.15s;
+  /* In step with the "More filters" panel it discloses. */
+  transition: rotate var(--duration-fast) var(--ease-smooth-out);
 }
 
 .chip__chevron--open {
