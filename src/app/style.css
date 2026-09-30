@@ -47,6 +47,8 @@
   --accent-soft-border: var(--blue-200);
   --accent-text: var(--blue-700);
   --on-accent: #ffffff;
+  /* Text on solid --free / --busy fills (counters, badges). */
+  --on-status: #ffffff;
   --focus-ring: color-mix(in srgb, var(--blue-500) 45%, transparent);
 
   --free: #15803d;
@@ -89,6 +91,7 @@
   --accent-soft-border: rgb(91 156 240 / 45%);
   --accent-text: #8cbcf6;
   --on-accent: var(--slate-950);
+  --on-status: var(--slate-950);
 
   --free: #4ade80;
   --free-soft: rgb(74 222 128 / 10%);
@@ -559,7 +562,7 @@ mark {
   height: 18px;
   border-radius: 999px;
   background: var(--busy);
-  color: #ffffff;
+  color: var(--on-status);
   font-size: 11px;
 }
 

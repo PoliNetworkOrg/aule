@@ -121,12 +121,13 @@
   padding: 0 6px;
   border-radius: 999px;
   background: var(--free);
-  color: #ffffff;
+  color: var(--on-status);
   font-size: 12px;
 }
 
 .map-marker--none .map-marker__count {
-  background: var(--slate-400);
+  background: var(--surface-muted);
+  color: var(--text-muted);
 }
 
 .map-marker--closed {
