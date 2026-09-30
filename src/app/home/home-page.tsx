@@ -42,7 +42,7 @@ function ControlsSummary() {
       aria-expanded={!collapsed}
       onClick={() => setControlsCollapsed(false)}
     >
-      <Icon name="search-01" />
+      <Icon name="filter-horizontal" />
       <span className="controls-summary__text">
         <strong>{campus?.name}</strong> · {day} · {formatRange(from, to)}
         {active > 0 && (
