@@ -22,6 +22,7 @@
       content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://api.poliaule.com https://api-beta.poliaule.com; connect-src 'self' https://api.poliaule.com https://api-beta.poliaule.com https://tiles.openfreemap.org; worker-src 'self' blob:; base-uri 'self'; object-src 'none'"
     />
 
+    <!-- Matches the header (--surface); kept in sync by the script below and theme.ts. -->
     <meta name="theme-color" content="#ffffff" />
     <script>
       // Set the saved theme before CSS and the splash screen are painted.
@@ -34,7 +35,7 @@
             : "light";
       document.documentElement.dataset.theme = theme;
       document.querySelector('meta[name="theme-color"]').content =
-        theme === "dark" ? "#131c2e" : "#ffffff";
+        theme === "dark" ? "#182236" : "#ffffff";
     </script>
 
     <link rel="icon" type="image/png" href="/favicons/main/favicon-96x96.png?v=3" sizes="96x96" />
@@ -62,7 +63,7 @@
       }
 
       :root[data-theme="dark"] {
-        --splash-bg: #020617;
+        --splash-bg: #131c2e;
         --splash-text: #f1f5f9;
         --splash-muted: #94a3b8;
       }
