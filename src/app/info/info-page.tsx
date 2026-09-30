@@ -125,7 +125,7 @@ export function InfoPage() {
         </p>
         <div className="flex flex-wrap gap-2">
           <a
-            className={cn(buttonVariants({ variant: "primary" }))}
+            className={buttonVariants({ variant: "primary" })}
             href={REPOSITORY}
             target="_blank"
             rel="noopener noreferrer"
@@ -134,7 +134,7 @@ export function InfoPage() {
             GitHub
           </a>
           <a
-            className={cn(buttonVariants({ variant: "ghost" }))}
+            className={buttonVariants({ variant: "ghost" })}
             href={`${REPOSITORY}/issues/new`}
             target="_blank"
             rel="noopener noreferrer"

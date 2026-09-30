@@ -2,7 +2,7 @@ import type { ComponentProps } from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "../../lib/cn";
 
-export const tagVariants = cva(
+const tagVariants = cva(
   "inline-flex h-[22px] items-center gap-1 rounded-sm px-2 text-12 font-bold whitespace-nowrap tabular-nums",
   {
     variants: {
@@ -27,7 +27,7 @@ export function Tag({
   return <span className={cn(tagVariants({ tone }), className)} {...props} />;
 }
 
-export const statusDotVariants = cva("size-2 flex-none rounded-full bg-neutral", {
+const statusDotVariants = cva("size-2 flex-none rounded-full bg-neutral", {
   variants: {
     status: {
       free: "bg-free",

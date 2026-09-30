@@ -3,7 +3,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "../../lib/cn";
 import { centreStable } from "./focus";
 
-export const buttonVariants = cva(
+const buttonCva = cva(
   [
     "inline-flex min-h-10 items-center justify-center gap-1.5 rounded-md border border-transparent px-4",
     "text-14 font-semibold whitespace-nowrap no-underline",
@@ -26,7 +26,12 @@ export const buttonVariants = cva(
   },
 );
 
-type ButtonVariants = VariantProps<typeof buttonVariants>;
+type ButtonVariants = VariantProps<typeof buttonCva>;
+
+/** Button classes, conflicts resolved (e.g. for links styled as buttons). */
+export function buttonVariants(variants?: ButtonVariants) {
+  return cn(buttonCva(variants));
+}
 
 /** Text buttons; links styled as buttons use `buttonVariants` directly. */
 export function Button({
@@ -41,7 +46,7 @@ export function Button({
   );
 }
 
-export const iconButtonVariants = cva(
+const iconButtonVariants = cva(
   [
     "inline-grid place-items-center rounded-md text-muted transition-[background-color,color]",
     "hover:bg-surface-muted hover:text-foreground",

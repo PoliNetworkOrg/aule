@@ -5,17 +5,9 @@
    src/app/ui. Only element defaults and the design tokens live here.
    ========================================================================== */
 
-@layer theme, base, components, legacy, utilities; /* MIGRATION-ONLY: legacy */
+@layer theme, base, components, utilities;
 @import "tailwindcss/theme.css" layer(theme);
 @import "tailwindcss/utilities.css" layer(utilities);
-
-/* MIGRATION-ONLY: legacy BEM styles for markup not yet converted. */
-@import "./app/style.css" layer(legacy);
-@import "./app/styles/header.css" layer(legacy);
-@import "./app/styles/home.css" layer(legacy);
-@import "./app/styles/results.css" layer(legacy);
-@import "./app/styles/map.css" layer(legacy);
-@import "./app/styles/classroom.css" layer(legacy);
 
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 

@@ -8,9 +8,7 @@ import { LOCALES, translate, useLocale, type Locale } from "../i18n";
  */
 export function Stable({ variants, current }: { variants: string[]; current: number }) {
   return (
-    <span data-slot="stable" className="stable inline-grid justify-items-start">
-      {" "}
-      {/* MIGRATION-ONLY: "stable" */}
+    <span data-slot="stable" className="inline-grid justify-items-start">
       {variants.map((text, index) => (
         <span
           key={index}

@@ -36,10 +36,8 @@ const VIEW_KEY = "poliAule_mapView";
 const BUILDING_ZOOM = 17.5;
 
 // The location map's own MapLibre overrides (its unlayered stylesheet loads
-// later, hence !important). The control groups keep MapLibre's own ring:
-// its `:not(:empty)` shadow always outranked the flattened one.
+// later, hence !important).
 const LOCATION_CONTROLS = [
-  "[&_.maplibregl-ctrl-group]:shadow-[0_0_0_2px_rgb(0_0_0/10%)]!",
   // "Ctrl + scroll to zoom" / "two fingers to move" hint over the map.
   "[&_.maplibregl-cooperative-gesture-screen]:bg-scrim/55! [&_.maplibregl-cooperative-gesture-screen]:p-4!",
   "[&_.maplibregl-cooperative-gesture-screen]:font-sans! [&_.maplibregl-cooperative-gesture-screen]:text-15!",

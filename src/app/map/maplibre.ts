@@ -28,10 +28,11 @@ export const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
 
 // MapLibre's controls and credit, flattened onto the app's surfaces. Set on the
 // element wrapping a map. MapLibre's stylesheet loads later and outside the
-// cascade layers, so these overrides are !important.
+// cascade layers, so these overrides are !important. The control groups keep
+// MapLibre's own ring shadow.
 export const MAP_CONTROLS = [
   "[&_.maplibregl-ctrl-group]:overflow-hidden! [&_.maplibregl-ctrl-group]:rounded-md! [&_.maplibregl-ctrl-group]:border!",
-  "[&_.maplibregl-ctrl-group]:border-border! [&_.maplibregl-ctrl-group]:bg-surface! [&_.maplibregl-ctrl-group]:shadow-sm!",
+  "[&_.maplibregl-ctrl-group]:border-border! [&_.maplibregl-ctrl-group]:bg-surface!",
   "[&_.maplibregl-ctrl-group_button+button]:border-t-border!",
   // The control icons are dark bitmaps; flip their lightness (keeping the hue
   // of the geolocate blue) on the dark surface.

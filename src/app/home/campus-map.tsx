@@ -261,15 +261,7 @@ export default function CampusMap({ results }: { results: BuildingAvailability[]
   }, [library, campus, results, selected, date, from, to]);
 
   return (
-    <div
-      className={cn(
-        "relative flex min-h-0 flex-1 max-md:flex-col",
-        MAP_CONTROLS,
-        // MapLibre's own ring (`.maplibregl-ctrl-group:not(:empty)`) always outranked the
-        // legacy shadow; keep it rather than MAP_CONTROLS' shadow-sm.
-        "[&_.maplibregl-ctrl-group]:shadow-[0_0_0_2px_rgb(0_0_0/10%)]!",
-      )}
-    >
+    <div className={cn("relative flex min-h-0 flex-1 max-md:flex-col", MAP_CONTROLS)}>
       <div
         className="min-w-0 flex-1 bg-surface-muted"
         ref={host}

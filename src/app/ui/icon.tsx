@@ -6,12 +6,7 @@ export function Icon({ name, className }: { name: string; className?: string }) 
   return (
     <i
       data-slot="icon"
-      className={cn(
-        `hgi-stroke hgi-${name}`,
-        "icon",
-        "flex-none text-[1.15em] leading-none",
-        className,
-      )} // MIGRATION-ONLY: "icon"
+      className={cn(`hgi-stroke hgi-${name}`, "flex-none text-[1.15em] leading-none", className)}
       aria-hidden="true"
     />
   );

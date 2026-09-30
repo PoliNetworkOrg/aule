@@ -211,7 +211,7 @@ function Location({ entry }: { entry: ClassroomEntry }) {
       )}
       <div className="flex flex-wrap gap-2">
         <a
-          className={cn(buttonVariants({ variant: "ghost" }))}
+          className={buttonVariants({ variant: "ghost" })}
           href={directionsUrl}
           target="_blank"
           rel="noopener noreferrer"

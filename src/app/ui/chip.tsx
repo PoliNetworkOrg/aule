@@ -6,7 +6,7 @@ import { insetFocus } from "./focus";
 // Pill toggles and actions: filters, professors, "remove this filter" hints.
 // Pressed (aria-pressed) and open (aria-expanded) chips light up in the accent.
 
-export const chipVariants = cva(
+const chipVariants = cva(
   [
     "inline-flex h-9 flex-none items-center gap-1.5 rounded-full border border-border bg-surface px-3",
     "text-14 font-medium whitespace-nowrap text-foreground",

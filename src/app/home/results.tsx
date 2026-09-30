@@ -407,8 +407,7 @@ export function Results({ className }: { className?: string }) {
       <DataNotice />
       <div
         className={cn(
-          // Very short viewports (landscape phones): the page scrolls instead.
-          "relative min-h-0 flex-1 max-lg:short:flex-none",
+          "relative min-h-0 flex-1",
           view === "list"
             ? "overflow-y-auto overscroll-contain max-[600px]:scrollbar-none"
             : "flex",

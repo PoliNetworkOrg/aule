@@ -10,7 +10,7 @@
  * (same layer order as src/styles.css), so Tailwind utilities on an icon, such
  * as `absolute` or `block`, override `.hgi-stroke`.
  */
-@layer theme, base, components, legacy, utilities; /* MIGRATION-ONLY: legacy */
+@layer theme, base, components, utilities;
 @font-face {
   font-family: "hugeicons-stroke-rounded";
   src: url("hgi-stroke-rounded.woff2") format("woff2");
