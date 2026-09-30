@@ -67,6 +67,8 @@
   --radius-sm: 6px;
   --radius: 10px;
   --radius-lg: 14px;
+  /* Bottom sheets: larger surfaces, rounder top corners. */
+  --radius-xl: 18px;
   --shadow-sm: 0 1px 2px rgb(15 23 42 / 6%);
   --shadow: 0 4px 16px rgb(15 23 42 / 8%);
 
@@ -492,7 +494,8 @@ mark {
   gap: 6px;
   min-height: 32px;
   padding: 0 12px;
-  border-radius: 7px;
+  /* Concentric with .segmented: its radius minus its 3px padding. */
+  border-radius: calc(var(--radius) - 3px);
   color: var(--text-muted);
   font-size: 14px;
   font-weight: 600;
@@ -878,7 +881,7 @@ mark {
   right: 0;
   bottom: 0;
   max-height: 80dvh;
-  border-radius: 18px 18px 0 0;
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
   border-bottom: 0;
   padding-bottom: env(safe-area-inset-bottom);
 }

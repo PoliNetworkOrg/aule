@@ -326,7 +326,7 @@
 .schedule__legend-swatch {
   width: 14px;
   height: 10px;
-  border-radius: 3px;
+  border-radius: calc(var(--radius-sm) / 2);
   border: 1.5px solid var(--accent);
   background: var(--accent-soft);
 }
@@ -382,7 +382,8 @@
   top: 2px;
   bottom: 2px;
   border: 2px solid var(--accent);
-  border-radius: 4px;
+  /* Concentric with .timeline__bar, which it's inset 2px into. */
+  border-radius: calc(var(--radius-sm) - 2px);
   background: color-mix(in srgb, var(--accent) 12%, transparent);
   z-index: 1;
 }
