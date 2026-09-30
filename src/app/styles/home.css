@@ -843,6 +843,22 @@ body[data-page="home"] #root {
   color: var(--text-muted);
 }
 
+/* No favourites yet: title and hint share one line instead of a full panel. */
+.favourites--empty {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 10px;
+}
+
+.favourites--empty .panel__header {
+  min-height: 0;
+}
+
+.favourites--empty .favourites__hint {
+  font-size: 13px;
+}
+
 /* ---------- Search results ---------- */
 
 .search-results {
