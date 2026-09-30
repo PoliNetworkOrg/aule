@@ -724,7 +724,9 @@ mark {
 .star-button svg {
   width: 20px;
   height: 20px;
-  fill: none;
+  /* Transparent rather than none, so the fill can fade in with the colour. */
+  fill: transparent;
+  transition: fill 0.15s;
   stroke: currentcolor;
   stroke-width: 1.7;
   stroke-linejoin: round;
