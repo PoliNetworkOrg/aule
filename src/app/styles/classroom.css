@@ -102,10 +102,48 @@
   border: 0;
   background: transparent;
   overflow: visible;
+  /* Closed state and close motion: quicker than the open, and display/overlay
+     stay discrete so the photo is still painted while it fades out. */
+  opacity: 0;
+  scale: var(--scale-large);
+  transition:
+    opacity var(--duration-quick) var(--ease-smooth-out),
+    scale var(--duration-quick) var(--ease-smooth-out),
+    display var(--duration-quick) allow-discrete,
+    overlay var(--duration-quick) allow-discrete;
+}
+
+.room-photo-dialog[open] {
+  opacity: 1;
+  scale: 1;
+  transition-duration: var(--duration-fast);
+}
+
+@starting-style {
+  .room-photo-dialog[open] {
+    opacity: 0;
+    scale: var(--scale-large);
+  }
 }
 
 .room-photo-dialog::backdrop {
   background: rgb(15 23 42 / 88%);
+  opacity: 0;
+  transition:
+    opacity var(--duration-quick) var(--ease-smooth-out),
+    display var(--duration-quick) allow-discrete,
+    overlay var(--duration-quick) allow-discrete;
+}
+
+.room-photo-dialog[open]::backdrop {
+  opacity: 1;
+  transition-duration: var(--duration-fast);
+}
+
+@starting-style {
+  .room-photo-dialog[open]::backdrop {
+    opacity: 0;
+  }
 }
 
 .room-photo-dialog__image {
