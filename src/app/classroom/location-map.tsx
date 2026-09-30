@@ -3,11 +3,14 @@ import type { Map as MapLibreMap, Marker as MapLibreMarker } from "maplibre-gl";
 import { t, tf, useLocale } from "../i18n";
 import { useTheme } from "../theme";
 import type { Building } from "../types";
+import { cn } from "../../lib/cn";
 import { Icon } from "../ui/icon";
+import { Segmented, SegmentedOption } from "../ui/segmented";
 import {
   applyMapTheme,
   hasCoordinates,
   loadMapLibre,
+  MAP_CONTROLS,
   mapControlsLocale,
   onStyleFailure,
   OPENFREEMAP_ATTRIBUTION,
@@ -31,6 +34,17 @@ const VIEWS: MapView[] = ["2d", "3d"];
 const VIEW_KEY = "poliAule_mapView";
 
 const BUILDING_ZOOM = 17.5;
+
+// The location map's own MapLibre overrides (its unlayered stylesheet loads
+// later, hence !important). The control groups keep MapLibre's own ring:
+// its `:not(:empty)` shadow always outranked the flattened one.
+const LOCATION_CONTROLS = [
+  "[&_.maplibregl-ctrl-group]:shadow-[0_0_0_2px_rgb(0_0_0/10%)]!",
+  // "Ctrl + scroll to zoom" / "two fingers to move" hint over the map.
+  "[&_.maplibregl-cooperative-gesture-screen]:bg-scrim/55! [&_.maplibregl-cooperative-gesture-screen]:p-4!",
+  "[&_.maplibregl-cooperative-gesture-screen]:font-sans! [&_.maplibregl-cooperative-gesture-screen]:text-15!",
+  "[&_.maplibregl-cooperative-gesture-screen]:font-semibold!",
+].join(" ");
 
 const CAMERA = {
   "2d": { pitch: 0, bearing: 0 },
@@ -113,18 +127,32 @@ function useNearViewport(element: RefObject<HTMLElement | null>) {
   return near;
 }
 
-function markerElement(className: string, label?: string) {
+// The building's pin: a labelled pill with a dot, pointing down at it. The
+// campus's other buildings (2D only) are just the dot. MapLibre positions the
+// element (absolute), which also anchors the pin's ::after pointer.
+const MARKER =
+  "inline-flex items-center gap-1.5 rounded-full font-sans text-13 font-bold whitespace-nowrap text-on-accent";
+
+const BUILDING_MARKER = cn(
+  MARKER,
+  "pointer-events-none mb-1.75 h-[30px] bg-accent pr-3 pl-2.5 shadow-md",
+  "after:absolute after:bottom-[-6px] after:left-1/2 after:-translate-x-1/2 after:content-['']",
+  "after:border-6 after:border-b-0 after:border-transparent after:border-t-accent",
+);
+
+const OTHER_MARKER = cn(MARKER, "pointer-events-auto");
+
+function markerElement(className: string, dotClassName: string, label?: string) {
   const element = document.createElement("div");
   const dot = document.createElement("span");
 
   element.className = className;
-  dot.className = "location-marker__dot";
+  dot.className = dotClassName;
   element.append(dot);
 
   if (label) {
     const text = document.createElement("span");
 
-    text.className = "location-marker__label";
     text.textContent = label;
     element.append(text);
   }
@@ -135,9 +163,12 @@ function markerElement(className: string, label?: string) {
 export default function LocationMap({
   building,
   campusBuildings,
+  className,
 }: {
   building: Building & Point;
   campusBuildings: Building[];
+  /** The map's frame, shared with the page's loading placeholder. */
+  className: string;
 }) {
   const locale = useLocale();
   const theme = useTheme();
@@ -241,7 +272,10 @@ export default function LocationMap({
 
     if (view === "2d") {
       for (const other of siblings) {
-        const element = markerElement("location-marker location-marker--other");
+        const element = markerElement(
+          OTHER_MARKER,
+          "size-2.5 rounded-full border-2 border-surface bg-neutral shadow-sm",
+        );
 
         element.title = buildingLabel(other);
         markers.current.push(
@@ -251,7 +285,10 @@ export default function LocationMap({
     }
 
     markers.current.push(
-      new library.Marker({ element: markerElement("location-marker", label), anchor: "bottom" })
+      new library.Marker({
+        element: markerElement(BUILDING_MARKER, "size-2 rounded-full bg-current", label),
+        anchor: "bottom",
+      })
         .setLngLat(toLngLat(building))
         .addTo(map),
     );
@@ -294,32 +331,33 @@ export default function LocationMap({
   }
 
   return (
-    <div className="location-map">
+    <div className={cn(className, MAP_CONTROLS, LOCATION_CONTROLS)}>
+      {/* Sized, not absolutely positioned: MapLibre's own stylesheet (loaded
+          later) makes its container `position: relative`. */}
       <div
-        className="location-map__canvas"
+        className="size-full"
         ref={host}
         role="application"
         aria-label={tf("classroom.mapOf", { building: label })}
       />
-      <div
-        className="segmented location-map__views"
+      <Segmented
+        className="absolute top-2.5 left-2.5 z-2 bg-surface shadow-sm"
         role="group"
         aria-label={t("classroom.mapView")}
       >
         {VIEWS.map((option) => (
-          <button
+          <SegmentedOption
             key={option}
-            type="button"
-            className="segmented__option"
+            className="min-h-7 px-2.5 text-13 tabular-nums aria-pressed:bg-accent aria-pressed:text-on-accent"
             aria-pressed={view === option}
             onClick={() => selectView(option)}
           >
             {option.toUpperCase()}
-          </button>
+          </SegmentedOption>
         ))}
-      </div>
+      </Segmented>
       {error && (
-        <div className="location-map__error">
+        <div className="absolute inset-0 z-3 flex items-center justify-center gap-2 bg-surface-muted text-14 text-muted">
           <Icon name="alert-02" />
           {t("map.error")}
         </div>
