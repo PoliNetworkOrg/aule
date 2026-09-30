@@ -125,7 +125,12 @@ export default function CampusMap({ results }: { results: BuildingAvailability[]
           center: [start.long, start.lat],
           zoom: campus ? CAMPUS_ZOOM : 11.3,
           minZoom: 8.5,
-          maxZoom: 18.5,
+          // Whole number on purpose: MapLibre caps vector tiles at
+          // maxZoom − zoomLevelsToOverscale (4), and a fractional cap (18.5 →
+          // 14.5) fetches z15 tiles OpenFreeMap doesn't serve and skips
+          // overscaling, dropping every layer with minzoom ≥ 16 (toilets,
+          // most POIs).
+          maxZoom: 19,
           pitch: campus ? PITCH : 0,
           maxPitch: 70,
           pitchWithRotate: true,
