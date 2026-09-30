@@ -875,6 +875,13 @@ mark {
 
 .popup-layer--sheet .popup-backdrop {
   background: rgb(15 23 42 / 40%);
+  transition: opacity var(--duration-quick) var(--ease-smooth-out);
+}
+
+@starting-style {
+  .popup-layer--sheet .popup-backdrop {
+    opacity: 0;
+  }
 }
 
 .popup {
@@ -912,6 +919,18 @@ mark {
   border-radius: var(--radius-xl) var(--radius-xl) 0 0;
   border-bottom: 0;
   padding-bottom: env(safe-area-inset-bottom);
+  /* Rises a short way rather than the full sheet height: a nudge, not a
+     drawer. Closing is instant, like the anchored panel. */
+  transition:
+    opacity var(--duration-fast) var(--ease-smooth-out),
+    translate var(--duration-fast) var(--ease-smooth-out);
+}
+
+@starting-style {
+  .popup--sheet {
+    opacity: 0;
+    translate: 0 var(--distance-base);
+  }
 }
 
 .popup__header {
