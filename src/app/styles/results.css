@@ -232,6 +232,13 @@ button.summary__partial[aria-pressed="true"] {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  /* Fades in over the muted placeholder once loaded, like the room page photo. */
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-in-out);
+}
+
+.room-thumbnail--ready img {
+  opacity: 1;
 }
 
 .room-card .room-thumbnail {
