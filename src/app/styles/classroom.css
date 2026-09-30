@@ -195,10 +195,12 @@
   color: var(--text);
 }
 
-/* Full width, one equal column per stat (two when the floor is unknown). */
+/* Full width, one equal column per stat (two when the floor is unknown); a
+   column only grows past its share when its content would not fit ("Ground"
+   on the narrowest phones). */
 .room-stats {
   display: grid;
-  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-columns: minmax(max-content, 1fr);
   grid-auto-flow: column;
   gap: 8px;
 }
@@ -209,7 +211,7 @@
   justify-content: center;
   gap: 8px;
   height: 36px;
-  padding: 0 8px;
+  padding: 0 4px;
   border-radius: var(--radius);
   background: var(--surface-muted);
 }
