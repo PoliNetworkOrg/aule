@@ -240,8 +240,10 @@ function themedLayer(layer: LayerSpecification, t: MapTheme): LayerSpecification
 
 const IS_TOILET: ExpressionSpecification = ["==", ["get", "class"], "toilets"];
 
-// Parking (car, bike, motorbike) is noise on a map for finding rooms; the
-// bike and motorbike classes have no sprite icon and only surface as names.
+// Parking is hidden on purpose. Most car parking mapped on campus (e.g.
+// between Leonardo's buildings 1–9) is reserved for Politecnico staff, which
+// would mislead students. Bike and motorbike parking have no sprite icon and
+// only surface as names.
 const IS_PARKING: ExpressionSpecification = [
   "match",
   ["get", "class"],
