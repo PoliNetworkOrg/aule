@@ -261,6 +261,27 @@ mark {
 
 /* ---------- Shared controls ---------- */
 
+/* Press feedback: taps get no hover state, and the tap highlight is off (see
+   body), so pressable surfaces sink slightly while held. Instant, not
+   animated, so it never lags the finger. */
+.button:active:not(:disabled),
+.chip:active,
+.choice:active,
+.date-strip__day:active,
+.time-grid__option:active,
+.option:active,
+.favourite__open:active,
+.search-room:active,
+.search-session:active {
+  scale: 0.97;
+}
+
+/* Large cards move more at the same ratio: keep their press subtle. */
+.room-card__main:active,
+.campus-select:active:not(:disabled) {
+  scale: 0.985;
+}
+
 .button {
   display: inline-flex;
   align-items: center;
