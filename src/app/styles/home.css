@@ -117,6 +117,8 @@ body[data-page="home"] #root {
     overscroll-behavior: contain;
     gap: 16px;
     padding-top: 16px;
+    /* The "Show n rooms" bar below reaches the edge itself, safe area included. */
+    padding-bottom: 0;
   }
 
   .home--results .home__controls {
@@ -163,13 +165,18 @@ body[data-page="home"] #root {
     flex: none;
   }
 
+  /* Attached to the bottom of the screen: pushed down by margin-top: auto when
+     the parameters are shorter than the screen, stuck there when they scroll. */
   .controls__cta {
     display: block;
     position: sticky;
     bottom: 0;
-    margin: 4px calc(var(--page-gutter) * -1) -18px;
+    margin: auto calc(var(--page-gutter) * -1) 0;
     padding: 12px var(--page-gutter) calc(12px + env(safe-area-inset-bottom));
-    background: linear-gradient(to top, var(--bg) 70%, transparent);
+    /* Solid with a top edge, like the header: a short fade only let a thin line
+       of the scrolling content show through above the button. */
+    border-top: 1px solid var(--border);
+    background: var(--bg);
   }
 
   /* Same compact height as the search bar (see .search__input below). */
