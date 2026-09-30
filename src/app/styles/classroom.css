@@ -282,60 +282,6 @@
   color: var(--text-muted);
 }
 
-.day-tabs {
-  display: flex;
-  gap: 6px;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.day-tabs::-webkit-scrollbar {
-  display: none;
-}
-
-.day-tabs__tab {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  flex: 1 1 48px;
-  max-width: 80px;
-  padding: 6px 4px;
-  gap: 1px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  line-height: 1.15;
-  transition:
-    border-color 0.15s,
-    background-color 0.15s;
-}
-
-.day-tabs__tab:hover {
-  border-color: var(--accent-soft-border);
-}
-
-.day-tabs__weekday {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-muted);
-}
-
-.day-tabs__number {
-  font-size: 17px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-
-.day-tabs__tab[aria-pressed="true"] {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--on-accent);
-}
-
-.day-tabs__tab[aria-pressed="true"] .day-tabs__weekday {
-  color: inherit;
-  opacity: 0.85;
-}
-
 .schedule__day {
   display: flex;
   flex-direction: column;
@@ -596,20 +542,8 @@
   }
 }
 
-/* Narrow phones: six day tabs and "18:00 20:00" labels no longer fit side by side. */
+/* Narrow phones: "18:00 20:00" timeline labels no longer fit side by side. */
 @media (max-width: 389px) {
-  .day-tabs {
-    gap: 4px;
-  }
-
-  .day-tabs__tab {
-    padding-inline: 2px;
-  }
-
-  .day-tabs__weekday {
-    font-size: 11px;
-  }
-
   .timeline__tick-minutes {
     display: none;
   }

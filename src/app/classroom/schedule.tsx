@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 
 type PositionStyle = CSSProperties & { "--pos": string };
 
+type DaysStyle = CSSProperties & { "--days": number };
+
 import { hasOpeningHours, romeMinutesOfDay } from "../available-rooms-script";
 import { t, tf, useLocale } from "../i18n";
 import { availableDates, roomDay } from "../state/availability";
@@ -241,24 +243,32 @@ export function Schedule({
       ? "schedule.closedAllDay"
       : "schedule.freeWhenOpen";
 
+  const daysStyle: DaysStyle = { "--days": dates.length };
+
   return (
     <div className="schedule" data-revision={revision}>
-      <div className="day-tabs" role="group" aria-label={t("schedule.days")}>
+      {/* Same day picker as the home "When" panel. */}
+      <div
+        className="date-strip__days"
+        style={daysStyle}
+        role="group"
+        aria-label={t("schedule.days")}
+      >
         {dates.map((date) => {
           return (
             <button
               key={date}
               type="button"
               aria-pressed={date === day}
-              className="day-tabs__tab"
+              className="date-strip__day"
               onClick={() => setSelected(date)}
             >
-              <span className="day-tabs__weekday">
+              <span className="date-strip__weekday">
                 {date === today
                   ? t("when.today")
                   : capitalise(weekday.format(parseIsoDate(date)).replace(/\.$/, ""), locale)}
               </span>
-              <span className="day-tabs__number">{parseIsoDate(date).getDate()}</span>
+              <span className="date-strip__number">{parseIsoDate(date).getDate()}</span>
             </button>
           );
         })}
