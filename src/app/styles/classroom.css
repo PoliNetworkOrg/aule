@@ -195,18 +195,21 @@
   color: var(--text);
 }
 
+/* Full width, one equal column per stat (two when the floor is unknown). */
 .room-stats {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
   gap: 8px;
 }
 
 .room-stats div {
-  display: inline-flex;
+  display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   height: 36px;
-  padding: 0 12px;
+  padding: 0 8px;
   border-radius: var(--radius);
   background: var(--surface-muted);
 }
