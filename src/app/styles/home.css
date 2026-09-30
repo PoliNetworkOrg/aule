@@ -499,6 +499,9 @@ body[data-page="home"] #root {
   font-size: 15px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+  transition:
+    background-color 0.15s,
+    color 0.15s;
 }
 
 .time-grid__option:hover {
@@ -564,6 +567,9 @@ body[data-page="home"] #root {
   height: 100%;
   color: var(--text-muted);
   font-size: 16px;
+  transition:
+    background-color 0.15s,
+    color 0.15s;
 }
 
 .stepper__button:hover:not(:disabled) {
@@ -778,6 +784,9 @@ body[data-page="home"] #root {
   font-size: 14px;
   font-weight: 600;
   white-space: nowrap;
+  transition:
+    background-color 0.15s,
+    color 0.15s;
 }
 
 .choice--wide {
@@ -809,6 +818,7 @@ body[data-page="home"] #root {
   border-radius: var(--radius);
   background: var(--surface);
   overflow: hidden;
+  transition: border-color 0.15s;
 }
 
 .favourite__open {
@@ -839,6 +849,9 @@ body[data-page="home"] #root {
   place-items: center;
   width: 34px;
   color: var(--text-subtle);
+  transition:
+    background-color 0.15s,
+    color 0.15s;
 }
 
 .favourite__remove:hover {

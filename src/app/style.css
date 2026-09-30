@@ -983,6 +983,7 @@ mark {
   padding: 6px 10px;
   border-radius: var(--radius);
   text-align: left;
+  transition: background-color 0.15s;
 }
 
 .option:hover {
