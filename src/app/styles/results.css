@@ -10,11 +10,21 @@
 }
 
 .results__toolbar {
+  position: relative;
+  z-index: 2;
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 10px var(--page-gutter);
   border-bottom: 1px solid var(--border);
+}
+
+/* List view: the toolbar sits outside the scroller, so its shadow can cover the
+   scrollport's top edge. Some browsers round the stuck building header a few
+   pixels below that edge (fractional display scaling), leaving a sliver of card
+   photos between the toolbar and the header. Only header padding sits there. */
+.results:has(.results__body--list) .results__toolbar {
+  box-shadow: 0 8px 0 var(--surface);
 }
 
 .summary {

@@ -170,12 +170,14 @@ body[data-page="home"] #root {
     background: linear-gradient(to top, var(--bg) 70%, transparent);
   }
 
+  /* Same compact height as the search bar (see .search__input below). */
   .home--results .controls-summary {
     display: flex;
     align-items: center;
     gap: 10px;
+    height: 40px;
     margin: 8px var(--page-gutter);
-    padding: 8px 14px;
+    padding: 0 14px;
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     background: var(--surface);
@@ -263,6 +265,13 @@ body[data-page="home"] #root {
   transition:
     border-color 0.15s,
     box-shadow 0.15s;
+}
+
+/* Phones and tablets: as compact as the controls summary below it. */
+@media (max-width: 959px) {
+  .search__input {
+    height: 40px;
+  }
 }
 
 .search__input:not(:placeholder-shown) {
