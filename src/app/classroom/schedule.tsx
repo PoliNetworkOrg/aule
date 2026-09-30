@@ -128,13 +128,19 @@ function AgendaRow({
   const row = useRef<HTMLLIElement>(null);
   const duration = formatDuration(toMinutes(item.end) - toMinutes(item.start));
 
+  // Waits a frame: opening a room scrolls to the top (ClassroomPage and the
+  // router both do, after this child effect), which would undo the scroll.
   // An explicit "smooth" overrides the CSS reduced-motion rule, so check it here.
   useEffect(() => {
     if (!highlighted) return;
 
-    const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const frame = requestAnimationFrame(() => {
+      const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-    row.current?.scrollIntoView({ block: "center", behavior: reduce ? "auto" : "smooth" });
+      row.current?.scrollIntoView({ block: "center", behavior: reduce ? "auto" : "smooth" });
+    });
+
+    return () => cancelAnimationFrame(frame);
   }, [highlighted]);
 
   const classes = [
