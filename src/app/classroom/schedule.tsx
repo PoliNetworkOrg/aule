@@ -128,8 +128,13 @@ function AgendaRow({
   const row = useRef<HTMLLIElement>(null);
   const duration = formatDuration(toMinutes(item.end) - toMinutes(item.start));
 
+  // An explicit "smooth" overrides the CSS reduced-motion rule, so check it here.
   useEffect(() => {
-    if (highlighted) row.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+    if (!highlighted) return;
+
+    const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    row.current?.scrollIntoView({ block: "center", behavior: reduce ? "auto" : "smooth" });
   }, [highlighted]);
 
   const classes = [
