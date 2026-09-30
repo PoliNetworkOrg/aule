@@ -60,6 +60,7 @@
   --busy-border: #f9c9c4;
   --exam: #6d28d9;
   --exam-soft: #f3efff;
+  --star: #b98300;
 
   --radius-sm: 6px;
   --radius: 10px;
@@ -100,6 +101,7 @@
   --busy-border: rgb(248 113 113 / 32%);
   --exam: #c4b5fd;
   --exam-soft: rgb(196 181 253 / 12%);
+  --star: #fbbf24;
 
   --shadow-sm: 0 1px 2px rgb(0 0 0 / 40%);
   --shadow: 0 8px 24px rgb(0 0 0 / 40%);
@@ -695,7 +697,7 @@ mark {
 }
 
 .star-button--active {
-  color: #d99a00;
+  color: var(--star);
 }
 
 .star-button--active svg {

@@ -263,10 +263,19 @@ button.summary__partial[aria-pressed="true"] {
   margin-top: 4px;
 }
 
+/* Sits on the photo when there is one: a surface pill keeps it legible on any image. */
 .room-card .star-button {
   position: absolute;
-  top: 4px;
-  right: 4px;
+  top: 6px;
+  right: 6px;
+  width: 32px;
+  height: 32px;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  box-shadow: var(--shadow-sm);
+}
+
+.room-card .star-button:hover {
+  background: var(--surface);
 }
 
 @media (min-width: 960px) {
