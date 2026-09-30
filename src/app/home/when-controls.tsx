@@ -50,8 +50,10 @@ function shortWeekday(locale: Locale, date: Date) {
   return capitalise(text.replace(/\.$/, ""), locale);
 }
 
-function monthName(locale: Locale, date: Date) {
-  return capitalise(new Intl.DateTimeFormat(locale, { month: "long" }).format(date), locale);
+function monthName(locale: Locale, date: Date, month: "long" | "short" = "long") {
+  const text = new Intl.DateTimeFormat(locale, { month }).format(date);
+
+  return capitalise(text.replace(/\.$/, ""), locale);
 }
 
 // ---------- Day ----------
@@ -84,20 +86,28 @@ export function DateStrip() {
   return (
     <div className="date-strip" style={style}>
       <div className="date-strip__months" aria-hidden="true">
-        {days.map((day, index) =>
-          index === 0 || days[index - 1].getMonth() !== day.getMonth() ? (
+        {days.map((day, index) => {
+          if (index > 0 && days[index - 1].getMonth() === day.getMonth()) return null;
+
+          // A month shown for a single day (e.g. today is the 30th) gets one
+          // column, too narrow for "Settembre": abbreviate it instead of overlapping.
+          const rest = days.slice(index).findIndex((next) => next.getMonth() !== day.getMonth());
+          const span = rest === -1 ? days.length - index : rest;
+          const format = span === 1 ? "short" : "long";
+
+          return (
             <span
               key={dates[index]}
               className="date-strip__month"
-              style={{ gridColumnStart: index + 1 }}
+              style={{ gridColumn: `${index + 1} / span ${span}` }}
             >
               <Stable
-                variants={LOCALES.map((variant) => monthName(variant, day))}
+                variants={LOCALES.map((variant) => monthName(variant, day, format))}
                 current={current}
               />
             </span>
-          ) : null,
-        )}
+          );
+        })}
       </div>
       <div className="date-strip__days" role="group" aria-label={t("when.day")}>
         {dates.map((date, index) => {

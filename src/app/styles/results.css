@@ -44,16 +44,18 @@
   color: var(--partial);
 }
 
+/* Off (grey) while partly free rooms are hidden, lit in the partial colour once listed. */
 button.summary__partial {
   padding: 2px 8px;
   border-radius: 999px;
-  background: var(--partial-soft);
+  background: var(--surface-muted);
+  color: var(--text-muted);
   font-weight: 700;
 }
 
 button.summary__partial[aria-pressed="true"] {
-  background: var(--surface-muted);
-  color: var(--text-muted);
+  background: var(--partial-soft);
+  color: var(--partial);
 }
 
 .summary__context {

@@ -130,12 +130,25 @@ body[data-page="home"] #root {
     border-top: 0;
   }
 
+  /* Pinned with its own top spacing, so it never slides up against the search bar. */
   .controls__header {
+    position: sticky;
+    /* Sticky offsets start inside the container's 16px top padding. */
+    top: -16px;
+    z-index: 2;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    min-height: 40px;
+    /* 20px of spacing below the search bar plus the 40px row. */
+    min-height: 60px;
     gap: 12px;
+    margin-top: -16px;
+    padding-top: 20px;
+    background: var(--bg);
+  }
+
+  .more-filters {
+    scroll-margin-top: 80px;
   }
 
   .controls__title {
