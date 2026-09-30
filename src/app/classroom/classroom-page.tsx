@@ -301,7 +301,13 @@ export function ClassroomPage({
                     <Icon name="stairs-01" />
                     <span className="visually-hidden">{t("classroom.floor")}</span>
                   </dt>
-                  <dd>{room.floor === 0 ? t("classroom.groundFloor") : room.floor}</dd>
+                  <dd>
+                    {room.floor === 0
+                      ? t("classroom.groundFloor")
+                      : room.floor === -1
+                        ? t("classroom.basementFloor")
+                        : room.floor}
+                  </dd>
                 </div>
               )}
             </dl>
