@@ -19,7 +19,8 @@ export interface Occupation {
 export interface Classroom {
   id: number;
   name: string;
-  floor?: number;
+  /** Null when the directory doesn't know it. */
+  floor?: number | null;
   features?: Feature[];
   idfoto?: number | null;
   seats?: number;

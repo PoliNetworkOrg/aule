@@ -14,6 +14,7 @@ import { formatTime, romeTodayIso } from "../state/time";
 import { hasCoordinates } from "../map/maplibre";
 import { fetchPhotoUrl } from "../utils/photo";
 import { FavouriteButton } from "../home/room-card";
+import { isNumber } from "../../lib/guards";
 import { Icon } from "../ui/icon";
 import { Schedule } from "./schedule";
 
@@ -294,7 +295,7 @@ export function ClassroomPage({
                 </dt>
                 <dd>{room.accessible_seats ?? 0}</dd>
               </div>
-              {room.floor !== undefined && (
+              {isNumber(room.floor) && (
                 <div title={t("classroom.floor")}>
                   <dt>
                     <Icon name="stairs-01" />
