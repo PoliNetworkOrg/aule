@@ -750,6 +750,18 @@ body[data-page="home"] #root {
   border-radius: var(--radius-lg);
   background: var(--surface);
   scroll-margin-top: 16px;
+  /* Settles in from just above as it opens; no height animation, so the
+     panels below simply move down. Closing (unmount) is instant. */
+  transition:
+    opacity var(--duration-fast) var(--ease-smooth-out),
+    translate var(--duration-fast) var(--ease-smooth-out);
+}
+
+@starting-style {
+  .more-filters {
+    opacity: 0;
+    translate: 0 calc(var(--distance-micro) * -1);
+  }
 }
 
 .choice-grid {
