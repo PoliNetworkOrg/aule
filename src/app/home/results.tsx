@@ -23,6 +23,7 @@ import {
   type ResultsView,
 } from "../state/store";
 import { capitalise, formatRange, parseIsoDate, romeTodayIso } from "../state/time";
+import { cn } from "../../lib/cn";
 import { Icon } from "../ui/icon";
 import { RoomCard } from "./room-card";
 import { StableText } from "../ui/stable";
@@ -357,7 +358,7 @@ function ResultsList({
   );
 }
 
-export function Results() {
+export function Results({ className }: { className?: string }) {
   useLocale();
   const all = useAvailability();
   const filters = useStore((state) => state.filters);
@@ -365,7 +366,7 @@ export function Results() {
   const view = useStore((state) => state.view);
 
   return (
-    <section className="results" aria-label={t("results.title")}>
+    <section className={cn("results", className)} aria-label={t("results.title")}>
       <div className="results__toolbar">
         <Summary results={all} />
         <ViewSwitch />

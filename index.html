@@ -67,8 +67,9 @@
         --splash-muted: #94a3b8;
       }
 
-      html,
-      body {
+      /* Until the app stylesheet lands; its base layer takes over from there. */
+      :root:not(.css-ready),
+      :root:not(.css-ready) body {
         margin: 0;
         background: var(--splash-bg);
       }
@@ -171,8 +172,17 @@
     <script type="module" src="/src/main.tsx"></script>
   </head>
 
-  <body>
-    <div id="splash-overlay" class="splash-overlay" aria-hidden="true">
+  <!-- The home is an app shell: header, search and controls stay put and only
+    the results scroll, so the initial screen always fits the viewport. Very
+    short viewports (landscape phones) let the page scroll instead. -->
+  <body
+    class="data-[page=home]:h-dvh data-[page=home]:overflow-hidden max-lg:short:data-[page=home]:h-auto max-lg:short:data-[page=home]:overflow-auto"
+  >
+    <div
+      id="splash-overlay"
+      class="splash-overlay transition-opacity duration-250 ease-[ease-out]"
+      aria-hidden="true"
+    >
       <img
         src="/brand/logo-80.png"
         srcset="
@@ -194,6 +204,9 @@
         <p>PoliNetwork Aule richiede JavaScript. / PoliNetwork Aule requires JavaScript.</p>
       </div>
     </noscript>
-    <div id="root"></div>
+    <div
+      id="root"
+      class="in-data-[page=home]:flex in-data-[page=home]:h-dvh in-data-[page=home]:flex-col max-lg:short:in-data-[page=home]:h-auto"
+    ></div>
   </body>
 </html>

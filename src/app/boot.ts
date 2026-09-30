@@ -8,6 +8,7 @@ import { initI18n } from "./i18n";
 import { availableDates, findCampus, campuses } from "./state/availability";
 import { readState, setState } from "./state/store";
 import { defaultWindow, isAfterHours, romeTodayIso } from "./state/time";
+import { buttonVariants } from "./ui/button";
 
 // Startup: translations and the classroom directory are needed to draw the
 // shell, so the splash waits for them; occupancy loads in parallel and fills
@@ -20,7 +21,7 @@ function dismissSplash() {
 
   if (!splash) return;
 
-  splash.classList.add("splash-hiding");
+  splash.classList.add("pointer-events-none", "opacity-0");
   window.setTimeout(() => splash.remove(), 250);
 }
 
@@ -29,7 +30,6 @@ function showSplashError() {
 
   if (!splash) return;
 
-  splash.classList.add("splash-error");
   splash.replaceChildren();
 
   const title = document.createElement("p");
@@ -41,7 +41,7 @@ function showSplashError() {
   subtitle.textContent = "Check your connection and try again.";
 
   const reload = document.createElement("button");
-  reload.className = "button button--primary";
+  reload.className = buttonVariants({ variant: "primary" });
   reload.textContent = "Reload";
   reload.addEventListener("click", () => location.reload());
 

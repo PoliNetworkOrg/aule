@@ -1,15 +1,296 @@
-@layer theme, base, components, utilities;
+/* ==========================================================================
+   PoliNetwork Aule — Tailwind theme and base styles.
+   Flat surfaces, thin borders, one accent (PoliNetwork blue). Every component
+   is styled with utilities in its own .tsx file; shared primitives live in
+   src/app/ui. Only element defaults and the design tokens live here.
+   ========================================================================== */
+
+@layer theme, base, components, legacy, utilities; /* MIGRATION-ONLY: legacy */
 @import "tailwindcss/theme.css" layer(theme);
 @import "tailwindcss/utilities.css" layer(utilities);
-@import "./app/style.css";
-@import "./app/styles/header.css";
-@import "./app/styles/home.css";
-@import "./app/styles/results.css";
-@import "./app/styles/map.css";
-@import "./app/styles/classroom.css";
 
-@theme inline {
-  --color-background: var(--bg);
-  --color-foreground: var(--text);
-  --color-muted: var(--text-muted);
+/* MIGRATION-ONLY: legacy BEM styles for markup not yet converted. */
+@import "./app/style.css" layer(legacy);
+@import "./app/styles/header.css" layer(legacy);
+@import "./app/styles/home.css" layer(legacy);
+@import "./app/styles/results.css" layer(legacy);
+@import "./app/styles/map.css" layer(legacy);
+@import "./app/styles/classroom.css" layer(legacy);
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* Icons (src/app/ui/icon.tsx) inside the element, e.g. `icon:text-accent`. */
+@custom-variant icon (& [data-slot="icon"]);
+
+/* Very short viewports (landscape phones). */
+@custom-variant short (@media (max-height: 540px));
+
+@theme static {
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  /* Semantic colours; the dark theme overrides them below. */
+  --color-*: initial;
+  --color-background: #f5f7fb;
+  --color-surface: #ffffff;
+  --color-surface-muted: #edf2f8;
+  --color-border: #d3deeb;
+  --color-border-strong: #b8c9dc;
+  --color-foreground: #0f172a;
+  --color-muted: #475569;
+  --color-subtle: #64748b;
+  --color-accent: #1055ad;
+  --color-accent-hover: #0d4690;
+  --color-accent-soft: #eef4fc;
+  --color-accent-soft-border: #b3cdf0;
+  --color-accent-strong: #0d4690;
+  --color-on-accent: #ffffff;
+  --color-focus-ring: color-mix(in srgb, #2a6fca 45%, transparent);
+
+  --color-free: #15803d;
+  --color-free-soft: #ecfdf3;
+  --color-free-border: #bbf0cf;
+  --color-partial: #a16207;
+  --color-partial-soft: #fef8e7;
+  --color-partial-border: #f6dc9a;
+  --color-busy: #b42318;
+  --color-busy-soft: #fef1f0;
+  --color-busy-border: #f9c9c4;
+  --color-exam: #6d28d9;
+  --color-exam-soft: #f3efff;
+
+  /* Theme-independent. */
+  --color-neutral: #94a3b8;
+  --color-star: #d99a00;
+  --color-white: #ffffff;
+  --color-scrim: #0f172a;
+
+  /* Type scale in px; sizes set no line-height, it's inherited as before. */
+  --text-*: initial;
+  --text-10: 10px;
+  --text-11: 11px;
+  --text-12: 12px;
+  --text-13: 13px;
+  --text-14: 14px;
+  --text-15: 15px;
+  --text-16: 16px;
+  --text-17: 17px;
+  --text-18: 18px;
+  --text-20: 20px;
+  --text-26: 26px;
+  --text-28: 28px;
+  --text-30: 30px;
+  --text-32: 32px;
+
+  --tracking-*: initial;
+  --tracking-tighter: -0.02em;
+  --tracking-tight: -0.01em;
+  --tracking-wide: 0.04em;
+  --tracking-wider: 0.05em;
+  --tracking-widest: 0.06em;
+
+  --radius-*: initial;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+
+  /* Backed by variables so the dark theme can deepen them. */
+  --shadow-*: initial;
+  --shadow-sm: var(--elevation-sm);
+  --shadow-md: var(--elevation-md);
+
+  /* Layout: page gutter and header height grow on tablets (see below). */
+  --spacing-gutter: 16px;
+  --spacing-header: 60px;
+  --container-content: 1440px;
+
+  --breakpoint-*: initial;
+  --breakpoint-3xs: 360px;
+  --breakpoint-2xs: 390px;
+  --breakpoint-xs: 480px;
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 960px;
+
+  /* Plain `ease` transitions, 0.15s unless a utility says otherwise. */
+  --default-transition-timing-function: ease;
+  --default-transition-duration: 150ms;
+
+  --animate-spin: spin 0.9s linear infinite;
+  --animate-shimmer: shimmer 1.4s ease-in-out infinite;
+
+  @keyframes shimmer {
+    from {
+      background-position: 100% 0;
+    }
+
+    to {
+      background-position: 0 0;
+    }
+  }
+}
+
+@layer base {
+  :root {
+    color-scheme: light;
+
+    --elevation-sm: 0 1px 2px rgb(15 23 42 / 6%);
+    --elevation-md: 0 4px 16px rgb(15 23 42 / 8%);
+  }
+
+  @media (width >= 768px) {
+    :root {
+      --spacing-gutter: 24px;
+      --spacing-header: 64px;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+
+    --color-background: #131c2e;
+    --color-surface: #182236;
+    --color-surface-muted: #222d44;
+    --color-border: #2c3850;
+    --color-border-strong: #334155;
+    --color-foreground: #f1f5f9;
+    --color-muted: #94a3b8;
+    --color-subtle: #7f8ca3;
+    --color-accent: #5b9cf0;
+    --color-accent-hover: #7db1f4;
+    --color-accent-soft: rgb(91 156 240 / 12%);
+    --color-accent-soft-border: rgb(91 156 240 / 45%);
+    --color-accent-strong: #8cbcf6;
+    --color-on-accent: #020617;
+
+    --color-free: #4ade80;
+    --color-free-soft: rgb(74 222 128 / 10%);
+    --color-free-border: rgb(74 222 128 / 30%);
+    --color-partial: #facc15;
+    --color-partial-soft: rgb(250 204 21 / 10%);
+    --color-partial-border: rgb(250 204 21 / 30%);
+    --color-busy: #f87171;
+    --color-busy-soft: rgb(248 113 113 / 10%);
+    --color-busy-border: rgb(248 113 113 / 32%);
+    --color-exam: #c4b5fd;
+    --color-exam-soft: rgb(196 181 253 / 12%);
+
+    --elevation-sm: 0 1px 2px rgb(0 0 0 / 40%);
+    --elevation-md: 0 8px 24px rgb(0 0 0 / 40%);
+  }
+
+  /* ---------- Reset ---------- */
+
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    background: var(--color-background);
+  }
+
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    background: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  h1,
+  h2,
+  h3,
+  p,
+  ul,
+  ol,
+  dl,
+  dd,
+  fieldset {
+    margin: 0;
+    padding: 0;
+  }
+
+  ul,
+  ol {
+    list-style: none;
+  }
+
+  fieldset {
+    border: 0;
+    min-width: 0;
+  }
+
+  legend {
+    padding: 0;
+  }
+
+  button,
+  input,
+  select {
+    font: inherit;
+    color: inherit;
+  }
+
+  button {
+    cursor: pointer;
+    background: none;
+    border: 0;
+    padding: 0;
+  }
+
+  button:disabled {
+    cursor: default;
+  }
+
+  a {
+    color: var(--color-accent-strong);
+  }
+
+  img {
+    display: block;
+    max-width: 100%;
+  }
+
+  /* Search matches: accent-coloured and bold, no box (it clashed with chips and links). */
+  mark {
+    background: none;
+    color: var(--color-accent-strong);
+    font-weight: 700;
+  }
+
+  [hidden] {
+    display: none !important;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* Scrollers that still scroll but draw no scrollbar. */
+@utility scrollbar-none {
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
 }
