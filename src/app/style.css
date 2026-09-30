@@ -888,6 +888,22 @@ mark {
   box-shadow: var(--shadow);
 }
 
+/* Anchored panel (desktop): fades and grows out of its trigger's edge (see
+   transformOrigin in popup.tsx). Closing is instant, as closes should get out
+   of the way. */
+.popup:not(.popup--sheet) {
+  transition:
+    opacity var(--duration-fast) var(--ease-smooth-out),
+    scale var(--duration-fast) var(--ease-smooth-out);
+}
+
+@starting-style {
+  .popup:not(.popup--sheet) {
+    opacity: 0;
+    scale: var(--scale-medium);
+  }
+}
+
 .popup--sheet {
   left: 0;
   right: 0;

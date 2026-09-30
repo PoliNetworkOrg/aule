@@ -21,6 +21,8 @@ interface Position {
   left: number;
   width: number;
   maxHeight: number;
+  /** Which edge faces the trigger: the panel grows out of it when it opens. */
+  origin: "top" | "bottom";
 }
 
 function useIsSheet() {
@@ -49,11 +51,11 @@ function anchorPosition(anchor: HTMLElement, minWidth: number, contentHeight: nu
   const wanted = Math.min(contentHeight, MAX_POPUP_HEIGHT);
 
   if (wanted <= below || (wanted > above && below >= above))
-    return { top: rect.bottom + 6, left, width, maxHeight: Math.min(wanted, below) };
+    return { top: rect.bottom + 6, left, width, maxHeight: Math.min(wanted, below), origin: "top" };
 
   const height = Math.min(wanted, above);
 
-  return { top: rect.top - 6 - height, left, width, maxHeight: height };
+  return { top: rect.top - 6 - height, left, width, maxHeight: height, origin: "bottom" };
 }
 
 export function Popup({
@@ -138,6 +140,7 @@ export function Popup({
           left: position.left,
           width: position.width,
           maxHeight: position.maxHeight,
+          transformOrigin: `${position.origin} center`,
         };
 
   return createPortal(
