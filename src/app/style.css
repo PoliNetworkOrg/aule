@@ -810,7 +810,7 @@ mark {
     var(--surface-muted) 70%
   );
   background-size: 300% 100%;
-  animation: shimmer 1.4s ease-in-out infinite;
+  animation: shimmer 1.4s var(--ease-linear) infinite;
 }
 
 .skeleton--title {
