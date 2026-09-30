@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { closePage } from "../../lib/navigation";
 import { formatRomeHHMM } from "../available-rooms-script";
 import { t, tf, useLocale } from "../i18n";
@@ -11,10 +11,13 @@ import {
 import { leavePage, type ClassroomContext } from "../state/navigation-context";
 import { useStore } from "../state/store";
 import { formatTime, romeTodayIso } from "../state/time";
+import { hasCoordinates } from "../map/maplibre";
 import { fetchPhotoUrl } from "../utils/photo";
 import { FavouriteButton } from "../home/room-card";
 import { Icon } from "../ui/icon";
 import { Schedule } from "./schedule";
+
+const LocationMap = lazy(() => import("./location-map"));
 
 const FEATURES = new Map([
   [142, { icon: "plug-socket", key: "features.sockets" }],
@@ -138,6 +141,52 @@ function Photo({ roomId, roomName }: { roomId: number; roomName: string }) {
   );
 }
 
+/** Where the building is: address, the location map and a directions link. */
+function Location({ entry }: { entry: ClassroomEntry }) {
+  useLocale();
+  const { building, campus } = entry;
+  const label = building.altName?.trim() || `${t("building.prefix")} ${building.name}`;
+  const point = hasCoordinates(building) ? building : null;
+
+  // A maps search on the building's coordinates (or, without them, its
+  // address): opens the maps app on phones, ready to route there.
+  const directionsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+    point ? `${point.lat},${point.long}` : (building.address ?? ""),
+  )}`;
+
+  return (
+    <section className="card location-card" aria-labelledby="location-title">
+      <div className="location-card__header">
+        <h2 className="section-title" id="location-title">
+          <Icon name="location-01" />
+          {t("classroom.location")}
+        </h2>
+        <p className="location-card__place">
+          <strong>{label}</strong>
+          {building.address ? <span>{building.address}</span> : null}
+        </p>
+      </div>
+      {point && (
+        <Suspense fallback={<div className="location-map" />}>
+          <LocationMap building={point} campusBuildings={campus.buildings} />
+        </Suspense>
+      )}
+      <div className="button-row">
+        <a
+          className="button button--ghost location-card__link"
+          href={directionsUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <Icon name="directions-01" />
+          {t("classroom.directions")}
+          <Icon name="arrow-up-right-01" className="location-card__external" />
+        </a>
+      </div>
+    </section>
+  );
+}
+
 export function ClassroomPage({
   id,
   campus,
@@ -184,11 +233,6 @@ export function ClassroomPage({
 
   const { room, building } = entry;
   const features = (room.features ?? []).filter((feature) => FEATURES.has(feature.id));
-
-  const mapsUrl =
-    building.lat !== undefined && building.long !== undefined
-      ? `https://www.google.com/maps/search/?api=1&query=${building.lat},${building.long}`
-      : null;
 
   return (
     <main className="page">
@@ -257,28 +301,22 @@ export function ClassroomPage({
                 })}
               </ul>
             )}
-
-            {(building.address || mapsUrl) && (
-              <p className="room-info__address">
-                <Icon name="location-01" />
-                <span>{building.address}</span>
-                {mapsUrl && (
-                  <a href={mapsUrl} target="_blank" rel="noopener noreferrer">
-                    {t("classroom.directions")}
-                  </a>
-                )}
-              </p>
-            )}
           </div>
         </section>
 
-        <section className="card schedule-card" aria-labelledby="schedule-title">
-          <h2 className="panel__title" id="schedule-title">
-            <Icon name="calendar-03" />
-            {t("schedule.title")}
-          </h2>
-          <Schedule key={room.id} roomId={room.id} context={context} />
-        </section>
+        <div className="classroom-page__main">
+          <section className="card schedule-card" aria-labelledby="schedule-title">
+            <h2 className="panel__title" id="schedule-title">
+              <Icon name="calendar-03" />
+              {t("schedule.title")}
+            </h2>
+            <Schedule key={room.id} roomId={room.id} context={context} />
+          </section>
+
+          {(building.address || hasCoordinates(building)) && (
+            <Location key={building.name} entry={entry} />
+          )}
+        </div>
       </div>
     </main>
   );

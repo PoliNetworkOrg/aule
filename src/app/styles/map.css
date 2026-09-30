@@ -145,8 +145,10 @@
   border-color: var(--accent);
 }
 
-/* MapLibre controls, flattened to match the rest of the UI. */
-.campus-map .maplibregl-ctrl-group {
+/* MapLibre controls, flattened to match the rest of the UI (campus map and
+   the classroom page's location map). */
+.campus-map .maplibregl-ctrl-group,
+.location-map .maplibregl-ctrl-group {
   border-radius: var(--radius);
   border: 1px solid var(--border);
   box-shadow: var(--shadow-sm);
@@ -154,6 +156,41 @@
   overflow: hidden;
 }
 
-.campus-map .maplibregl-ctrl-group button + button {
+.campus-map .maplibregl-ctrl-group button + button,
+.location-map .maplibregl-ctrl-group button + button {
   border-top-color: var(--border);
+}
+
+/* The control icons are dark bitmaps; flip their lightness (keeping the hue of
+   the geolocate blue) on the dark surface. */
+:root[data-theme="dark"] .maplibregl-ctrl-group .maplibregl-ctrl-icon {
+  filter: invert(0.9) hue-rotate(180deg);
+}
+
+/* "Ctrl + scroll to zoom" / "two fingers to move" hint over the location map. */
+.location-map .maplibregl-cooperative-gesture-screen {
+  padding: 16px;
+  background: rgb(15 23 42 / 55%);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* The OSM credit, on the app's surfaces rather than MapLibre's fixed white
+   (doubled class to outrank MapLibre's stylesheet, which loads later). */
+.campus-map .maplibregl-ctrl.maplibregl-ctrl-attrib,
+.location-map .maplibregl-ctrl.maplibregl-ctrl-attrib {
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  color: var(--text-muted);
+  font-family: var(--font-sans);
+  font-size: 11px;
+}
+
+.campus-map .maplibregl-ctrl-attrib a,
+.location-map .maplibregl-ctrl-attrib a {
+  color: inherit;
+}
+
+:root[data-theme="dark"] .maplibregl-ctrl-attrib-button {
+  filter: invert(0.9);
 }
