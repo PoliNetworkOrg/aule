@@ -170,6 +170,7 @@
   "classroom.enlargePhoto": "Enlarge the photo of room {name}",
   "classroom.enlarge": "Enlarge",
   "classroom.photoOf": "Photo of room {name}",
+  "classroom.noPhoto": "No photo available",
   "classroom.closePhoto": "Close photo",
   "when.earlier": "15 minutes earlier",
   "when.later": "15 minutes later",

@@ -60,6 +60,28 @@
   text-align: left;
 }
 
+/* No photo: only desktop keeps the slot (see PhotoPlaceholder). */
+.room-photo--empty {
+  display: none;
+}
+
+@media (min-width: 960px) {
+  .room-photo--empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    color: var(--text-muted);
+    font-size: 13px;
+  }
+
+  .room-photo--empty .icon {
+    font-size: 28px;
+    color: var(--text-subtle);
+  }
+}
+
 .room-photo:disabled {
   cursor: default;
 }

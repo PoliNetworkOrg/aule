@@ -68,6 +68,20 @@ function NowStatus({ entry }: { entry: ClassroomEntry }) {
   );
 }
 
+/**
+ * Stands in for a missing or broken photo on desktop, where the card sits next
+ * to the schedule: keeps the 16:9 slot so every room's card has the same shape.
+ * Hidden on phones (see .room-photo--empty), where the card just starts lower.
+ */
+function PhotoPlaceholder() {
+  return (
+    <div className="room-photo room-photo--empty" aria-hidden="true">
+      <Icon name="album-not-found-01" />
+      <span>{t("classroom.noPhoto")}</span>
+    </div>
+  );
+}
+
 function Photo({ roomId, roomName }: { roomId: number; roomName: string }) {
   const [url, setUrl] = useState<string | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "failed">("loading");
@@ -83,7 +97,7 @@ function Photo({ roomId, roomName }: { roomId: number; roomName: string }) {
     };
   }, [roomId]);
 
-  if (state === "failed") return null;
+  if (state === "failed") return <PhotoPlaceholder />;
 
   return (
     <>
@@ -243,7 +257,11 @@ export function ClassroomPage({
 
       <div className="classroom-page__layout">
         <section className="card room-info" aria-labelledby="room-title">
-          {room.idfoto ? <Photo key={room.id} roomId={room.id} roomName={room.name} /> : null}
+          {room.idfoto ? (
+            <Photo key={room.id} roomId={room.id} roomName={room.name} />
+          ) : (
+            <PhotoPlaceholder />
+          )}
           <div className="room-info__body">
             <div className="room-info__title-row">
               <div>
