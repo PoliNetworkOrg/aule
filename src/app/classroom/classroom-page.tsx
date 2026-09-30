@@ -273,7 +273,7 @@ export function ClassroomPage({
         </section>
 
         <section className="card schedule-card" aria-labelledby="schedule-title">
-          <h2 className="section-title" id="schedule-title">
+          <h2 className="panel__title" id="schedule-title">
             <Icon name="calendar-03" />
             {t("schedule.title")}
           </h2>
