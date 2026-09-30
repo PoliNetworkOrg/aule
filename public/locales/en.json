@@ -82,6 +82,9 @@
   "classroom.groundFloor": "Ground",
   "classroom.features": "Equipment",
   "classroom.directions": "Directions",
+  "classroom.location": "Location",
+  "classroom.mapView": "Map view",
+  "classroom.mapOf": "Map of {building}",
   "now.free": "Free now",
   "now.busy": "Occupied now",
   "now.closed": "Closed now",
@@ -168,5 +171,16 @@
   "classroom.photoOf": "Photo of room {name}",
   "classroom.closePhoto": "Close photo",
   "when.earlier": "15 minutes earlier",
-  "when.later": "15 minutes later"
+  "when.later": "15 minutes later",
+  "maplibre.AttributionControl.ToggleAttribution": "Toggle attribution",
+  "maplibre.FullscreenControl.Enter": "Enter fullscreen",
+  "maplibre.FullscreenControl.Exit": "Exit fullscreen",
+  "maplibre.GeolocateControl.FindMyLocation": "Find my location",
+  "maplibre.GeolocateControl.LocationNotAvailable": "Location not available",
+  "maplibre.NavigationControl.ResetBearing": "Drag to rotate the map, click to reset north",
+  "maplibre.NavigationControl.ZoomIn": "Zoom in",
+  "maplibre.NavigationControl.ZoomOut": "Zoom out",
+  "maplibre.CooperativeGesturesHandler.WindowsHelpText": "Use Ctrl + scroll to zoom the map",
+  "maplibre.CooperativeGesturesHandler.MacHelpText": "Use ⌘ + scroll to zoom the map",
+  "maplibre.CooperativeGesturesHandler.MobileHelpText": "Use two fingers to move the map"
 }

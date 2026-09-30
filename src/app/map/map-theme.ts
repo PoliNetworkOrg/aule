@@ -236,7 +236,7 @@ function themedLayer(layer: LayerSpecification, t: MapTheme): LayerSpecification
   return { ...layer, paint: { ...layer.paint, ...paint } } as LayerSpecification;
 }
 
-// MapLibre `transformStyle` hook — see campus-map.tsx's applyTheme().
+// MapLibre `transformStyle` hook — see maplibre.ts's applyMapTheme().
 export function themedStyle(t: MapTheme) {
   return (_previous: StyleSpecification | undefined, next: StyleSpecification) => ({
     ...next,
