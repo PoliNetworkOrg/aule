@@ -1,5 +1,7 @@
+import { cn } from "../../lib/cn";
 import { t, tf, useLocale } from "../i18n";
 import { capitalise, formatRange, parseIsoDate, romeTodayIso } from "../state/time";
+import { Button, IconButton } from "../ui/button";
 import { Icon } from "../ui/icon";
 import { countActiveFilters, setControlsCollapsed, useStore } from "../state/store";
 import { Favourites } from "./favourites";
@@ -37,19 +39,24 @@ function ControlsSummary() {
   return (
     <button
       type="button"
-      className="controls-summary"
+      // Phones and tablets only (and `hidden` while the controls are open), as
+      // compact as the search bar above it (see search-bar.tsx).
+      className={cn(
+        "hidden icon:text-accent max-lg:mx-gutter max-lg:my-2 max-lg:flex max-lg:h-10 max-lg:items-center max-lg:gap-2.5",
+        "max-lg:rounded-lg max-lg:border max-lg:border-border max-lg:bg-surface max-lg:px-3.5 max-lg:text-left max-lg:text-14",
+      )}
       hidden={!collapsed}
       aria-expanded={!collapsed}
       onClick={() => setControlsCollapsed(false)}
     >
       <Icon name="search-01" />
-      <span className="controls-summary__text">
+      <span className="min-w-0 flex-1 truncate tabular-nums">
         <strong>{campus?.name}</strong> · {day} · {formatRange(from, to)}
         {active > 0 && (
           <> · {tf(active === 1 ? "filters.oneActive" : "filters.active", { n: active })}</>
         )}
       </span>
-      <span className="controls-summary__edit">
+      <span className="inline-flex items-center gap-1 text-13 font-bold text-accent-strong">
         {t("filters.edit")}
         <Icon name="arrow-down-01" />
       </span>
@@ -64,12 +71,14 @@ function ShowResultsButton() {
   const loading = useStore((state) => state.occupancy === "loading");
 
   return (
-    <div className="controls__cta">
-      <button
-        type="button"
-        className="button button--primary button--large"
-        onClick={() => setControlsCollapsed(true)}
-      >
+    <div
+      className={cn(
+        "hidden max-lg:sticky max-lg:bottom-0 max-lg:-mx-gutter max-lg:mt-1 max-lg:-mb-4.5 max-lg:block",
+        "max-lg:px-gutter max-lg:pt-3 max-lg:pb-[calc(12px+env(safe-area-inset-bottom))]",
+        "max-lg:bg-[linear-gradient(to_top,var(--color-background)_70%,transparent)]",
+      )}
+    >
+      <Button size="large" onClick={() => setControlsCollapsed(true)}>
         {loading
           ? t("results.loading")
           : count === 0
@@ -78,7 +87,7 @@ function ShowResultsButton() {
               ? t("results.showOneResult")
               : tf("results.showResults", { n: count })}
         <Icon name="arrow-right-02" />
-      </button>
+      </Button>
     </div>
   );
 }
@@ -89,27 +98,49 @@ export function HomePage({ hidden }: { hidden: boolean }) {
   const collapsed = useStore((state) => state.controlsCollapsed);
 
   return (
-    <main className={`home ${collapsed ? "home--results" : "home--form"}`} hidden={hidden}>
-      <div className="home__search">
+    <main className="mx-auto flex min-h-0 w-full max-w-content flex-1 flex-col" hidden={hidden}>
+      <div className="px-gutter pt-3.5 lg:pt-5">
         <SearchBar />
       </div>
       {searching ? (
         <SearchResults />
       ) : (
-        <div className="home__body">
+        <div
+          className={cn(
+            "flex min-h-0 flex-1 flex-col",
+            "lg:grid lg:grid-cols-[384px_minmax(0,1fr)] lg:gap-9 lg:px-gutter lg:py-6",
+            // Very short viewports (landscape phones): the page scrolls instead of squeezing results.
+            "max-lg:short:flex-none max-lg:short:overflow-visible",
+          )}
+        >
           <ControlsSummary />
-          <aside className="home__controls" aria-label={t("controls.label")}>
-            <div className="controls__header">
-              <span className="controls__title">{t("controls.label")}</span>
-              <button
-                type="button"
-                className="icon-button controls__close"
+          <aside
+            className={cn(
+              "group/controls flex flex-none flex-col gap-3 px-gutter pt-3 pb-4.5 max-[600px]:scrollbar-none",
+              // Phones and tablets: two steps. First the parameters, full screen, with a
+              // button to see the rooms; then the rooms, with a summary to edit them.
+              collapsed
+                ? "max-lg:hidden"
+                : "max-lg:min-h-0 max-lg:flex-1 max-lg:gap-4 max-lg:overflow-y-auto max-lg:overscroll-contain max-lg:pt-4",
+              // The inline padding leaves room for the range handles (and their focus
+              // rings), which overhang the track at the ends of the day.
+              "lg:-mx-4 lg:-mt-1 lg:gap-3 lg:overflow-y-auto lg:px-4 lg:pt-1 lg:pb-4 lg:[scrollbar-width:thin]",
+            )}
+            aria-label={t("controls.label")}
+          >
+            {/* Pinned with its own top spacing, so it never slides up against the search
+                bar: sticky offsets start inside the 16px top padding, and the 60px are
+                20px of spacing plus the 40px row. */}
+            <div className="hidden max-lg:sticky max-lg:-top-4 max-lg:z-2 max-lg:-mt-4 max-lg:flex max-lg:min-h-15 max-lg:items-center max-lg:justify-between max-lg:gap-3 max-lg:bg-background max-lg:pt-5">
+              <span className="text-13 font-bold text-muted">{t("controls.label")}</span>
+              <IconButton
+                className="flex-none"
                 aria-label={t("controls.close")}
                 title={t("controls.close")}
                 onClick={() => setControlsCollapsed(true)}
               >
                 <Icon name="cancel-01" />
-              </button>
+              </IconButton>
             </div>
             <WherePanel />
             <WhenPanel />
@@ -117,7 +148,7 @@ export function HomePage({ hidden }: { hidden: boolean }) {
             <Favourites />
             <ShowResultsButton />
           </aside>
-          <Results />
+          <Results className={collapsed ? undefined : "max-lg:hidden"} />
         </div>
       )}
     </main>
