@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { cn } from "../../lib/cn";
 import { t, useLocale } from "../i18n";
 import { setQuery, useStore } from "../state/store";
 import { Icon } from "../ui/icon";
@@ -63,7 +64,7 @@ export function SearchBar() {
   return (
     <div>
       <form
-        className="search__field"
+        className="relative flex items-center"
         role="search"
         onSubmit={(event) => {
           event.preventDefault();
@@ -71,10 +72,22 @@ export function SearchBar() {
           input.current?.blur();
         }}
       >
-        <Icon name="search-01" className="search__icon" />
+        <Icon
+          name="search-01"
+          className="pointer-events-none absolute left-3.5 text-20 text-accent"
+        />
         <input
           ref={input}
-          className="search__input"
+          className={cn(
+            // Phones and tablets: as compact as the controls summary below it.
+            "h-10 w-full appearance-none rounded-lg border-[1.5px] border-border-strong bg-surface lg:h-13.5",
+            "text-16 text-ellipsis lg:text-17 placeholder:text-subtle placeholder:text-ellipsis",
+            // Room on the right only for the clear button or the "/" hint (fine pointers).
+            "py-0 pr-4 pl-11.5 not-placeholder-shown:pr-12 pointer-fine:pr-12",
+            "transition-[border-color,box-shadow] hover:border-accent-soft-border",
+            "focus:border-accent focus:shadow-[0_0_0_4px_var(--color-focus-ring)] focus:[outline:none]",
+            "[&::-webkit-search-cancel-button]:appearance-none",
+          )}
           type="search"
           value={draft}
           placeholder={t("search.placeholder")}
@@ -93,14 +106,17 @@ export function SearchBar() {
         {draft ? (
           <button
             type="button"
-            className="search__clear"
+            className="absolute right-1.5 grid size-9 place-items-center rounded-md text-muted hover:bg-surface-muted"
             aria-label={t("search.clear")}
             onClick={clear}
           >
             <Icon name="cancel-01" />
           </button>
         ) : (
-          <kbd className="search__kbd" aria-hidden="true">
+          <kbd
+            className="absolute right-3 hidden h-6 min-w-6 place-items-center rounded-sm border border-border text-13 text-subtle [font-family:inherit] pointer-fine:grid"
+            aria-hidden="true"
+          >
             /
           </kbd>
         )}
