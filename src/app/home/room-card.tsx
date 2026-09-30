@@ -152,9 +152,8 @@ export function RoomCard({
           idfoto={room.idfoto}
           className="-mx-3 -mt-2.5 mb-1.5 h-[88px] w-[calc(100%+24px)]"
         />
-        {/* Without a thumbnail, keep the content bottom-aligned with photo cards in the same row. */}
         <span
-          className="max-w-full truncate pr-8 text-17 font-bold tracking-tight tabular-nums first:mt-auto"
+          className="max-w-full truncate pr-8 text-17 font-bold tracking-tight tabular-nums"
           title={room.name}
         >
           {room.name}
