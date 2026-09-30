@@ -181,8 +181,9 @@ button.summary__partial[aria-pressed="true"] {
   color: var(--text-subtle);
 }
 
+/* Beside the building it maps, not across the pane from it (900px+ on desktop). */
 .building-group__header .icon-button {
-  margin-left: auto;
+  margin-left: -4px;
 }
 
 /* ---------- Room cards ---------- */
