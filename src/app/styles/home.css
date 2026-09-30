@@ -361,7 +361,7 @@ body[data-page="home"] #root {
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--text-subtle);
+  color: var(--text-muted);
   white-space: nowrap;
 }
 
@@ -723,7 +723,7 @@ body[data-page="home"] #root {
   position: absolute;
   translate: -50% 0;
   font-size: 11px;
-  color: var(--text-subtle);
+  color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
 
