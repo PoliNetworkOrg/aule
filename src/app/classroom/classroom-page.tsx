@@ -157,7 +157,7 @@ function Location({ entry }: { entry: ClassroomEntry }) {
   return (
     <section className="card location-card" aria-labelledby="location-title">
       <div className="location-card__header">
-        <h2 className="section-title" id="location-title">
+        <h2 className="panel__title" id="location-title">
           <Icon name="location-01" />
           {t("classroom.location")}
         </h2>
