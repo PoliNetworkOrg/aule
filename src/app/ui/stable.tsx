@@ -1,3 +1,4 @@
+import { cn } from "../../lib/cn";
 import { LOCALES, translate, useLocale, type Locale } from "../i18n";
 
 /**
@@ -7,11 +8,14 @@ import { LOCALES, translate, useLocale, type Locale } from "../i18n";
  */
 export function Stable({ variants, current }: { variants: string[]; current: number }) {
   return (
-    <span className="stable">
+    <span data-slot="stable" className="inline-grid justify-items-start">
       {variants.map((text, index) => (
         <span
           key={index}
-          className={index === current ? "stable__text" : "stable__text stable__text--ghost"}
+          className={cn(
+            "col-start-1 row-start-1 [text-align:inherit]",
+            index !== current && "invisible",
+          )}
           aria-hidden={index === current ? undefined : true}
         >
           {text}

@@ -14,10 +14,29 @@ import { formatTime, romeTodayIso } from "../state/time";
 import { hasCoordinates } from "../map/maplibre";
 import { fetchPhotoUrl } from "../utils/photo";
 import { FavouriteButton } from "../home/room-card";
+import { cn } from "../../lib/cn";
+import { Button, buttonVariants } from "../ui/button";
+import { Card, SectionTitle } from "../ui/card";
+import { EmptyState, emptyStateAction } from "../ui/empty-state";
 import { Icon } from "../ui/icon";
+import { StatusDot } from "../ui/tag";
 import { Schedule } from "./schedule";
 
 const LocationMap = lazy(() => import("./location-map"));
+
+const PAGE = "mx-auto w-full max-w-[1200px] px-gutter pt-3 pb-12";
+
+/** The classroom's cards: schedule and location. */
+const CONTENT_CARD = "flex min-w-0 flex-col gap-3.5 px-4.5 pt-4 pb-4.5";
+
+// Firefox doesn't always clip the composited WebGL canvas to overflow +
+// border-radius, so the frame clips itself explicitly as well.
+const LOCATION_MAP_FRAME = cn(
+  "relative isolate h-80 overflow-hidden rounded-md border border-border bg-surface-muted max-md:h-65",
+  "[clip-path:inset(0_round_var(--radius-md))]",
+);
+
+const ROOM_STAT = "flex h-9 items-center justify-center gap-2 rounded-md bg-surface-muted px-1";
 
 const FEATURES = new Map([
   [142, { icon: "plug-socket", key: "features.sockets" }],
@@ -56,11 +75,18 @@ function NowStatus({ entry }: { entry: ClassroomEntry }) {
   if (!status) return null;
 
   return (
-    <p className={`now-status now-status--${status.state}`}>
-      <span className="status-dot" aria-hidden="true" />
+    <p
+      className={cn(
+        "flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md px-3 py-2.5 text-14",
+        status.state === "free" && "bg-free-soft text-free",
+        status.state === "busy" && "bg-busy-soft text-busy",
+        status.state === "closed" && "bg-surface-muted text-muted",
+      )}
+    >
+      <StatusDot className="bg-current" />
       <strong>{t(`now.${status.state}`)}</strong>
       {status.detail && (
-        <span>
+        <span className="text-foreground">
           {tf(`now.${status.detail}`, { time: status.time ? formatTime(status.time) : "" })}
         </span>
       )}
@@ -89,13 +115,17 @@ function Photo({ roomId, roomName }: { roomId: number; roomName: string }) {
     <>
       <button
         type="button"
-        className={`room-photo room-photo--${state}`}
+        className="relative block aspect-video w-full overflow-hidden bg-surface-muted text-left disabled:cursor-default"
         aria-label={tf("classroom.enlargePhoto", { name: roomName })}
         disabled={!url || state !== "ready"}
         onClick={() => dialog.current?.showModal()}
       >
         {url && (
           <img
+            className={cn(
+              "size-full object-cover opacity-0 transition-opacity duration-250",
+              state === "ready" && "opacity-100",
+            )}
             src={url}
             alt=""
             decoding="async"
@@ -104,7 +134,7 @@ function Photo({ roomId, roomName }: { roomId: number; roomName: string }) {
           />
         )}
         {state === "ready" && (
-          <span className="room-photo__expand">
+          <span className="absolute right-3 bottom-3 inline-flex items-center gap-1.5 rounded-md bg-scrim/82 px-2.5 py-[7px] text-13 font-bold text-white">
             <Icon name="full-screen" />
             {t("classroom.enlarge")}
           </span>
@@ -112,7 +142,7 @@ function Photo({ roomId, roomName }: { roomId: number; roomName: string }) {
       </button>
       <dialog
         ref={dialog}
-        className="room-photo-dialog"
+        className="fixed inset-0 h-[96dvh] max-h-none w-[min(98vw,1700px)] max-w-none overflow-visible border-0 bg-transparent p-0 backdrop:bg-scrim/88"
         aria-label={tf("classroom.photoOf", { name: roomName })}
         onClick={(event) => {
           if (event.target === dialog.current) dialog.current?.close();
@@ -120,7 +150,7 @@ function Photo({ roomId, roomName }: { roomId: number; roomName: string }) {
       >
         <button
           type="button"
-          className="room-photo-dialog__close"
+          className="absolute top-3 right-3 z-1 grid size-10 place-items-center rounded-md bg-scrim/82 text-white"
           aria-label={t("classroom.closePhoto")}
           onClick={() => dialog.current?.close()}
         >
@@ -129,11 +159,15 @@ function Photo({ roomId, roomName }: { roomId: number; roomName: string }) {
         {url && (
           <button
             type="button"
-            className="room-photo-dialog__image"
+            className="block size-full cursor-zoom-out"
             aria-label={t("classroom.closePhoto")}
             onClick={() => dialog.current?.close()}
           >
-            <img src={url} alt={tf("classroom.photoOf", { name: roomName })} />
+            <img
+              className="block size-full object-contain"
+              src={url}
+              alt={tf("classroom.photoOf", { name: roomName })}
+            />
           </button>
         )}
       </dialog>
@@ -155,35 +189,39 @@ function Location({ entry }: { entry: ClassroomEntry }) {
   )}`;
 
   return (
-    <section className="card location-card" aria-labelledby="location-title">
-      <div className="location-card__header">
-        <h2 className="section-title" id="location-title">
+    <Card className={CONTENT_CARD} aria-labelledby="location-title">
+      <div className="flex flex-col gap-1.5">
+        <SectionTitle id="location-title">
           <Icon name="location-01" />
           {t("classroom.location")}
-        </h2>
-        <p className="location-card__place">
-          <strong>{label}</strong>
+        </SectionTitle>
+        <p className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-14 text-muted">
+          <strong className="text-16 text-foreground">{label}</strong>
           {building.address ? <span>{building.address}</span> : null}
         </p>
       </div>
       {point && (
-        <Suspense fallback={<div className="location-map" />}>
-          <LocationMap building={point} campusBuildings={campus.buildings} />
+        <Suspense fallback={<div className={LOCATION_MAP_FRAME} />}>
+          <LocationMap
+            building={point}
+            campusBuildings={campus.buildings}
+            className={LOCATION_MAP_FRAME}
+          />
         </Suspense>
       )}
-      <div className="button-row">
+      <div className="flex flex-wrap gap-2">
         <a
-          className="button button--ghost location-card__link"
+          className={buttonVariants({ variant: "ghost" })}
           href={directionsUrl}
           target="_blank"
           rel="noopener noreferrer"
         >
-          <Icon name="directions-01" />
+          <Icon name="directions-01" className="text-18" />
           {t("classroom.directions")}
-          <Icon name="arrow-up-right-01" className="location-card__external" />
+          <Icon name="arrow-up-right-01" className="text-14 text-subtle" />
         </a>
       </div>
-    </section>
+    </Card>
   );
 }
 
@@ -216,17 +254,16 @@ export function ClassroomPage({
 
   if (!entry)
     return (
-      <main className="page">
+      <main className={PAGE}>
         {directory === "ready" ? (
-          <div className="empty-state">
-            <Icon name="door-01" className="empty-state__icon" />
-            <p className="empty-state__title">{t("classroom.notFound")}</p>
-            <button type="button" className="button button--primary" onClick={() => closePage()}>
+          <EmptyState icon="door-01" title={t("classroom.notFound")}>
+            <Button className={emptyStateAction} onClick={() => closePage()}>
               {t("classroom.backHome")}
-            </button>
-          </div>
+            </Button>
+          </EmptyState>
         ) : (
-          <div className="skeleton skeleton--page" />
+          // Skeleton's classes on a div, the element this placeholder has always been.
+          <div className="mt-6 block h-80 animate-shimmer rounded-md bg-[linear-gradient(90deg,var(--color-surface-muted)_30%,var(--color-border)_50%,var(--color-surface-muted)_70%)] bg-size-[300%_100%]" />
         )}
       </main>
     );
@@ -235,22 +272,32 @@ export function ClassroomPage({
   const features = (room.features ?? []).filter((feature) => FEATURES.has(feature.id));
 
   return (
-    <main className="page">
-      <button type="button" className="back-link" onClick={leavePage}>
+    <main className={PAGE}>
+      <button
+        type="button"
+        className="mb-2 -ml-1.5 inline-flex min-h-10 items-center gap-1.5 rounded-md pr-2.5 pl-1.5 text-14 font-semibold text-muted hover:bg-accent-soft hover:text-accent-strong"
+        onClick={leavePage}
+      >
         <Icon name="arrow-left-01" />
         {t("classroom.back")}
       </button>
 
-      <div className="classroom-page__layout">
-        <section className="card room-info" aria-labelledby="room-title">
+      <div className="grid gap-4 lg:grid-cols-[380px_minmax(0,1fr)] lg:gap-6 lg:[align-items:start]">
+        <Card
+          className="overflow-hidden lg:sticky lg:top-[calc(var(--spacing-header)+16px)]"
+          aria-labelledby="room-title"
+        >
           {room.idfoto ? <Photo key={room.id} roomId={room.id} roomName={room.name} /> : null}
-          <div className="room-info__body">
-            <div className="room-info__title-row">
+          <div className="flex flex-col gap-4 px-4.5 pt-4 pb-4.5">
+            <div className="flex items-start justify-between gap-2">
               <div>
-                <h1 className="room-info__title" id="room-title">
+                <h1
+                  className="text-30 leading-[1.1] font-bold tracking-tighter max-xs:text-26"
+                  id="room-title"
+                >
                   {room.name}
                 </h1>
-                <p className="room-info__subtitle">
+                <p className="mt-1 text-muted">
                   {t("building.prefix")} {building.name}
                   {building.altName ? ` · ${building.altName}` : ""} · {entry.campus.name}
                 </p>
@@ -260,40 +307,48 @@ export function ClassroomPage({
 
             <NowStatus entry={entry} />
 
-            {/* Icons label the values; the text stays for screen readers and as a tooltip. */}
-            <dl className="room-stats">
-              <div title={t("classroom.seats")}>
-                <dt>
+            {/* Icons label the values; the text stays for screen readers and as a tooltip.
+                Full width, one equal column per stat (two when the floor is unknown); a
+                column only grows past its share when its content would not fit ("Ground"
+                on the narrowest phones). */}
+            <dl className="grid auto-cols-[minmax(max-content,1fr)] grid-flow-col gap-2">
+              <div className={ROOM_STAT} title={t("classroom.seats")}>
+                <dt className="flex text-18 text-muted">
                   <Icon name="user-multiple" />
-                  <span className="visually-hidden">{t("classroom.seats")}</span>
+                  <span className="sr-only">{t("classroom.seats")}</span>
                 </dt>
-                <dd>{room.seats ?? "—"}</dd>
+                <dd className="text-16 font-bold tabular-nums">{room.seats ?? "—"}</dd>
               </div>
-              <div title={t("classroom.accessibleSeats")}>
-                <dt>
+              <div className={ROOM_STAT} title={t("classroom.accessibleSeats")}>
+                <dt className="flex text-18 text-muted">
                   <Icon name="wheelchair" />
-                  <span className="visually-hidden">{t("classroom.accessibleSeats")}</span>
+                  <span className="sr-only">{t("classroom.accessibleSeats")}</span>
                 </dt>
-                <dd>{room.accessible_seats ?? 0}</dd>
+                <dd className="text-16 font-bold tabular-nums">{room.accessible_seats ?? 0}</dd>
               </div>
               {room.floor !== undefined && (
-                <div title={t("classroom.floor")}>
-                  <dt>
+                <div className={ROOM_STAT} title={t("classroom.floor")}>
+                  <dt className="flex text-18 text-muted">
                     <Icon name="stairs-01" />
-                    <span className="visually-hidden">{t("classroom.floor")}</span>
+                    <span className="sr-only">{t("classroom.floor")}</span>
                   </dt>
-                  <dd>{room.floor === 0 ? t("classroom.groundFloor") : room.floor}</dd>
+                  <dd className="text-16 font-bold tabular-nums">
+                    {room.floor === 0 ? t("classroom.groundFloor") : room.floor}
+                  </dd>
                 </div>
               )}
             </dl>
 
             {features.length > 0 && (
-              <ul className="feature-list" aria-label={t("classroom.features")}>
+              <ul className="flex flex-wrap gap-1.5" aria-label={t("classroom.features")}>
                 {features.map((feature) => {
                   const meta = FEATURES.get(feature.id)!;
 
                   return (
-                    <li key={feature.id} className="feature">
+                    <li
+                      key={feature.id}
+                      className="inline-flex h-[30px] items-center gap-1.5 rounded-full border border-border px-2.5 text-13 icon:text-accent"
+                    >
                       <Icon name={meta.icon} />
                       {t(meta.key)}
                     </li>
@@ -302,16 +357,16 @@ export function ClassroomPage({
               </ul>
             )}
           </div>
-        </section>
+        </Card>
 
-        <div className="classroom-page__main">
-          <section className="card schedule-card" aria-labelledby="schedule-title">
-            <h2 className="section-title" id="schedule-title">
+        <div className="grid min-w-0 gap-4 lg:gap-6">
+          <Card className={CONTENT_CARD} aria-labelledby="schedule-title">
+            <SectionTitle id="schedule-title">
               <Icon name="calendar-03" />
               {t("schedule.title")}
-            </h2>
+            </SectionTitle>
             <Schedule key={room.id} roomId={room.id} context={context} />
-          </section>
+          </Card>
 
           {(building.address || hasCoordinates(building)) && (
             <Location key={building.name} entry={entry} />

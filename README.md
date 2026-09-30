@@ -24,10 +24,11 @@ The frontend uses the existing hosted APIs. Production hosts use the stable back
 - `src/app/home/` — search bar and results, date strip, time range, filters, favourites, results list and the lazily loaded 3D campus map (MapLibre GL over OpenFreeMap).
 - `src/app/classroom/` — classroom page and its schedule (day tabs, day bar, agenda of busy/free intervals).
 - `src/app/info/` — about/data page; on non-production hosts it also exposes the beta-backend switch.
-- `src/app/style.css` holds the design tokens (DM Sans, slate neutrals, PoliNetwork blue, dark mode) and shared controls; `src/app/styles/` the per-area styles. Plain CSS, no glass effects.
+- `src/app/ui/` — shared UI primitives (buttons, chips, segmented controls, tags, cards, notices, popups…) as Tailwind `cva` variants.
+- `src/styles.css` holds the Tailwind v4 theme — design tokens (DM Sans, slate neutrals, PoliNetwork blue, light/dark colours, px type scale, radii, breakpoints) — and the base element styles. Components style themselves with utilities; combine classes with `cn()` from `src/lib/cn.ts`. No glass effects.
 - `src/app/available-rooms-script.ts` and `src/app/classroom-search-data.ts` fetch occupancy and the classroom directory and run the room/lesson search.
 
-Lint runs Oxlint's built-in rules, the vendored [anti-slop](https://github.com/dmmulroy/anti-slop) generic rules, and [@shadcn/lint](https://github.com/shadcn-ui/lint) class/color validation, followed by Oxfmt's formatting check. Both plugins are registered and enabled in `.oxlintrc.json`; shadcn runs inside Oxlint, without ESLint or a separate CLI. Tailwind Preflight is omitted; `src/app/style.css` has its own small reset.
+Lint runs Oxlint's built-in rules, the vendored [anti-slop](https://github.com/dmmulroy/anti-slop) generic rules, and [@shadcn/lint](https://github.com/shadcn-ui/lint) class/color validation, followed by Oxfmt's formatting check. Both plugins are registered and enabled in `.oxlintrc.json`; shadcn runs inside Oxlint, without ESLint or a separate CLI. The shadcn rules only accept classes Tailwind can generate from the theme. Tailwind Preflight is omitted; `src/styles.css` has its own small reset in the base layer.
 
 `workers/api/`, `workers/cron/`, `scripts/`, and the data-refresh GitHub workflows are retained. Workers remain independently deployed Cloudflare projects with their original dependencies and secrets; the frontend build does not deploy them. Their original API and architecture documentation is archived in `docs/upstream/` and describes the pre-migration frontend.
 

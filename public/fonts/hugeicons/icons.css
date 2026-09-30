@@ -5,12 +5,18 @@
  * Permission is granted free of charge to use, copy, modify, publish and
  * distribute this font, for personal or commercial purposes, provided this
  * notice is kept with any copy of the source files.
+ *
+ * Local change: the icon rules sit in the app's `components` cascade layer
+ * (same layer order as src/styles.css), so Tailwind utilities on an icon, such
+ * as `absolute` or `block`, override `.hgi-stroke`.
  */
+@layer theme, base, components, utilities;
 @font-face {
   font-family: "hugeicons-stroke-rounded";
   src: url("hgi-stroke-rounded.woff2") format("woff2");
   font-display: swap;
 }
+@layer components {
 .hgi-stroke {
   font-family: "hugeicons-stroke-rounded" !important;
   font-style: normal;
@@ -24936,4 +24942,5 @@
 
 .hgi-stroke.hgi-zzz::before {
   content: "\f2a5d";
+}
 }

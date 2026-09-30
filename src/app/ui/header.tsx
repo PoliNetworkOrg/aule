@@ -1,19 +1,29 @@
+import { cn } from "../../lib/cn";
 import { closePage } from "../../lib/navigation";
 import { leavePage, openInApp } from "../state/navigation-context";
 import { LOCALES, setLocale, t, useLocale } from "../i18n";
 import { setTheme, useTheme } from "../theme";
+import { IconButton } from "./button";
 import { Icon } from "./icon";
 
 function LanguageToggle() {
   const locale = useLocale();
 
   return (
-    <div className="lang-toggle" role="group" aria-label={t("header.language")}>
+    <div
+      className="inline-flex rounded-full border border-border bg-surface-muted p-[3px]"
+      role="group"
+      aria-label={t("header.language")}
+    >
       {LOCALES.map((option) => (
         <button
           key={option}
           type="button"
-          className="lang-toggle__option"
+          className={cn(
+            "h-7 w-[34px] rounded-full text-12 font-bold tracking-wide text-muted",
+            "transition-[background-color,color] hover:text-foreground",
+            "aria-pressed:bg-surface aria-pressed:text-accent-strong aria-pressed:shadow-sm",
+          )}
           aria-pressed={option === locale}
           lang={option}
           aria-label={option === "it" ? "Italiano" : "English"}
@@ -32,10 +42,10 @@ export function Header({ page }: { page: "home" | "classroom" | "info" }) {
   const themeLabel = t(theme === "dark" ? "header.lightMode" : "header.darkMode");
 
   return (
-    <header className="app-header">
-      <div className="app-header__inner">
+    <header className="sticky top-0 z-20 border-b border-border bg-surface pt-[env(safe-area-inset-top)]">
+      <div className="mx-auto flex h-header max-w-content items-center gap-3 px-gutter max-xs:gap-2">
         <a
-          className="brand"
+          className="flex min-w-0 items-center gap-2.5 text-foreground no-underline"
           href="./"
           aria-label={t("header.home")}
           onClick={(event) => {
@@ -44,22 +54,23 @@ export function Header({ page }: { page: "home" | "classroom" | "info" }) {
           }}
         >
           <img
-            className="brand__logo"
+            className="size-10 flex-none"
             src="/brand/logo-40.png"
             srcSet="/brand/logo-40.png 1x, /brand/logo-80.png 2x, /brand/logo-120.png 3x"
             alt=""
             width="40"
             height="40"
           />
-          <span className="brand__name">PoliNetwork</span>
-          <span className="brand__product">{t("app.name")}</span>
+          <span className="text-17 font-bold tracking-tight max-xs:hidden">PoliNetwork</span>
+          {/* Phones drop "PoliNetwork" and set the product name in its style. */}
+          <span className="text-17 text-muted max-xs:font-bold max-xs:text-foreground">
+            {t("app.name")}
+          </span>
         </a>
 
-        <div className="app-header__actions">
+        <div className="ml-auto flex min-w-0 items-center gap-1">
           <LanguageToggle />
-          <button
-            type="button"
-            className="icon-button"
+          <IconButton
             aria-label={themeLabel}
             title={themeLabel}
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
@@ -71,17 +82,15 @@ export function Header({ page }: { page: "home" | "classroom" | "info" }) {
                 <path d="M12 9c1.65 0 3 1.35 3 3s-1.35 3-3 3-3-1.35-3-3 1.35-3 3-3m0-2c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zM5.99 4.58a.996.996 0 0 0-1.41 0 .996.996 0 0 0 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41L5.99 4.58zm12.37 12.37a.996.996 0 0 0-1.41 0 .996.996 0 0 0 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0a.996.996 0 0 0 0-1.41l-1.06-1.06zm1.06-10.96a.996.996 0 0 0 0-1.41.996.996 0 0 0-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06zM7.05 18.36a.996.996 0 0 0 0-1.41.996.996 0 0 0-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06z" />
               )}
             </svg>
-          </button>
-          <button
-            type="button"
-            className="icon-button"
+          </IconButton>
+          <IconButton
             aria-label={t("header.info")}
             title={t("header.info")}
             aria-current={page === "info" ? "page" : undefined}
             onClick={() => (page === "info" ? leavePage() : openInApp("/info"))}
           >
             <Icon name="information-circle" />
-          </button>
+          </IconButton>
         </div>
       </div>
     </header>
