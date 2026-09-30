@@ -217,7 +217,8 @@ button.summary__partial[aria-pressed="true"] {
   overflow: hidden;
   transition:
     border-color 0.15s,
-    background-color 0.15s;
+    background-color 0.15s,
+    scale var(--duration-quick) var(--ease-smooth-out);
 }
 
 .room-thumbnail {

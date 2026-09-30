@@ -66,7 +66,9 @@ body[data-page="home"] #root {
   border-radius: var(--radius);
   background: var(--surface);
   text-align: left;
-  transition: border-color 0.15s;
+  transition:
+    border-color 0.15s,
+    scale var(--duration-quick) var(--ease-smooth-out);
 }
 
 .campus-select:hover,
@@ -377,7 +379,8 @@ body[data-page="home"] #root {
   line-height: 1.1;
   transition:
     background-color 0.15s,
-    color 0.15s;
+    color 0.15s,
+    scale var(--duration-quick) var(--ease-smooth-out);
 }
 
 .date-strip__day:hover {
@@ -501,7 +504,8 @@ body[data-page="home"] #root {
   font-variant-numeric: tabular-nums;
   transition:
     background-color 0.15s,
-    color 0.15s;
+    color 0.15s,
+    scale var(--duration-quick) var(--ease-smooth-out);
 }
 
 .time-grid__option:hover {
@@ -786,7 +790,8 @@ body[data-page="home"] #root {
   white-space: nowrap;
   transition:
     background-color 0.15s,
-    color 0.15s;
+    color 0.15s,
+    scale var(--duration-quick) var(--ease-smooth-out);
 }
 
 .choice--wide {
@@ -828,6 +833,7 @@ body[data-page="home"] #root {
   column-gap: 8px;
   padding: 6px 4px 6px 12px;
   text-align: left;
+  transition: scale var(--duration-quick) var(--ease-smooth-out);
 }
 
 .favourite__open .status-dot {
@@ -919,7 +925,9 @@ body[data-page="home"] #root {
   border-radius: var(--radius);
   background: var(--surface);
   text-align: left;
-  transition: border-color 0.15s;
+  transition:
+    border-color 0.15s,
+    scale var(--duration-quick) var(--ease-smooth-out);
 }
 
 .search-room .room-thumbnail {
@@ -1021,6 +1029,7 @@ body[data-page="home"] #root {
   border-bottom: 1px solid var(--border);
   text-align: left;
   column-gap: 8px;
+  transition: scale var(--duration-quick) var(--ease-smooth-out);
 }
 
 .search-sessions li:last-child .search-session {
