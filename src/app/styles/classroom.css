@@ -69,7 +69,7 @@
   height: 100%;
   object-fit: cover;
   opacity: 0;
-  transition: opacity 0.25s;
+  transition: opacity var(--duration-fast) var(--ease-in-out);
 }
 
 .room-photo--ready img {
