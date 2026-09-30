@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { cn } from "../../lib/cn";
 import { t, tf, useLocale } from "../i18n";
 import {
   OCC_MAX_GROUPS,
@@ -13,7 +14,11 @@ import { openClassroom } from "../state/navigation-context";
 import { setQuery, useStore } from "../state/store";
 import { capitalise, formatRange, parseIsoDate } from "../state/time";
 import { Highlight, titleCase } from "../ui/text";
+import { SectionCount, SectionTitle } from "../ui/card";
+import { Chip, ChipRow } from "../ui/chip";
+import { EmptyState } from "../ui/empty-state";
 import { Icon } from "../ui/icon";
+import { Tag } from "../ui/tag";
 import { StatusTag } from "./room-card";
 import { RoomThumbnail } from "./room-thumbnail";
 import { ProfessorList } from "./professor-link";
@@ -47,6 +52,12 @@ function matchingProfessors(groups: OccupationGroup[], query: string) {
   return [...byName, ...[...others].filter((name) => !byName.has(name))].slice(0, 10);
 }
 
+const searchSection = "flex flex-col gap-2.5";
+
+const searchNote = "text-13 text-subtle";
+
+const eventMetaItem = "inline-flex items-center gap-1";
+
 function RoomResults({ query }: { query: string }) {
   useLocale();
   const date = useStore((state) => state.date);
@@ -57,11 +68,11 @@ function RoomResults({ query }: { query: string }) {
   if (!rooms.visible.length) return null;
 
   return (
-    <section className="search-section">
-      <h2 className="section-title">
-        {t("search.rooms")} <span className="section-title__count">{rooms.total}</span>
-      </h2>
-      <ul className="search-rooms">
+    <section className={searchSection}>
+      <SectionTitle>
+        {t("search.rooms")} <SectionCount>{rooms.total}</SectionCount>
+      </SectionTitle>
+      <ul className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-2">
         {rooms.visible.map((room) => {
           const entry = findClassroom(room.id);
           const availability = date ? roomWindowStatus(room.id, date, from, to) : null;
@@ -72,22 +83,35 @@ function RoomResults({ query }: { query: string }) {
             <li key={room.id}>
               <button
                 type="button"
-                className="search-room"
+                className={cn(
+                  "group/room grid w-full grid-cols-[1fr_auto] items-center gap-x-2 rounded-md border border-border bg-surface px-3.5 py-3 text-left",
+                  "transition-[border-color] hover:border-accent-soft-border",
+                  "has-data-[slot=thumbnail]:grid-cols-[56px_minmax(0,1fr)_auto]",
+                )}
                 onClick={() =>
                   openClassroom(entry, date ? { date, from, to, highlight: false } : null)
                 }
               >
-                <RoomThumbnail id={room.id} idfoto={room.idfoto} />
-                <span className="search-room__name">
+                <RoomThumbnail
+                  id={room.id}
+                  idfoto={room.idfoto}
+                  className="col-start-1 row-[1/3] size-14 rounded-sm"
+                />
+                <span className="text-16 font-bold group-has-data-[slot=thumbnail]/room:col-start-2">
                   <Highlight text={room.name} query={query} />
                 </span>
-                <span className="search-room__meta">
+                <span className="col-start-1 text-13 text-muted group-has-data-[slot=thumbnail]/room:col-start-2">
                   {t("building.prefix")} <Highlight text={room.buildingName} query={query} />
                   {room.buildingAltName ? ` · ${room.buildingAltName}` : ""} ·{" "}
                   <Highlight text={room.campusName} query={query} />
                 </span>
                 {availability && (
-                  <StatusTag status={availability.status} slots={availability.slots} compact />
+                  <StatusTag
+                    status={availability.status}
+                    slots={availability.slots}
+                    compact
+                    className="col-start-2 row-[1/3] group-has-data-[slot=thumbnail]/room:col-start-3"
+                  />
                 )}
               </button>
             </li>
@@ -95,7 +119,7 @@ function RoomResults({ query }: { query: string }) {
         })}
       </ul>
       {rooms.capped && (
-        <p className="search-note">{tf("search.capped", { n: SEARCH_MAX_RESULTS })}</p>
+        <p className={searchNote}>{tf("search.capped", { n: SEARCH_MAX_RESULTS })}</p>
       )}
     </section>
   );
@@ -111,44 +135,42 @@ function EventResults({ query }: { query: string }) {
   return (
     <>
       {professors.length > 0 && (
-        <section className="search-section">
-          <h2 className="section-title">{t("search.professors")}</h2>
-          <div className="chip-row chip-row--wrap">
+        <section className={searchSection}>
+          <SectionTitle>{t("search.professors")}</SectionTitle>
+          <ChipRow>
             {professors.map((name) => (
-              <button
-                key={name}
-                type="button"
-                className="chip"
-                onClick={() => setQuery(titleCase(name, locale))}
-              >
+              <Chip key={name} onClick={() => setQuery(titleCase(name, locale))}>
                 <Icon name="user-multiple" />
                 <span>
                   <Highlight text={titleCase(name, locale)} query={query} />
                 </span>
-              </button>
+              </Chip>
             ))}
-          </div>
+          </ChipRow>
         </section>
       )}
-      <section className="search-section">
-        <h2 className="section-title">
-          {t("search.lessons")} <span className="section-title__count">{events.total}</span>
-        </h2>
-        <ul className="search-events">
+      <section className={searchSection}>
+        <SectionTitle>
+          {t("search.lessons")} <SectionCount>{events.total}</SectionCount>
+        </SectionTitle>
+        <ul className="grid grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-3">
           {events.groups.map((group, index) => (
-            <li key={index} className="search-event">
-              <div className="search-event__head">
-                <h3 className="search-event__title">
+            <li
+              key={index}
+              className="flex flex-col gap-2 rounded-lg border border-border bg-surface p-3.5"
+            >
+              <div className="flex items-start gap-2">
+                <h3 className="flex-1 text-16 leading-[1.3] font-bold">
                   <Highlight
                     text={titleCase(group.title || t("schedule.occupied"), locale)}
                     query={query}
                   />
                 </h3>
-                {group.isExam && <span className="tag tag--exam">{t("schedule.exam")}</span>}
+                {group.isExam && <Tag tone="exam">{t("schedule.exam")}</Tag>}
               </div>
-              <p className="search-event__meta">
+              <p className="flex flex-wrap gap-x-3 gap-y-1 text-13 text-muted">
                 {group.professors.length > 0 && (
-                  <span>
+                  <span className={eventMetaItem}>
                     <Icon name="user-multiple" />
                     <span>
                       <ProfessorList names={group.professors} query={query} />
@@ -156,13 +178,13 @@ function EventResults({ query }: { query: string }) {
                   </span>
                 )}
                 {group.code != null && (
-                  <span>
+                  <span className={eventMetaItem}>
                     <Highlight text={String(group.code)} query={query} />
                   </span>
                 )}
-                {group.section && <span>{group.section}</span>}
+                {group.section && <span className={eventMetaItem}>{group.section}</span>}
               </p>
-              <ul className="search-sessions">
+              <ul className="flex flex-col border-t border-border">
                 {group.sessions.slice(0, events.maxSessions).map((session, sessionIndex) => {
                   const entry = findClassroom(session.roomId);
 
@@ -170,7 +192,10 @@ function EventResults({ query }: { query: string }) {
                     <li key={sessionIndex}>
                       <button
                         type="button"
-                        className="search-session"
+                        className={cn(
+                          "group/session grid w-full grid-cols-[1fr_auto] items-center gap-x-2 border-b border-border px-0.5 py-2 text-left",
+                          "[li:last-child>&]:border-b-0",
+                        )}
                         disabled={!entry}
                         onClick={() =>
                           entry &&
@@ -182,22 +207,26 @@ function EventResults({ query }: { query: string }) {
                           })
                         }
                       >
-                        <span className="search-session__when">
-                          <span>{formatDay(session.date, locale)}</span>
-                          <strong>{formatRange(session.inizio, session.fine)}</strong>
+                        <span className="flex gap-2 text-14 tabular-nums">
+                          <span className="min-w-[82px] text-muted">
+                            {formatDay(session.date, locale)}
+                          </span>
+                          <strong className="group-hover/session:text-accent-strong">
+                            {formatRange(session.inizio, session.fine)}
+                          </strong>
                         </span>
-                        <span className="search-session__where">
+                        <span className="col-start-1 text-13 text-subtle">
                           {session.roomName} · {session.buildingAltName || session.buildingName} ·{" "}
                           {session.campusName}
                         </span>
-                        <Icon name="arrow-right-01" className="search-session__chevron" />
+                        <Icon name="arrow-right-01" className="col-start-2 row-[1/3] text-subtle" />
                       </button>
                     </li>
                   );
                 })}
               </ul>
               {(group.sessionCount ?? 0) > events.maxSessions && (
-                <p className="search-note">
+                <p className={searchNote}>
                   {tf("search.moreSessions", {
                     n: (group.sessionCount ?? 0) - events.maxSessions,
                   })}
@@ -207,7 +236,7 @@ function EventResults({ query }: { query: string }) {
           ))}
         </ul>
         {events.capped && (
-          <p className="search-note">{tf("search.capped", { n: OCC_MAX_GROUPS })}</p>
+          <p className={searchNote}>{tf("search.capped", { n: OCC_MAX_GROUPS })}</p>
         )}
       </section>
     </>
@@ -229,15 +258,16 @@ export function SearchResults() {
   );
 
   return (
-    <div className="search-results" aria-live="polite">
+    <div
+      className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-gutter pt-5 pb-8 lg:pt-7"
+      aria-live="polite"
+    >
       {empty ? (
-        <div className="empty-state">
-          <Icon name="search-01" className="empty-state__icon" />
-          <p className="empty-state__title">{tf("search.emptyTitle", { query })}</p>
-          <p className="empty-state__text">
-            {occupancy === "loading" ? t("search.loadingLessons") : t("search.emptyText")}
-          </p>
-        </div>
+        <EmptyState
+          icon="search-01"
+          title={tf("search.emptyTitle", { query })}
+          text={occupancy === "loading" ? t("search.loadingLessons") : t("search.emptyText")}
+        />
       ) : (
         <>
           <RoomResults query={query} />

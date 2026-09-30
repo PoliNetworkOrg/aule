@@ -24,8 +24,14 @@ import {
 } from "../state/store";
 import { capitalise, formatRange, parseIsoDate, romeTodayIso } from "../state/time";
 import { cn } from "../../lib/cn";
+import { Button, IconButton } from "../ui/button";
+import { Chip, ChipRow } from "../ui/chip";
+import { EmptyState, emptyStateAction } from "../ui/empty-state";
 import { Icon } from "../ui/icon";
-import { RoomCard } from "./room-card";
+import { Notice, noticeAction } from "../ui/notice";
+import { Segmented, SegmentedOption } from "../ui/segmented";
+import { Skeleton } from "../ui/skeleton";
+import { RoomCard, roomGrid } from "./room-card";
 import { StableText } from "../ui/stable";
 
 const CampusMap = lazy(() => import("./campus-map"));
@@ -61,22 +67,22 @@ function ViewSwitch() {
   ];
 
   return (
-    <div className="segmented segmented--icons" role="group" aria-label={t("results.view")}>
+    <Segmented role="group" aria-label={t("results.view")}>
       {options.map((option) => (
-        <button
+        <SegmentedOption
           key={option.value}
-          type="button"
           aria-pressed={view === option.value}
           aria-label={t(option.label)}
           title={t(option.label)}
-          className="segmented__option"
+          // Phones: icon only.
+          className="max-sm:px-2.5 max-sm:text-18 max-sm:[&_span]:hidden"
           onClick={() => setView(option.value)}
         >
           <Icon name={option.icon} />
           <StableText k={option.label} />
-        </button>
+        </SegmentedOption>
       ))}
-    </div>
+    </Segmented>
   );
 }
 
@@ -106,17 +112,21 @@ function Summary({ results }: { results: BuildingAvailability[] }) {
     : "";
 
   return (
-    <div className="summary">
-      <p className="summary__count">
+    <div className="min-w-0 flex-1">
+      <p className="text-16 font-bold max-sm:flex max-sm:flex-wrap max-sm:items-center max-sm:gap-x-2 max-sm:gap-y-1">
         {occupancy === "loading" && !rooms.length
           ? t("results.loading")
           : free === 1
             ? t("results.oneRoom")
             : tf("results.rooms", { n: free })}
         {partial > 0 && (
+          // Off (grey) while partly free rooms are hidden, lit in the partial colour once listed.
           <button
             type="button"
-            className="summary__partial"
+            className={cn(
+              "ml-2 rounded-full bg-surface-muted px-2 py-0.5 text-14 font-bold text-muted",
+              "aria-pressed:bg-partial-soft aria-pressed:text-partial max-sm:ml-0 max-sm:text-13",
+            )}
             aria-pressed={filters.partial}
             title={tf(filters.partial ? "results.hidePartial" : "results.showPartial", {
               n: partial,
@@ -129,7 +139,8 @@ function Summary({ results }: { results: BuildingAvailability[] }) {
           </button>
         )}
       </p>
-      <p className="summary__context">
+      {/* Phones: campus, day and time are right above in the controls summary. */}
+      <p className="truncate text-13 text-muted tabular-nums max-sm:hidden">
         {campus?.name} · {day} · {formatRange(from, to)}
       </p>
     </div>
@@ -143,46 +154,40 @@ function DataNotice() {
 
   if (occupancy === "error")
     return (
-      <div className="notice notice--error" role="alert">
+      <Notice tone="error" className={noticeMargin} role="alert">
         <Icon name="alert-02" />
         <span>{t("data.error")}</span>
-        <button
-          type="button"
-          className="button button--ghost"
-          onClick={() => void reloadOccupancy()}
-        >
+        <Button variant="ghost" className={noticeAction} onClick={() => void reloadOccupancy()}>
           {t("data.retry")}
-        </button>
-      </div>
+        </Button>
+      </Notice>
     );
 
   if (generatedAt && formatRomeYYYYMMDD(generatedAt) !== formatRomeYYYYMMDD(new Date()))
     return (
-      <div className="notice notice--warning">
+      <Notice tone="warning" className={noticeMargin}>
         <Icon name="alert-02" />
         <span>{t("data.stale")}</span>
-      </div>
+      </Notice>
     );
 
   // Occupancy loaded but opening hours did not: rooms are listed as if every
   // building were open, so say so and let the user retry.
   if (occupancy === "ready" && !openingHours)
     return (
-      <div className="notice notice--warning">
+      <Notice tone="warning" className={noticeMargin}>
         <Icon name="alert-02" />
         <span>{t("data.hoursUnavailable")}</span>
-        <button
-          type="button"
-          className="button button--ghost"
-          onClick={() => void reloadOccupancy()}
-        >
+        <Button variant="ghost" className={noticeAction} onClick={() => void reloadOccupancy()}>
           {t("data.retry")}
-        </button>
-      </div>
+        </Button>
+      </Notice>
     );
 
   return null;
 }
+
+const noticeMargin = "mx-gutter mt-2.5 lg:mx-5";
 
 function BuildingGroup({ group }: { group: BuildingAvailability }) {
   const date = useStore((state) => state.date);
@@ -191,20 +196,28 @@ function BuildingGroup({ group }: { group: BuildingAvailability }) {
   const { building, rooms } = group;
 
   return (
-    <section className="building-group" aria-labelledby={`building-${building.name}`}>
-      <header className="building-group__header">
-        <h3 className="building-group__title" id={`building-${building.name}`}>
+    <section className="flex flex-col" aria-labelledby={`building-${building.name}`}>
+      {/* Sticks 8px above the scrollport with 8px of extra top padding: the header's
+          own background covers the edge, where the scrollport's fractional offset
+          (and iOS momentum scrolling) would otherwise leave a sliver of rows. */}
+      <header className="sticky -top-2 z-1 -mx-gutter -mt-2 flex items-center gap-2.5 bg-surface px-gutter pt-4 pb-2 lg:-mx-5 lg:px-5">
+        <h3
+          className="flex items-baseline gap-2 text-16 font-bold"
+          id={`building-${building.name}`}
+        >
           {t("building.prefix")} {building.name}
-          {building.altName && <span className="building-group__alt">{building.altName}</span>}
+          {building.altName && (
+            <span className="text-14 font-medium text-muted">{building.altName}</span>
+          )}
         </h3>
-        <span className="building-group__count">
+        <span className="text-13 text-subtle">
           {tf(rooms.length === 1 ? "results.oneAvailable" : "results.available", {
             n: rooms.length,
           })}
         </span>
-        <button
-          type="button"
-          className="icon-button icon-button--small"
+        <IconButton
+          size="small"
+          className="ml-auto"
           aria-label={tf("results.showOnMap", { name: building.name })}
           title={tf("results.showOnMap", { name: building.name })}
           onClick={() => {
@@ -213,9 +226,9 @@ function BuildingGroup({ group }: { group: BuildingAvailability }) {
           }}
         >
           <Icon name="maps-location-01" />
-        </button>
+        </IconButton>
       </header>
-      <ul className="room-grid">
+      <ul className={roomGrid}>
         {rooms.map((result) => (
           <RoomCard key={result.room.id} result={result} date={date} from={from} to={to} />
         ))}
@@ -231,6 +244,14 @@ const FILTER_LABELS: Record<RestrictiveFilter, string> = {
   building: "filters.building",
   network: "filters.network",
 };
+
+const hint =
+  "grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-2 rounded-lg border border-accent-soft-border bg-accent-soft px-3.5 py-3";
+
+const hintIcon = "text-20 text-accent";
+
+/** The hint's action sits under its text. */
+const hintAction = "col-start-2 justify-self-start";
 
 /**
  * Helps out when the list is short: offers the partially free rooms when no
@@ -255,42 +276,37 @@ function ResultsHints({ all, shown }: { all: BuildingAvailability[]; shown: numb
   if (!offerPartial && !impact.length) return null;
 
   return (
-    <div className="hints">
+    <div className="grid gap-2.5">
       {offerPartial && (
-        <div className="hint">
-          <Icon name="time-quarter-pass" className="hint__icon" />
-          <p className="hint__text">{tf("results.onlyPartial", { n: partial })}</p>
-          <button
-            type="button"
-            className="button button--primary"
+        <div className={hint}>
+          <Icon name="time-quarter-pass" className={hintIcon} />
+          <p className="text-14">{tf("results.onlyPartial", { n: partial })}</p>
+          <Button
+            variant="primary"
+            className={hintAction}
             onClick={() => setFilters({ partial: true })}
           >
             <StableText k="results.showPartialButton" />
-          </button>
+          </Button>
         </div>
       )}
       {impact.length > 0 && (
-        <div className="hint">
-          <Icon name="filter-horizontal" className="hint__icon" />
-          <p className="hint__text">{t("results.filterImpact")}</p>
-          <div className="chip-row chip-row--wrap">
+        <div className={hint}>
+          <Icon name="filter-horizontal" className={hintIcon} />
+          <p className="text-14">{t("results.filterImpact")}</p>
+          <ChipRow className={hintAction}>
             {impact.map(({ key, gain }) => (
-              <button
-                key={key}
-                type="button"
-                className="chip chip--impact"
-                onClick={() => clearFilter(key)}
-              >
+              <Chip key={key} variant="impact" onClick={() => clearFilter(key)}>
                 <Icon name="cancel-01" />
                 {key === "minSeats"
                   ? tf("filters.seatsValue", { n: filters.minSeats })
                   : key === "building"
                     ? `${t("building.prefix")} ${filters.building}`
                     : t(FILTER_LABELS[key])}
-                <span className="chip__gain">+{gain}</span>
-              </button>
+                <span className="font-bold text-free">+{gain}</span>
+              </Chip>
             ))}
-          </div>
+          </ChipRow>
         </div>
       )}
     </div>
@@ -315,13 +331,13 @@ function ResultsList({
 
   if (occupancy === "loading" && !all.length)
     return (
-      <div className="results-list" aria-busy="true">
+      <div className={resultsList} aria-busy="true">
         {Array.from({ length: 3 }, (_, index) => (
-          <div key={index} className="skeleton-group">
-            <span className="skeleton skeleton--title" />
-            <div className="room-grid">
+          <div key={index}>
+            <Skeleton className="mb-3 h-[18px] w-[140px]" />
+            <div className={roomGrid}>
               {Array.from({ length: 4 }, (__, card) => (
-                <span key={card} className="skeleton skeleton--card" />
+                <Skeleton key={card} className="h-[86px]" />
               ))}
             </div>
           </div>
@@ -330,33 +346,34 @@ function ResultsList({
     );
 
   return (
-    <div className="results-list">
+    <div className={resultsList}>
       <ResultsHints all={all} shown={shown} />
       {results.length ? (
         results.map((group) => <BuildingGroup key={group.building.name} group={group} />)
       ) : (
-        <div className="empty-state">
-          <Icon name="door-01" className="empty-state__icon" />
-          <p className="empty-state__title">
-            {t(allClosed ? "results.closedTitle" : "results.emptyTitle")}
-          </p>
-          <p className="empty-state__text">
-            {allClosed
+        <EmptyState
+          icon="door-01"
+          title={t(allClosed ? "results.closedTitle" : "results.emptyTitle")}
+          text={
+            allClosed
               ? t("results.closedText")
               : countActiveFilters(filters)
                 ? t("results.emptyFiltered")
-                : t("results.emptyText")}
-          </p>
+                : t("results.emptyText")
+          }
+        >
           {countActiveFilters(filters) > 0 && (
-            <button type="button" className="button button--ghost" onClick={resetFilters}>
+            <Button variant="ghost" className={emptyStateAction} onClick={resetFilters}>
               <StableText k="filters.resetAll" />
-            </button>
+            </Button>
           )}
-        </div>
+        </EmptyState>
       )}
     </div>
   );
 }
+
+const resultsList = "flex flex-col gap-5 px-gutter pt-3 pb-8 lg:px-5";
 
 export function Results({ className }: { className?: string }) {
   useLocale();
@@ -366,17 +383,41 @@ export function Results({ className }: { className?: string }) {
   const view = useStore((state) => state.view);
 
   return (
-    <section className={cn("results", className)} aria-label={t("results.title")}>
-      <div className="results__toolbar">
+    <section
+      className={cn(
+        "flex min-h-0 flex-1 flex-col border-t border-border bg-surface",
+        "lg:overflow-clip lg:rounded-lg lg:border",
+        className,
+      )}
+      aria-label={t("results.title")}
+    >
+      <div
+        className={cn(
+          "relative z-2 flex items-center gap-3 border-b border-border px-gutter py-2.5 max-sm:py-1.5 lg:px-5",
+          // List view: the toolbar sits outside the scroller, so its shadow can cover the
+          // scrollport's top edge. Some browsers round the stuck building header a few
+          // pixels below that edge (fractional display scaling), leaving a sliver of card
+          // photos between the toolbar and the header. Only header padding sits there.
+          view === "list" && "shadow-[0_8px_0_var(--color-surface)]",
+        )}
+      >
         <Summary results={all} />
         <ViewSwitch />
       </div>
       <DataNotice />
-      <div className={`results__body results__body--${view}`}>
+      <div
+        className={cn(
+          // Very short viewports (landscape phones): the page scrolls instead.
+          "relative min-h-0 flex-1 max-lg:short:flex-none",
+          view === "list"
+            ? "overflow-y-auto overscroll-contain max-[600px]:scrollbar-none"
+            : "flex",
+        )}
+      >
         {view === "list" ? (
           <ResultsList all={all} results={results} />
         ) : (
-          <Suspense fallback={<div className="map-placeholder" />}>
+          <Suspense fallback={<div className="flex-1 bg-surface-muted" />}>
             <CampusMap results={results} />
           </Suspense>
         )}

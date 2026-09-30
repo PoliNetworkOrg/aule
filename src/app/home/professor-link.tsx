@@ -11,7 +11,7 @@ export function ProfessorLink({ name, query = "" }: { name: string; query?: stri
   return (
     <button
       type="button"
-      className="link-button"
+      className="text-left text-accent-strong underline decoration-accent/35 underline-offset-2 hover:decoration-current"
       title={tf("search.byProfessor", { name: label })}
       onClick={() => {
         setQuery(label);
@@ -21,7 +21,7 @@ export function ProfessorLink({ name, query = "" }: { name: string; query?: stri
       }}
     >
       <Highlight text={label} query={query} />
-      <span className="visually-hidden">{t("search.byProfessorHint")}</span>
+      <span className="sr-only">{t("search.byProfessorHint")}</span>
     </button>
   );
 }
