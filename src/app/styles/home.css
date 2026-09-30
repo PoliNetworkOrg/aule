@@ -432,7 +432,9 @@ body[data-page="home"] #root {
   flex-direction: column;
   align-items: flex-start;
   justify-content: center;
-  width: 90px;
+  /* Share the row with the stepper instead of leaving a gap before it. */
+  flex: 1 1 90px;
+  min-width: 0;
   height: 46px;
   padding: 0 10px;
   border: 1px solid var(--border);
@@ -545,8 +547,9 @@ body[data-page="home"] #root {
 /* Duration stepper */
 .stepper {
   display: inline-flex;
+  flex: none;
   align-items: center;
-  margin-left: auto;
+  margin-left: 4px;
   height: 46px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
