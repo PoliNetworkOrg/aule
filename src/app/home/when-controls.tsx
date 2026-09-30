@@ -83,17 +83,29 @@ export function DateStrip() {
   const days = dates.map((date) => parseIsoDate(date));
   const style: DaysStyle = { "--days": dates.length };
 
+  // Columns each month spans, keyed by its first day's index.
+  const spans = new Map<number, number>();
+
+  days.forEach((day, index) => {
+    if (index > 0 && days[index - 1].getMonth() === day.getMonth()) return;
+
+    const rest = days.slice(index).findIndex((next) => next.getMonth() !== day.getMonth());
+
+    spans.set(index, rest === -1 ? days.length - index : rest);
+  });
+
+  // A month shown for a single day (e.g. today is the 30th) gets one column,
+  // too narrow for "Settembre": abbreviate it, and its neighbour too so the
+  // row never mixes "Sep" with "October".
+  const format = [...spans.values()].includes(1) ? "short" : "long";
+
   return (
     <div className="date-strip" style={style}>
       <div className="date-strip__months" aria-hidden="true">
         {days.map((day, index) => {
-          if (index > 0 && days[index - 1].getMonth() === day.getMonth()) return null;
+          const span = spans.get(index);
 
-          // A month shown for a single day (e.g. today is the 30th) gets one
-          // column, too narrow for "Settembre": abbreviate it instead of overlapping.
-          const rest = days.slice(index).findIndex((next) => next.getMonth() !== day.getMonth());
-          const span = rest === -1 ? days.length - index : rest;
-          const format = span === 1 ? "short" : "long";
+          if (span === undefined) return null;
 
           return (
             <span
