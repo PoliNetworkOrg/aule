@@ -173,10 +173,9 @@ export function RoomCard({
             row && "md:col-start-1 md:row-span-2 md:row-start-1 md:m-0 md:size-14 md:rounded-sm",
           )}
         />
-        {/* Without a thumbnail, keep the content bottom-aligned with photo cards in the same row. */}
         <span
           className={cn(
-            "max-w-full truncate pr-8 text-17 font-bold tracking-tight tabular-nums first:mt-auto",
+            "max-w-full truncate pr-8 text-17 font-bold tracking-tight tabular-nums",
             row && "md:pr-0 md:group-has-data-[slot=thumbnail]/card:col-start-2",
           )}
           title={room.name}

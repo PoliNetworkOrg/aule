@@ -280,8 +280,10 @@ function ResultsHints({ all, shown }: { all: BuildingAvailability[]; shown: numb
 
   if (!offerPartial && !impact.length) return null;
 
+  // The building header below adds its sticky padding on top of the list gap:
+  // pull it closer so the hints sit 20px from both the toolbar and the header.
   return (
-    <div className="grid gap-2.5">
+    <div className="mt-2 -mb-3 grid gap-2.5">
       {offerPartial && (
         <div className={hint}>
           <Icon name="time-quarter-pass" className={hintIcon} />
