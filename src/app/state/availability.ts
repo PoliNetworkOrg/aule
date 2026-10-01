@@ -6,6 +6,7 @@ import {
 import { classroomsData as directory } from "../classroom-search-data";
 import type { Building, Campus, Classroom, Occupation } from "../types";
 import {
+  buildingKey,
   DEFAULT_FILTERS,
   isFilterActive,
   RESTRICTIVE_FILTERS,
@@ -58,6 +59,9 @@ interface WindowAvailability {
 }
 
 export interface BuildingAvailability {
+  /** buildingKey: names repeat across campuses. */
+  key: string;
+  campus: Campus;
   building: Building;
   rooms: RoomAvailability[];
   /** Rooms in the building before filters, for "n of m" counts. */
@@ -257,30 +261,49 @@ export function matchesFilters(room: Classroom, filters: Filters) {
   return true;
 }
 
+/** The day's data for each of `campusIds` that has some, in the given order. */
+function dayCampuses(campusIds: string[], isoDate: string) {
+  const day = occupancyDays.find((entry) => entry.date === isoToDateKey(isoDate));
+
+  return campusIds.flatMap((id) => day?.campuses.find((entry) => entry.id === id) ?? []);
+}
+
 /**
- * Rooms of a campus that are free for at least part of [from, to] on `isoDate`
+ * Rooms of the campuses that are free for at least part of [from, to] on `isoDate`
  * (partially free ones included regardless of the `partial` filter: see visibleResults),
- * grouped by building. Room metadata (seats, features) comes from the static
- * directory; occupancy from the day's data.
+ * grouped by building, campus by campus. Room metadata (seats, features) comes from
+ * the static directory; occupancy from the day's data.
  */
 export function findAvailability(
-  campusId: string,
+  campusIds: string[],
   isoDate: string,
   from: string,
   to: string,
   filters: Filters,
 ): BuildingAvailability[] {
-  const day = occupancyDays.find((entry) => entry.date === isoToDateKey(isoDate));
-  const campus = day?.campuses.find((entry) => entry.id === campusId);
-
-  if (!campus) return [];
-
   buildIndexes();
 
   const results: BuildingAvailability[] = [];
 
+  for (const campus of dayCampuses(campusIds, isoDate))
+    results.push(...campusAvailability(campus, isoDate, from, to, filters));
+
+  return results;
+}
+
+function campusAvailability(
+  campus: Campus<Classroom & { occupancy: Occupation[] }>,
+  isoDate: string,
+  from: string,
+  to: string,
+  filters: Filters,
+) {
+  const results: BuildingAvailability[] = [];
+
   for (const building of campus.buildings) {
-    if (filters.building && building.name !== filters.building) continue;
+    const key = buildingKey(campus.id, building.name);
+
+    if (filters.building && key !== filters.building) continue;
 
     const opening = buildingOpening(building, isoDate);
     const rooms: RoomAvailability[] = [];
@@ -313,7 +336,13 @@ export function findAvailability(
         b.freeMinutes - a.freeMinutes ||
         a.room.name.localeCompare(b.room.name, undefined, { numeric: true }),
     );
-    results.push({ building, rooms, total: building.classrooms.length });
+    results.push({
+      key,
+      campus: findCampus(campus.id) ?? campus,
+      building,
+      rooms,
+      total: building.classrooms.length,
+    });
   }
 
   return results;
@@ -328,22 +357,21 @@ export function roomWindowStatus(roomId: number, isoDate: string, from: string, 
   return windowAvailability(day.occupancy, day.opening, from, to);
 }
 
-/** Names of the campus buildings that are shut for the whole window, for map and empty states. */
-export function closedBuildings(campusId: string, isoDate: string, from: string, to: string) {
-  const day = occupancyDays.find((entry) => entry.date === isoToDateKey(isoDate));
-  const campus = day?.campuses.find((entry) => entry.id === campusId);
+/** Keys (buildingKey) of the campuses' buildings shut for the whole window, for map and empty states. */
+export function closedBuildings(campusIds: string[], isoDate: string, from: string, to: string) {
   const closed = new Set<string>();
 
-  for (const building of campus?.buildings ?? [])
-    if (!clipToOpening(buildingOpening(building, isoDate), from, to)) closed.add(building.name);
+  for (const campus of dayCampuses(campusIds, isoDate))
+    for (const building of campus.buildings)
+      if (!clipToOpening(buildingOpening(building, isoDate), from, to))
+        closed.add(buildingKey(campus.id, building.name));
 
   return closed;
 }
 
-/** Whether every building the day has data for on this campus is shut for the whole window. */
-export function campusClosed(campusId: string, isoDate: string, from: string, to: string) {
-  const day = occupancyDays.find((entry) => entry.date === isoToDateKey(isoDate));
-  const buildings = day?.campuses.find((entry) => entry.id === campusId)?.buildings ?? [];
+/** Whether every building the day has data for on these campuses is shut for the whole window. */
+export function campusClosed(campusIds: string[], isoDate: string, from: string, to: string) {
+  const buildings = dayCampuses(campusIds, isoDate).flatMap((campus) => campus.buildings);
 
   return (
     buildings.length > 0 &&
@@ -429,14 +457,14 @@ export interface FilterImpact {
 
 /** For each active filter, how many rooms it hides on its own: the biggest culprit first. */
 export function filterImpact(
-  campusId: string,
+  campusIds: string[],
   isoDate: string,
   from: string,
   to: string,
   filters: Filters,
 ): FilterImpact[] {
   const shown = countRooms(
-    visibleResults(findAvailability(campusId, isoDate, from, to, filters), filters),
+    visibleResults(findAvailability(campusIds, isoDate, from, to, filters), filters),
   );
 
   return RESTRICTIVE_FILTERS.filter((key) => isFilterActive(filters, key))
@@ -444,7 +472,7 @@ export function filterImpact(
       const relaxed = { ...filters, [key]: DEFAULT_FILTERS[key] };
 
       const total = countRooms(
-        visibleResults(findAvailability(campusId, isoDate, from, to, relaxed), relaxed),
+        visibleResults(findAvailability(campusIds, isoDate, from, to, relaxed), relaxed),
       );
 
       return { key, gain: total - shown };

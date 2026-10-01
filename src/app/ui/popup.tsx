@@ -202,6 +202,25 @@ export interface MenuGroup {
   options: MenuOption[];
 }
 
+/** A row of OptionList and CheckList. */
+const optionRow = cn(
+  "flex min-h-11 items-center gap-2 rounded-md px-2.5 py-1.5 text-left transition-[background-color,scale]",
+  pressable,
+  "hover:bg-surface-muted aria-pressed:bg-accent-soft aria-pressed:text-accent-strong",
+  insetFocus,
+);
+
+const groupLabel = "px-2.5 pb-1 text-11 font-bold tracking-widest text-subtle uppercase";
+
+function OptionText({ option }: { option: MenuOption }) {
+  return (
+    <span className="flex flex-col">
+      <span className="font-semibold">{option.label}</span>
+      {option.description && <span className="text-13 text-muted">{option.description}</span>}
+    </span>
+  );
+}
+
 /** A single-choice list inside a Popup (campus, building…). */
 export function OptionList({
   groups,
@@ -221,35 +240,96 @@ export function OptionList({
           role="group"
           aria-label={group.label}
         >
-          {group.label && (
-            <p className="px-2.5 pb-1 text-11 font-bold tracking-widest text-subtle uppercase">
-              {group.label}
-            </p>
-          )}
+          {group.label && <p className={groupLabel}>{group.label}</p>}
           {group.options.map((option) => (
             <button
               key={option.value}
               type="button"
-              className={cn(
-                "flex min-h-11 items-center gap-2 rounded-md px-2.5 py-1.5 text-left transition-[background-color,scale]",
-                pressable,
-                "hover:bg-surface-muted aria-pressed:bg-accent-soft aria-pressed:text-accent-strong",
-                insetFocus,
-              )}
+              className={optionRow}
               aria-pressed={option.value === value}
               onClick={() => onSelect(option.value)}
             >
-              <span className="flex flex-col">
-                <span className="font-semibold">{option.label}</span>
-                {option.description && (
-                  <span className="text-13 text-muted">{option.description}</span>
-                )}
-              </span>
+              <OptionText option={option} />
               {option.value === value && (
                 <Icon name="tick-02" className="ml-auto text-18 text-accent" />
               )}
             </button>
           ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export interface CheckGroup extends MenuGroup {
+  /** A chip beside the group's label that turns the whole group on or off. */
+  toggleAll?: { text: string; label: string; pressed: boolean; onToggle: () => void };
+}
+
+/**
+ * A multiple-choice list inside a Popup (campuses). `locked` is a value that
+ * can't be turned off right now, such as the last one selected.
+ */
+export function CheckList({
+  groups,
+  values,
+  locked,
+  onToggle,
+}: {
+  groups: CheckGroup[];
+  values: string[];
+  locked?: string | null;
+  onToggle: (value: string) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-3">
+      {groups.map((group, index) => (
+        <div
+          key={group.label ?? index}
+          className="flex flex-col gap-0.5"
+          role="group"
+          aria-label={group.label}
+        >
+          {(group.label || group.toggleAll) && (
+            <div className="flex items-center justify-between gap-2 pr-1">
+              <p className={groupLabel}>{group.label}</p>
+              {group.toggleAll && (
+                <button
+                  type="button"
+                  className={cn(
+                    "mb-1 rounded-full bg-surface-muted px-2.5 py-0.5 text-12 font-bold text-muted transition-[background-color,color,scale]",
+                    pressable,
+                    "hover:text-foreground aria-pressed:bg-accent-soft aria-pressed:text-accent-strong",
+                  )}
+                  aria-pressed={group.toggleAll.pressed}
+                  aria-label={group.toggleAll.label}
+                  onClick={group.toggleAll.onToggle}
+                >
+                  {group.toggleAll.text}
+                </button>
+              )}
+            </div>
+          )}
+          {group.options.map((option) => {
+            const selected = values.includes(option.value);
+            const isLocked = option.value === locked;
+
+            return (
+              <button
+                key={option.value}
+                type="button"
+                className={optionRow}
+                aria-pressed={selected}
+                aria-disabled={isLocked || undefined}
+                onClick={() => {
+                  if (!isLocked) onToggle(option.value);
+                }}
+              >
+                <OptionText option={option} />
+                {selected && <Icon name="tick-02" className="ml-auto text-18 text-accent" />}
+              </button>
+            );
+          })}
         </div>
       ))}
     </div>

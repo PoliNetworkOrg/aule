@@ -6,7 +6,7 @@ import {
 import { ensureClassroomDirectory } from "./classroom-search-data";
 import { initI18n } from "./i18n";
 import { availableDates, findCampus, campuses } from "./state/availability";
-import { readState, setState } from "./state/store";
+import { readState, setState, sortCampuses } from "./state/store";
 import { defaultWindow, isAfterHours, romeTodayIso } from "./state/time";
 import { buttonVariants } from "./ui/button";
 
@@ -106,8 +106,18 @@ export function startApplication() {
     try {
       await Promise.all([initI18n(), ensureClassroomDirectory()]);
 
-      if (!findCampus(readState().campusId))
-        setState({ campusId: campuses()[0]?.id ?? readState().campusId });
+      // Saved campuses may have left the directory; the selection is never empty.
+      const order = campuses().map((campus) => campus.id);
+      const known = readState().campusIds.filter((id) => findCampus(id));
+      const first = order[0];
+
+      setState({
+        campusIds: known.length
+          ? sortCampuses(known, order)
+          : first
+            ? [first]
+            : readState().campusIds,
+      });
 
       setState({ directory: "ready" });
       window.clearTimeout(timeout);

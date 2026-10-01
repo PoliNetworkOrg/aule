@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { cn } from "../../lib/cn";
 import { t, tf, useLocale } from "../i18n";
 import { findCampus } from "../state/availability";
 import {
+  buildingKey,
   countActiveFilters,
   countAdvancedFilters,
   resetFilters,
@@ -19,6 +20,7 @@ import { pressable } from "../ui/motion";
 import { Panel, PanelHeader, PanelTitle } from "../ui/panel";
 import { Segmented, SegmentedOption } from "../ui/segmented";
 import { StableText } from "../ui/stable";
+import { buildingLabel } from "./campus-label";
 
 const SEAT_OPTIONS: SeatsFilter[] = [0, 30, 60, 100, 200];
 
@@ -58,8 +60,8 @@ function ToggleChip({
 
 function MoreFilters({ filters }: { filters: FilterState }) {
   useLocale();
-  const campusId = useStore((state) => state.campusId);
-  const buildings = findCampus(campusId)?.buildings ?? [];
+  const campusIds = useStore((state) => state.campusIds);
+  const selected = campusIds.flatMap((id) => findCampus(id) ?? []);
 
   return (
     <div
@@ -102,20 +104,30 @@ function MoreFilters({ filters }: { filters: FilterState }) {
           >
             <StableText k="filters.allBuildings" />
           </button>
-          {buildings.map((building) => (
-            <button
-              key={building.name}
-              type="button"
-              className={choice}
-              aria-pressed={filters.building === building.name}
-              aria-label={`${t("building.prefix")} ${building.name}`}
-              title={building.altName || undefined}
-              onClick={() =>
-                setFilters({ building: filters.building === building.name ? "" : building.name })
-              }
-            >
-              {building.name}
-            </button>
+          {selected.map((campus) => (
+            <Fragment key={campus.id}>
+              {/* Several campuses: each one's buildings under its name ("8" is in two). */}
+              {selected.length > 1 && (
+                <p className="col-span-full pt-1 text-12 font-bold text-subtle">{campus.name}</p>
+              )}
+              {campus.buildings.map((building) => {
+                const key = buildingKey(campus.id, building.name);
+
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    className={choice}
+                    aria-pressed={filters.building === key}
+                    aria-label={buildingLabel(key, selected.length > 1)}
+                    title={building.altName || undefined}
+                    onClick={() => setFilters({ building: filters.building === key ? "" : key })}
+                  >
+                    {building.name}
+                  </button>
+                );
+              })}
+            </Fragment>
           ))}
         </div>
       </Field>
