@@ -120,6 +120,13 @@ describe("closed buildings across campuses", () => {
     seed(CLOSED, CLOSED);
     expect(availability.campusClosed([LEONARDO, LECCO], TUESDAY, "09:00", "11:00")).toBe(true);
   });
+
+  it("does not call every campus closed when one selected campus has no data", () => {
+    seed(OPEN, CLOSED);
+    script.classroomsData[0].campuses.splice(1, 1);
+
+    expect(availability.campusClosed([LEONARDO, LECCO], TUESDAY, "09:00", "11:00")).toBe(false);
+  });
 });
 
 describe("filter hints across campuses", () => {

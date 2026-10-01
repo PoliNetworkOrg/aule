@@ -371,7 +371,13 @@ export function closedBuildings(campusIds: string[], isoDate: string, from: stri
 
 /** Whether every building the day has data for on these campuses is shut for the whole window. */
 export function campusClosed(campusIds: string[], isoDate: string, from: string, to: string) {
-  const buildings = dayCampuses(campusIds, isoDate).flatMap((campus) => campus.buildings);
+  const campuses = dayCampuses(campusIds, isoDate);
+
+  // A missing campus is unknown, not closed: otherwise an incomplete daily
+  // response could incorrectly replace the generic empty state with "all closed".
+  if (campusIds.some((id) => !campuses.some((campus) => campus.id === id))) return false;
+
+  const buildings = campuses.flatMap((campus) => campus.buildings);
 
   return (
     buildings.length > 0 &&
