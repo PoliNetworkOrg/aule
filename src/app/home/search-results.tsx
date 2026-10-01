@@ -18,6 +18,7 @@ import { SectionCount, SectionTitle } from "../ui/card";
 import { Chip, ChipRow } from "../ui/chip";
 import { EmptyState } from "../ui/empty-state";
 import { Icon } from "../ui/icon";
+import { pressable } from "../ui/motion";
 import { Tag } from "../ui/tag";
 import { StatusTag } from "./room-card";
 import { RoomThumbnail } from "./room-thumbnail";
@@ -85,7 +86,8 @@ function RoomResults({ query }: { query: string }) {
                 type="button"
                 className={cn(
                   "group/room grid w-full grid-cols-[1fr_auto] items-center gap-x-2 rounded-md border border-border bg-surface px-3.5 py-3 text-left",
-                  "transition-[border-color] hover:border-accent-soft-border",
+                  "transition-[border-color,scale] hover:border-accent-soft-border",
+                  pressable,
                   "has-data-[slot=thumbnail]:grid-cols-[56px_minmax(0,1fr)_auto]",
                 )}
                 onClick={() =>
@@ -194,7 +196,8 @@ function EventResults({ query }: { query: string }) {
                         type="button"
                         className={cn(
                           "group/session grid w-full grid-cols-[1fr_auto] items-center gap-x-2 border-b border-border px-0.5 py-2 text-left",
-                          "[li:last-child>&]:border-b-0",
+                          "transition-[scale] [li:last-child>&]:border-b-0",
+                          pressable,
                         )}
                         disabled={!entry}
                         onClick={() =>

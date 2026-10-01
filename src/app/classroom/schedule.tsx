@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 
 type PositionStyle = CSSProperties & { "--pos": string };
 
+type DaysStyle = CSSProperties & { "--days": number };
+
 import { hasOpeningHours, romeMinutesOfDay } from "../available-rooms-script";
 import { t, tf, useLocale } from "../i18n";
 import { availableDates, roomDay } from "../state/availability";
@@ -26,6 +28,7 @@ import { Icon } from "../ui/icon";
 import { Tag } from "../ui/tag";
 import { titleCase } from "../ui/text";
 import { ProfessorList } from "../home/professor-link";
+import { dateColumns, dateDay, dateNumber, dateWeekday } from "../home/when-controls";
 
 const TICKS = [8, 10, 12, 14, 16, 18, 20];
 
@@ -79,7 +82,8 @@ function DayTimeline({
         ))}
         {searchWindow && (
           <span
-            className="absolute inset-y-0.5 z-1 rounded-[4px] border-2 border-accent bg-accent/12"
+            // Concentric with the bar, which it's inset 2px into.
+            className="absolute inset-y-0.5 z-1 rounded-[calc(var(--radius-sm)-2px)] border-2 border-accent bg-accent/12"
             style={{
               left: percent(searchWindow.from),
               width: `calc(${percent(searchWindow.to)} - ${percent(searchWindow.from)})`,
@@ -144,8 +148,19 @@ function AgendaRow({
   const row = useRef<HTMLLIElement>(null);
   const duration = formatDuration(toMinutes(item.end) - toMinutes(item.start));
 
+  // Waits a frame: opening a room scrolls to the top (ClassroomPage and the
+  // router both do, after this child effect), which would undo the scroll.
+  // An explicit "smooth" overrides the CSS reduced-motion rule, so check it here.
   useEffect(() => {
-    if (highlighted) row.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+    if (!highlighted) return;
+
+    const frame = requestAnimationFrame(() => {
+      const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+      row.current?.scrollIntoView({ block: "center", behavior: reduce ? "auto" : "smooth" });
+    });
+
+    return () => cancelAnimationFrame(frame);
   }, [highlighted]);
 
   const title = "flex flex-wrap items-center gap-1.5 leading-[1.3] font-semibold";
@@ -169,7 +184,7 @@ function AgendaRow({
         <span className="text-15 font-bold whitespace-nowrap max-xs:text-14">
           {formatRange(item.start, item.end)}
         </span>
-        <span className="text-12 text-subtle">{duration}</span>
+        <span className="text-12 text-muted">{duration}</span>
       </div>
       <div className="relative flex min-w-0 flex-col gap-0.5">
         {item.kind === "free" ? (
@@ -268,33 +283,27 @@ export function Schedule({
       ? "schedule.closedAllDay"
       : "schedule.freeWhenOpen";
 
+  const daysStyle: DaysStyle = { "--days": dates.length };
+
   return (
     <div className="flex flex-col gap-3.5" data-revision={revision}>
-      {/* Narrow phones: tighter tabs so all six still fit. */}
-      <div
-        className="flex scrollbar-none gap-1.5 overflow-x-auto max-2xs:gap-1"
-        role="group"
-        aria-label={t("schedule.days")}
-      >
+      {/* Same day picker as the home "When" panel. */}
+      <div className={dateColumns} style={daysStyle} role="group" aria-label={t("schedule.days")}>
         {dates.map((date) => {
           return (
             <button
               key={date}
               type="button"
               aria-pressed={date === day}
-              className={cn(
-                "group flex max-w-20 flex-[1_1_48px] flex-col items-center gap-px rounded-md border border-border px-1 py-1.5 leading-[1.15]",
-                "transition-[border-color,background-color] hover:border-accent-soft-border max-2xs:px-0.5",
-                "aria-pressed:border-accent aria-pressed:bg-accent aria-pressed:text-on-accent",
-              )}
+              className={dateDay}
               onClick={() => setSelected(date)}
             >
-              <span className="text-12 font-semibold text-muted group-aria-pressed:text-inherit group-aria-pressed:opacity-85 max-2xs:text-11">
+              <span className={dateWeekday}>
                 {date === today
                   ? t("when.today")
                   : capitalise(weekday.format(parseIsoDate(date)).replace(/\.$/, ""), locale)}
               </span>
-              <span className="text-17 font-bold tabular-nums">{parseIsoDate(date).getDate()}</span>
+              <span className={dateNumber}>{parseIsoDate(date).getDate()}</span>
             </button>
           );
         })}
@@ -321,7 +330,7 @@ export function Schedule({
         {searchWindow && (
           <p className="flex items-center gap-1.5 text-13 text-muted">
             <span
-              className="h-2.5 w-3.5 rounded-[3px] border-[1.5px] border-accent bg-accent-soft"
+              className="h-2.5 w-3.5 rounded-[calc(var(--radius-sm)/2)] border-[1.5px] border-accent bg-accent-soft"
               aria-hidden="true"
             />
             {tf(context?.highlight ? "schedule.selected" : "schedule.yourWindow", {

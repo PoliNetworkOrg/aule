@@ -93,11 +93,18 @@ function BuildingPanel({
         <ul
           className={cn(
             roomGrid,
-            "grid-cols-[1fr] max-md:grid-cols-[repeat(auto-fill,minmax(150px,1fr))]",
+            "grid-cols-[1fr] max-md:grid-cols-[repeat(auto-fill,minmax(150px,1fr))] md:gap-1.5",
           )}
         >
           {rooms.map((result) => (
-            <RoomCard key={result.room.id} result={result} date={date} from={from} to={to} />
+            <RoomCard
+              key={result.room.id}
+              result={result}
+              date={date}
+              from={from}
+              to={to}
+              layout="row"
+            />
           ))}
         </ul>
       ) : (
@@ -249,8 +256,8 @@ export default function CampusMap({ results }: { results: BuildingAvailability[]
 
       label.textContent = building.altName || building.name;
       count.className = cn(
-        "inline-grid h-[22px] min-w-[22px] place-items-center rounded-full bg-free px-1.5 text-12 text-white",
-        !free && "bg-neutral",
+        "inline-grid h-[22px] min-w-[22px] place-items-center rounded-full bg-free px-1.5 text-12 text-on-status",
+        !free && "bg-surface-muted text-muted",
       );
       count.textContent = String(free);
       element.append(label, count);

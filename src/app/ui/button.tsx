@@ -2,12 +2,14 @@ import type { ComponentProps } from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "../../lib/cn";
 import { centreStable } from "./focus";
+import { pressable } from "./motion";
 
 const buttonCva = cva(
   [
     "inline-flex min-h-10 items-center justify-center gap-1.5 rounded-md border border-transparent px-4",
     "text-14 font-semibold whitespace-nowrap no-underline",
-    "transition-[background-color,border-color,color] disabled:opacity-50",
+    "transition-[background-color,border-color,color,scale] disabled:opacity-50",
+    pressable,
     centreStable,
   ],
   {

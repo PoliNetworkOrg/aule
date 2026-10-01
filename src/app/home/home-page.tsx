@@ -40,16 +40,17 @@ function ControlsSummary() {
     <button
       type="button"
       // Phones and tablets only (and `hidden` while the controls are open), as
-      // compact as the search bar above it (see search-bar.tsx).
+      // compact as the search bar above it (see search-bar.tsx). Muted, unlike
+      // the white search field: a summary, not an input.
       className={cn(
         "hidden icon:text-accent max-lg:mx-gutter max-lg:my-2 max-lg:flex max-lg:h-10 max-lg:items-center max-lg:gap-2.5",
-        "max-lg:rounded-lg max-lg:border max-lg:border-border max-lg:bg-surface max-lg:px-3.5 max-lg:text-left max-lg:text-14",
+        "max-lg:rounded-lg max-lg:border max-lg:border-border max-lg:bg-surface-muted max-lg:px-3.5 max-lg:text-left max-lg:text-14",
       )}
       hidden={!collapsed}
       aria-expanded={!collapsed}
       onClick={() => setControlsCollapsed(false)}
     >
-      <Icon name="search-01" />
+      <Icon name="filter-horizontal" />
       <span className="min-w-0 flex-1 truncate tabular-nums">
         <strong>{campus?.name}</strong> · {day} · {formatRange(from, to)}
         {active > 0 && (
@@ -72,10 +73,14 @@ function ShowResultsButton() {
 
   return (
     <div
+      // Attached to the bottom of the screen: pushed down by mt-auto when the
+      // parameters are shorter than the screen, stuck there when they scroll.
+      // Solid with a top edge, like the header: a short fade only let a thin
+      // line of the scrolling content show through above the button.
       className={cn(
-        "hidden max-lg:sticky max-lg:bottom-0 max-lg:-mx-gutter max-lg:mt-1 max-lg:-mb-4.5 max-lg:block",
+        "hidden max-lg:sticky max-lg:bottom-0 max-lg:-mx-gutter max-lg:mt-auto max-lg:block",
         "max-lg:px-gutter max-lg:pt-3 max-lg:pb-[calc(12px+env(safe-area-inset-bottom))]",
-        "max-lg:bg-[linear-gradient(to_top,var(--color-background)_70%,transparent)]",
+        "max-lg:border-t max-lg:border-t-border max-lg:bg-background",
       )}
     >
       <Button size="large" onClick={() => setControlsCollapsed(true)}>
@@ -121,7 +126,8 @@ export function HomePage({ hidden }: { hidden: boolean }) {
               // button to see the rooms; then the rooms, with a summary to edit them.
               collapsed
                 ? "max-lg:hidden"
-                : "max-lg:min-h-0 max-lg:flex-1 max-lg:gap-4 max-lg:overflow-y-auto max-lg:overscroll-contain max-lg:pt-4",
+                : // The "Show n rooms" bar reaches the bottom edge itself, safe area included.
+                  "max-lg:min-h-0 max-lg:flex-1 max-lg:gap-4 max-lg:overflow-y-auto max-lg:overscroll-contain max-lg:pt-4 max-lg:pb-0",
               // The inline padding leaves room for the range handles (and their focus
               // rings), which overhang the track at the ends of the day.
               "lg:-mx-4 lg:-mt-1 lg:gap-3 lg:overflow-y-auto lg:px-4 lg:pt-1 lg:pb-4 lg:[scrollbar-width:thin]",

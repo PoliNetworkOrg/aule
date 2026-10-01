@@ -36,6 +36,8 @@
   --color-accent-soft-border: #b3cdf0;
   --color-accent-strong: #0d4690;
   --color-on-accent: #ffffff;
+  /* Text on solid free / busy fills (counters, badges). */
+  --color-on-status: #ffffff;
   --color-focus-ring: color-mix(in srgb, #2a6fca 45%, transparent);
 
   --color-free: #15803d;
@@ -49,10 +51,10 @@
   --color-busy-border: #f9c9c4;
   --color-exam: #6d28d9;
   --color-exam-soft: #f3efff;
+  --color-star: #b98300;
 
   /* Theme-independent. */
   --color-neutral: #94a3b8;
-  --color-star: #d99a00;
   --color-white: #ffffff;
   --color-scrim: #0f172a;
 
@@ -108,8 +110,17 @@
   --default-transition-timing-function: ease;
   --default-transition-duration: 150ms;
 
+  /* Motion: the transitions.dev token scale, only the steps in use. Small
+     transitions only; closes are quicker than opens. Durations are
+     `duration-150` (closes, small state changes) and `duration-250` (dropdown
+     and modal opens, panel reveals); distances `1` (4px, micro) and `2` (8px,
+     base); scales `96` (modal) and `97` (dropdown, press). */
+  --ease-*: initial;
+  --ease-smooth-out: cubic-bezier(0.22, 1, 0.36, 1); /* open/close, position change */
+  --ease-in-out: ease-in-out; /* content reveal */
+
   --animate-spin: spin 0.9s linear infinite;
-  --animate-shimmer: shimmer 1.4s ease-in-out infinite;
+  --animate-shimmer: shimmer 1.4s linear infinite;
 
   @keyframes shimmer {
     from {
@@ -154,6 +165,7 @@
     --color-accent-soft-border: rgb(91 156 240 / 45%);
     --color-accent-strong: #8cbcf6;
     --color-on-accent: #020617;
+    --color-on-status: #020617;
 
     --color-free: #4ade80;
     --color-free-soft: rgb(74 222 128 / 10%);
@@ -166,6 +178,7 @@
     --color-busy-border: rgb(248 113 113 / 32%);
     --color-exam: #c4b5fd;
     --color-exam-soft: rgb(196 181 253 / 12%);
+    --color-star: #fbbf24;
 
     --elevation-sm: 0 1px 2px rgb(0 0 0 / 40%);
     --elevation-md: 0 8px 24px rgb(0 0 0 / 40%);

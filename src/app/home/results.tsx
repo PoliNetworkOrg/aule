@@ -120,12 +120,16 @@ function Summary({ results }: { results: BuildingAvailability[] }) {
             ? t("results.oneRoom")
             : tf("results.rooms", { n: free })}
         {partial > 0 && (
-          // Off (grey) while partly free rooms are hidden, lit in the partial colour once listed.
+          // Off (grey) while partly free rooms are hidden, lit in the partial colour once
+          // listed. A dashed edge, like the other chips that add or drop results, so it
+          // reads as a toggle and not a count label.
           <button
             type="button"
             className={cn(
-              "ml-2 rounded-full bg-surface-muted px-2 py-0.5 text-14 font-bold text-muted",
-              "aria-pressed:bg-partial-soft aria-pressed:text-partial max-sm:ml-0 max-sm:text-13",
+              "ml-2 rounded-full border border-dashed border-current/45 bg-surface-muted px-2 py-px text-14 font-bold text-muted",
+              "transition-[border-color,color] hover:border-partial hover:text-partial",
+              "aria-pressed:border-partial-border aria-pressed:bg-partial-soft aria-pressed:text-partial",
+              "max-sm:ml-0 max-sm:text-13",
             )}
             aria-pressed={filters.partial}
             title={tf(filters.partial ? "results.hidePartial" : "results.showPartial", {
@@ -215,9 +219,10 @@ function BuildingGroup({ group }: { group: BuildingAvailability }) {
             n: rooms.length,
           })}
         </span>
+        {/* Beside the building it maps, not across the pane from it. */}
         <IconButton
           size="small"
-          className="ml-auto"
+          className="-ml-1"
           aria-label={tf("results.showOnMap", { name: building.name })}
           title={tf("results.showOnMap", { name: building.name })}
           onClick={() => {

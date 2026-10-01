@@ -27,6 +27,7 @@ import {
   toMinutes,
 } from "../state/time";
 import { centreStable, insetFocus } from "../ui/focus";
+import { pressable } from "../ui/motion";
 import { Icon } from "../ui/icon";
 import { Panel, PanelHeader, PanelTitle } from "../ui/panel";
 import { Popup } from "../ui/popup";
@@ -63,7 +64,24 @@ function monthName(locale: Locale, date: Date, month: "long" | "short" = "long")
 // ---------- Day ----------
 
 /** One column per available day (`--days`, set on the strip), for months and days alike. */
-const dateColumns = "grid grid-cols-[repeat(var(--days,6),minmax(0,1fr))] gap-1.5";
+export const dateColumns = "grid grid-cols-[repeat(var(--days,6),minmax(0,1fr))] gap-1.5";
+
+/** A day of the strip (an aria-pressed button); the room schedule picks its day with these too. */
+export const dateDay = cn(
+  "group flex h-11.5 flex-col items-center justify-center gap-px rounded-md bg-surface-muted leading-[1.1]",
+  "transition-[background-color,color,scale] hover:bg-accent-soft aria-pressed:bg-accent aria-pressed:text-on-accent",
+  pressable,
+  insetFocus,
+);
+
+/** The weekday above a day's number, dimmed unless the day is picked. */
+export const dateWeekday = cn(
+  "text-11 font-semibold text-muted",
+  "group-aria-pressed:text-inherit group-aria-pressed:opacity-85",
+  centreStable,
+);
+
+export const dateNumber = "text-16 font-bold tabular-nums";
 
 export function DateStrip() {
   const locale = useLocale();
@@ -90,22 +108,34 @@ export function DateStrip() {
   const days = dates.map((date) => parseIsoDate(date));
   const style: DaysStyle = { "--days": dates.length };
 
+  // Columns each month spans, keyed by its first day's index.
+  const spans = new Map<number, number>();
+
+  days.forEach((day, index) => {
+    if (index > 0 && days[index - 1].getMonth() === day.getMonth()) return;
+
+    const rest = days.slice(index).findIndex((next) => next.getMonth() !== day.getMonth());
+
+    spans.set(index, rest === -1 ? days.length - index : rest);
+  });
+
+  // A month shown for a single day (e.g. today is the 30th) gets one column,
+  // too narrow for "Settembre": abbreviate it, and its neighbour too so the
+  // row never mixes "Sep" with "October".
+  const format = [...spans.values()].includes(1) ? "short" : "long";
+
   return (
     <div className="grid gap-1" style={style}>
       <div className={cn(dateColumns, "min-h-4")} aria-hidden="true">
         {days.map((day, index) => {
-          if (index > 0 && days[index - 1].getMonth() === day.getMonth()) return null;
+          const span = spans.get(index);
 
-          // A month shown for a single day (e.g. today is the 30th) gets one
-          // column, too narrow for "Settembre": abbreviate it instead of overlapping.
-          const rest = days.slice(index).findIndex((next) => next.getMonth() !== day.getMonth());
-          const span = rest === -1 ? days.length - index : rest;
-          const format = span === 1 ? "short" : "long";
+          if (span === undefined) return null;
 
           return (
             <span
               key={dates[index]}
-              className="row-start-1 text-11 font-bold tracking-widest whitespace-nowrap text-subtle uppercase"
+              className="row-start-1 text-11 font-bold tracking-widest whitespace-nowrap text-muted uppercase"
               style={{ gridColumn: `${index + 1} / span ${span}` }}
             >
               <Stable
@@ -119,32 +149,21 @@ export function DateStrip() {
       <div className={dateColumns} role="group" aria-label={t("when.day")}>
         {dates.map((date, index) => {
           const day = days[index];
-          const pressed = date === selected;
 
           return (
             <button
               key={date}
               type="button"
-              aria-pressed={pressed}
+              aria-pressed={date === selected}
               aria-label={new Intl.DateTimeFormat(locale, {
                 weekday: "long",
                 day: "numeric",
                 month: "long",
               }).format(day)}
-              className={cn(
-                "flex h-11.5 flex-col items-center justify-center gap-px rounded-md bg-surface-muted leading-[1.1]",
-                "transition-[background-color,color] hover:bg-accent-soft aria-pressed:bg-accent aria-pressed:text-on-accent",
-                insetFocus,
-              )}
+              className={dateDay}
               onClick={() => setDate(date)}
             >
-              <span
-                className={cn(
-                  "text-11 font-semibold text-muted",
-                  pressed && "text-inherit opacity-85",
-                  centreStable,
-                )}
-              >
+              <span className={dateWeekday}>
                 <Stable
                   variants={LOCALES.map((variant) =>
                     date === today ? translate(variant, "when.today") : shortWeekday(variant, day),
@@ -152,7 +171,7 @@ export function DateStrip() {
                   current={current}
                 />
               </span>
-              <span className="text-16 font-bold tabular-nums">{day.getDate()}</span>
+              <span className={dateNumber}>{day.getDate()}</span>
             </button>
           );
         })}
@@ -212,7 +231,8 @@ function TimePickerButton({
         ref={trigger}
         type="button"
         className={cn(
-          "relative flex h-11.5 w-22.5 flex-col items-start justify-center rounded-md border border-border bg-surface px-2.5",
+          // Shares the row with the stepper instead of leaving a gap before it.
+          "relative flex h-11.5 min-w-0 flex-[1_1_90px] flex-col items-start justify-center rounded-md border border-border-strong bg-surface px-2.5",
           "transition-[border-color] select-none hover:border-accent aria-expanded:border-accent",
           // Mice and pens can drag it sideways to change the time.
           "pointer-fine:cursor-ew-resize max-3xs:h-13 max-3xs:w-full",
@@ -314,7 +334,8 @@ function TimePickerButton({
                 key={option}
                 type="button"
                 className={cn(
-                  "min-h-11 rounded-sm bg-surface-muted text-15 font-semibold tabular-nums",
+                  "min-h-11 rounded-sm bg-surface-muted text-15 font-semibold tabular-nums transition-[background-color,color,scale]",
+                  pressable,
                   "hover:bg-accent-soft hover:text-accent-strong aria-pressed:bg-accent aria-pressed:text-on-accent",
                   insetFocus,
                 )}
@@ -507,13 +528,14 @@ function RangeSlider() {
         ))}
         {showNow && (
           <span
-            className="pointer-events-none absolute -top-1 -bottom-1 z-2 -ml-px w-0.5 rounded-[1px] bg-busy"
+            className="pointer-events-none absolute -top-1 -bottom-1 z-2 -ml-px w-0.5 rounded-[1px] bg-accent"
             style={{ left: percentOf(now) }}
           />
         )}
         <span
           className={cn(
-            "absolute top-1 bottom-1 z-1 min-w-1 rounded-[7px] shadow-[inset_0_0_0_1.5px_var(--color-accent)]",
+            // Concentric with the track it sits in.
+            "absolute top-1 bottom-1 z-1 min-w-1 rounded-[calc(var(--radius-md)-3px)] shadow-[inset_0_0_0_1.5px_var(--color-accent)]",
             "bg-[color-mix(in_srgb,var(--color-accent)_28%,var(--color-surface))]",
             sliderFocus,
           )}
@@ -552,7 +574,7 @@ function RangeSlider() {
         {SLIDER_TICKS.map((hour) => (
           <span
             key={hour}
-            className="absolute -translate-x-1/2 text-11 text-subtle tabular-nums"
+            className="absolute -translate-x-1/2 text-11 text-muted tabular-nums"
             style={{ left: percentOf(hour * 60) }}
           >
             {hour}
@@ -564,7 +586,7 @@ function RangeSlider() {
 }
 
 const stepperButton = cn(
-  "grid h-full w-8.5 place-items-center text-16 text-muted first:rounded-l-md last:rounded-r-md disabled:opacity-35",
+  "grid h-full w-8.5 place-items-center text-16 text-muted transition-[background-color,color] first:rounded-l-md last:rounded-r-md disabled:opacity-35",
   "hover:not-disabled:bg-accent-soft hover:not-disabled:text-accent-strong",
 );
 
@@ -584,7 +606,7 @@ function DurationStepper() {
   return (
     <div
       className={cn(
-        "ml-auto inline-flex h-11.5 items-center rounded-md border border-border bg-surface",
+        "ml-1 inline-flex h-11.5 flex-none items-center rounded-md border border-border-strong bg-surface",
         // Narrow phones: a full row under the two times.
         "max-3xs:col-span-full max-3xs:ml-0 max-3xs:h-10 max-3xs:justify-between",
       )}

@@ -18,6 +18,9 @@ export function RoomThumbnail({
 }) {
   const [failure, setFailure] = useState<{ id: number; source: "thumb" | "full" } | null>(null);
   const failedSource = failure?.id === id ? failure.source : null;
+  // The URL that finished loading: fades the image in, and a new URL (another
+  // room, or the full-size fallback) starts hidden again.
+  const [loaded, setLoaded] = useState<string | null>(null);
 
   if (!idfoto || failedSource === "full")
     return (
@@ -48,12 +51,17 @@ export function RoomThumbnail({
       className={cn("block flex-none overflow-hidden bg-surface-muted", className)}
       aria-hidden="true"
     >
+      {/* Fades in over the muted placeholder once loaded, like the room page photo. */}
       <img
-        className="size-full object-cover"
+        className={cn(
+          "size-full object-cover opacity-0 transition-opacity duration-250 ease-in-out",
+          loaded === url && "opacity-100",
+        )}
         src={url}
         alt=""
         loading="lazy"
         decoding="async"
+        onLoad={() => setLoaded(url)}
         onError={() => setFailure({ id, source: failedSource === "thumb" ? "full" : "thumb" })}
       />
     </span>

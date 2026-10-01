@@ -15,6 +15,7 @@ import { Chip, ChipRow } from "../ui/chip";
 import { Field, FieldLabel } from "../ui/field";
 import { centreStable, insetFocus } from "../ui/focus";
 import { Icon } from "../ui/icon";
+import { pressable } from "../ui/motion";
 import { Panel, PanelHeader, PanelTitle } from "../ui/panel";
 import { Segmented, SegmentedOption } from "../ui/segmented";
 import { StableText } from "../ui/stable";
@@ -29,7 +30,8 @@ export const hiddenByMoreFilters = "max-lg:group-has-[#more-filters]/controls:hi
 
 /** A building choice. */
 const choice = cn(
-  "h-9.5 rounded-sm bg-surface-muted px-1.5 text-14 font-semibold whitespace-nowrap",
+  "h-9.5 rounded-sm bg-surface-muted px-1.5 text-14 font-semibold whitespace-nowrap transition-[background-color,color,scale]",
+  pressable,
   "hover:bg-accent-soft hover:text-accent-strong aria-pressed:bg-accent aria-pressed:text-on-accent",
   insetFocus,
   centreStable,
@@ -61,7 +63,12 @@ function MoreFilters({ filters }: { filters: FilterState }) {
 
   return (
     <div
-      className="grid scroll-mt-4 gap-4.5 rounded-lg border border-border bg-surface p-4"
+      className={cn(
+        "grid scroll-mt-4 gap-4.5 rounded-lg border border-border bg-surface p-4",
+        // Settles in from just above as it opens; no height animation, so the
+        // panels below simply move down. Closing (unmount) is instant.
+        "transition-[opacity,translate] duration-250 ease-smooth-out starting:-translate-y-1 starting:opacity-0",
+      )}
       id="more-filters"
     >
       <Field>
@@ -159,7 +166,7 @@ export function Filters() {
         >
           <Icon name="cancel-01" />
           {t("filters.reset")}
-          <span className="inline-grid h-4.5 min-w-4.5 place-items-center rounded-full bg-busy text-11 text-white">
+          <span className="inline-grid h-4.5 min-w-4.5 place-items-center rounded-full bg-busy text-11 text-on-status">
             {active}
           </span>
         </button>
@@ -206,7 +213,11 @@ export function Filters() {
           )}
           <Icon
             name="arrow-down-01"
-            className={cn("text-14 transition-[rotate]", open && "rotate-180")}
+            // In step with the "More filters" panel it discloses.
+            className={cn(
+              "text-14 transition-[rotate] duration-250 ease-smooth-out",
+              open && "rotate-180",
+            )}
           />
         </Chip>
       </ChipRow>

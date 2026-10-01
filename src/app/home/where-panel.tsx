@@ -4,6 +4,7 @@ import { t, useLocale } from "../i18n";
 import { campuses } from "../state/availability";
 import { setCampus, useStore } from "../state/store";
 import { Icon } from "../ui/icon";
+import { pressableLarge } from "../ui/motion";
 import { Panel, PanelHeader, PanelTitle } from "../ui/panel";
 import { OptionList, Popup, type MenuGroup } from "../ui/popup";
 import { hiddenByMoreFilters } from "./filters";
@@ -40,8 +41,9 @@ export function WherePanel() {
         ref={trigger}
         type="button"
         className={cn(
-          "flex min-h-13 w-full items-center gap-3 rounded-md border border-border bg-surface px-3.5 py-1.5 text-left",
-          "transition-[border-color] hover:border-accent aria-expanded:border-accent",
+          "flex min-h-13 w-full items-center gap-3 rounded-md border border-border-strong bg-surface px-3.5 py-1.5 text-left",
+          "transition-[border-color,scale] hover:border-accent aria-expanded:border-accent",
+          pressableLarge,
         )}
         aria-haspopup="dialog"
         aria-expanded={open}

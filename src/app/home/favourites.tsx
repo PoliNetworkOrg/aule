@@ -6,6 +6,7 @@ import { findClassroom, roomWindowStatus } from "../state/availability";
 import { openClassroom } from "../state/navigation-context";
 import { useStore } from "../state/store";
 import { Icon } from "../ui/icon";
+import { pressable } from "../ui/motion";
 import { Panel, PanelHeader, PanelTitle } from "../ui/panel";
 import { StatusDot } from "../ui/tag";
 import { hiddenByMoreFilters } from "./filters";
@@ -37,11 +38,17 @@ export function Favourites() {
 
   return (
     <Panel
-      // Divided from the panel above.
-      className={cn("border-t border-t-border pt-3", hiddenByMoreFilters)}
+      className={cn(
+        // Divided from the panel above.
+        "border-t border-t-border pt-3",
+        // No favourites yet: title and hint share one line instead of a full panel.
+        !entries.length &&
+          "flex-row flex-wrap items-baseline gap-x-2.5 gap-y-0.5 lg:gap-x-2.5 lg:gap-y-0.5",
+        hiddenByMoreFilters,
+      )}
       aria-labelledby="favourites-title"
     >
-      <PanelHeader>
+      <PanelHeader className={cn(!entries.length && "min-h-0")}>
         <PanelTitle id="favourites-title">
           <Icon name="star" />
           {t("favourites.title")}
@@ -58,11 +65,14 @@ export function Favourites() {
             return (
               <li
                 key={entry.room.id}
-                className="flex min-w-0 items-stretch overflow-hidden rounded-md border border-border bg-surface hover:border-accent-soft-border"
+                className="flex min-w-0 items-stretch overflow-hidden rounded-md border border-border bg-surface transition-[border-color] hover:border-accent-soft-border"
               >
                 <button
                   type="button"
-                  className="grid min-w-0 flex-1 grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2 py-1.5 pr-1 pl-3 text-left"
+                  className={cn(
+                    "grid min-w-0 flex-1 grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2 py-1.5 pr-1 pl-3 text-left transition-[scale]",
+                    pressable,
+                  )}
                   title={`${entry.room.name} · ${t("building.prefix")} ${entry.building.name} · ${entry.campus.name}`}
                   onClick={() =>
                     openClassroom(entry, date ? { date, from, to, highlight: false } : null)
@@ -79,7 +89,7 @@ export function Favourites() {
                 </button>
                 <button
                   type="button"
-                  className="grid w-8.5 place-items-center text-subtle hover:bg-busy-soft hover:text-busy"
+                  className="grid w-8.5 place-items-center text-subtle transition-[background-color,color] hover:bg-busy-soft hover:text-busy"
                   aria-label={tf("favourites.remove", { name: entry.room.name })}
                   title={tf("favourites.remove", { name: entry.room.name })}
                   onClick={() => toggleFavourite(entry.room.id)}
@@ -91,7 +101,7 @@ export function Favourites() {
           })}
         </ul>
       ) : (
-        <p className="text-14 text-muted">{t("favourites.empty")}</p>
+        <p className="text-13 text-muted">{t("favourites.empty")}</p>
       )}
     </Panel>
   );

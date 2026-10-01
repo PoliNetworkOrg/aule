@@ -12,6 +12,7 @@ import { t, useLocale } from "../i18n";
 import { IconButton } from "./button";
 import { insetFocus } from "./focus";
 import { Icon } from "./icon";
+import { pressable } from "./motion";
 
 // One primitive for every picker: a panel anchored under its trigger on
 // desktop, a bottom sheet on phones. Escape, a click outside or the close
@@ -24,6 +25,8 @@ interface Position {
   left: number;
   width: number;
   maxHeight: number;
+  /** Which edge faces the trigger: the panel grows out of it when it opens. */
+  origin: "top" | "bottom";
 }
 
 function useIsSheet() {
@@ -52,11 +55,11 @@ function anchorPosition(anchor: HTMLElement, minWidth: number, contentHeight: nu
   const wanted = Math.min(contentHeight, MAX_POPUP_HEIGHT);
 
   if (wanted <= below || (wanted > above && below >= above))
-    return { top: rect.bottom + 6, left, width, maxHeight: Math.min(wanted, below) };
+    return { top: rect.bottom + 6, left, width, maxHeight: Math.min(wanted, below), origin: "top" };
 
   const height = Math.min(wanted, above);
 
-  return { top: rect.top - 6 - height, left, width, maxHeight: height };
+  return { top: rect.top - 6 - height, left, width, maxHeight: height, origin: "bottom" };
 }
 
 export function Popup({
@@ -141,17 +144,29 @@ export function Popup({
           left: position.left,
           width: position.width,
           maxHeight: position.maxHeight,
+          transformOrigin: `${position.origin} center`,
         };
 
   return createPortal(
     <div className="fixed inset-0 z-50">
-      <div className={cn("absolute inset-0", sheet && "bg-scrim/40")} onClick={onClose} />
+      <div
+        className={cn(
+          "absolute inset-0",
+          sheet && "bg-scrim/40 transition-opacity duration-150 ease-smooth-out starting:opacity-0",
+        )}
+        onClick={onClose}
+      />
       <div
         ref={panel}
         className={cn(
           "fixed flex flex-col overflow-hidden rounded-lg border border-border bg-surface shadow-md",
-          sheet &&
-            "right-0 bottom-0 left-0 max-h-[80dvh] rounded-t-xl rounded-b-none border-b-0 pb-[env(safe-area-inset-bottom)]",
+          // Closing (unmount) is instant, as closes should get out of the way.
+          "duration-250 ease-smooth-out starting:opacity-0",
+          sheet
+            ? // Rises a short way rather than the full sheet height: a nudge, not a drawer.
+              "right-0 bottom-0 left-0 max-h-[80dvh] rounded-t-xl rounded-b-none border-b-0 pb-[env(safe-area-inset-bottom)] transition-[opacity,translate] starting:translate-y-2"
+            : // Fades and grows out of its trigger's edge (transformOrigin, below).
+              "transition-[opacity,scale] starting:scale-97",
         )}
         role="dialog"
         aria-modal="true"
@@ -216,7 +231,8 @@ export function OptionList({
               key={option.value}
               type="button"
               className={cn(
-                "flex min-h-11 items-center gap-2 rounded-md px-2.5 py-1.5 text-left",
+                "flex min-h-11 items-center gap-2 rounded-md px-2.5 py-1.5 text-left transition-[background-color,scale]",
+                pressable,
                 "hover:bg-surface-muted aria-pressed:bg-accent-soft aria-pressed:text-accent-strong",
                 insetFocus,
               )}

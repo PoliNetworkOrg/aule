@@ -30,7 +30,8 @@ export function SegmentedOption({
     <button
       type={type}
       className={cn(
-        "inline-flex min-h-8 items-center justify-center gap-1.5 rounded-[7px] px-3",
+        // Concentric with the group: its radius minus its 3px padding.
+        "inline-flex min-h-8 items-center justify-center gap-1.5 rounded-[calc(var(--radius-md)-3px)] px-3",
         "text-14 font-semibold whitespace-nowrap text-muted transition-[background-color,color] hover:text-foreground",
         "aria-pressed:bg-surface aria-pressed:text-accent-strong aria-pressed:shadow-sm",
         insetFocus,

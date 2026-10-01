@@ -15,10 +15,12 @@ import { hasCoordinates } from "../map/maplibre";
 import { fetchPhotoUrl } from "../utils/photo";
 import { FavouriteButton } from "../home/room-card";
 import { cn } from "../../lib/cn";
+import { isNumber } from "../../lib/guards";
 import { Button, buttonVariants } from "../ui/button";
-import { Card, SectionTitle } from "../ui/card";
+import { Card } from "../ui/card";
 import { EmptyState, emptyStateAction } from "../ui/empty-state";
 import { Icon } from "../ui/icon";
+import { PanelTitle } from "../ui/panel";
 import { StatusDot } from "../ui/tag";
 import { Schedule } from "./schedule";
 
@@ -94,6 +96,30 @@ function NowStatus({ entry }: { entry: ClassroomEntry }) {
   );
 }
 
+/** The room card's 16:9 photo slot. */
+const PHOTO_SLOT = "relative block aspect-video w-full overflow-hidden bg-surface-muted";
+
+/**
+ * Stands in for a missing or broken photo on desktop, where the card sits next
+ * to the schedule: keeps the 16:9 slot so every room's card has the same shape.
+ * Hidden on phones and tablets, where the card just starts lower.
+ */
+function PhotoPlaceholder() {
+  return (
+    <div
+      className={cn(
+        PHOTO_SLOT,
+        "hidden flex-col items-center justify-center gap-1.5 text-13 text-muted lg:flex",
+        "icon:text-28 icon:text-subtle",
+      )}
+      aria-hidden="true"
+    >
+      <Icon name="album-not-found-01" />
+      <span>{t("classroom.noPhoto")}</span>
+    </div>
+  );
+}
+
 function Photo({ roomId, roomName }: { roomId: number; roomName: string }) {
   const [url, setUrl] = useState<string | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "failed">("loading");
@@ -109,13 +135,13 @@ function Photo({ roomId, roomName }: { roomId: number; roomName: string }) {
     };
   }, [roomId]);
 
-  if (state === "failed") return null;
+  if (state === "failed") return <PhotoPlaceholder />;
 
   return (
     <>
       <button
         type="button"
-        className="relative block aspect-video w-full overflow-hidden bg-surface-muted text-left disabled:cursor-default"
+        className={cn(PHOTO_SLOT, "text-left disabled:cursor-default")}
         aria-label={tf("classroom.enlargePhoto", { name: roomName })}
         disabled={!url || state !== "ready"}
         onClick={() => dialog.current?.showModal()}
@@ -123,7 +149,7 @@ function Photo({ roomId, roomName }: { roomId: number; roomName: string }) {
         {url && (
           <img
             className={cn(
-              "size-full object-cover opacity-0 transition-opacity duration-250",
+              "size-full object-cover opacity-0 transition-opacity duration-250 ease-in-out",
               state === "ready" && "opacity-100",
             )}
             src={url}
@@ -142,7 +168,15 @@ function Photo({ roomId, roomName }: { roomId: number; roomName: string }) {
       </button>
       <dialog
         ref={dialog}
-        className="fixed inset-0 h-[96dvh] max-h-none w-[min(98vw,1700px)] max-w-none overflow-visible border-0 bg-transparent p-0 backdrop:bg-scrim/88"
+        className={cn(
+          "fixed inset-0 h-[96dvh] max-h-none w-[min(98vw,1700px)] max-w-none overflow-visible border-0 bg-transparent p-0 backdrop:bg-scrim/88",
+          // Closed state and close motion: quicker than the open, and display and
+          // overlay stay discrete so the photo is still painted while it fades out.
+          "scale-96 opacity-0 transition-[opacity,scale,display,overlay] transition-discrete duration-150 ease-smooth-out",
+          "open:scale-100 open:opacity-100 open:duration-250 starting:open:scale-96 starting:open:opacity-0",
+          "backdrop:opacity-0 backdrop:transition-[opacity,display,overlay] backdrop:transition-discrete backdrop:duration-150 backdrop:ease-smooth-out",
+          "open:backdrop:opacity-100 open:backdrop:duration-250 starting:open:backdrop:opacity-0",
+        )}
         aria-label={tf("classroom.photoOf", { name: roomName })}
         onClick={(event) => {
           if (event.target === dialog.current) dialog.current?.close();
@@ -191,10 +225,10 @@ function Location({ entry }: { entry: ClassroomEntry }) {
   return (
     <Card className={CONTENT_CARD} aria-labelledby="location-title">
       <div className="flex flex-col gap-1.5">
-        <SectionTitle id="location-title">
+        <PanelTitle id="location-title">
           <Icon name="location-01" />
           {t("classroom.location")}
-        </SectionTitle>
+        </PanelTitle>
         <p className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-14 text-muted">
           <strong className="text-16 text-foreground">{label}</strong>
           {building.address ? <span>{building.address}</span> : null}
@@ -287,7 +321,11 @@ export function ClassroomPage({
           className="overflow-hidden lg:sticky lg:top-[calc(var(--spacing-header)+16px)]"
           aria-labelledby="room-title"
         >
-          {room.idfoto ? <Photo key={room.id} roomId={room.id} roomName={room.name} /> : null}
+          {room.idfoto ? (
+            <Photo key={room.id} roomId={room.id} roomName={room.name} />
+          ) : (
+            <PhotoPlaceholder />
+          )}
           <div className="flex flex-col gap-4 px-4.5 pt-4 pb-4.5">
             <div className="flex items-start justify-between gap-2">
               <div>
@@ -310,8 +348,9 @@ export function ClassroomPage({
             {/* Icons label the values; the text stays for screen readers and as a tooltip.
                 Full width, one equal column per stat (two when the floor is unknown); a
                 column only grows past its share when its content would not fit ("Ground"
-                on the narrowest phones). */}
-            <dl className="grid auto-cols-[minmax(max-content,1fr)] grid-flow-col gap-2">
+                on the narrowest phones). There "Seminterrato" no longer fits beside the
+                other two stats, so the floor takes its own row below them. */}
+            <dl className="grid auto-cols-[minmax(max-content,1fr)] grid-flow-col gap-2 max-3xs:grid-flow-row max-3xs:grid-cols-2">
               <div className={ROOM_STAT} title={t("classroom.seats")}>
                 <dt className="flex text-18 text-muted">
                   <Icon name="user-multiple" />
@@ -326,14 +365,21 @@ export function ClassroomPage({
                 </dt>
                 <dd className="text-16 font-bold tabular-nums">{room.accessible_seats ?? 0}</dd>
               </div>
-              {room.floor !== undefined && (
-                <div className={ROOM_STAT} title={t("classroom.floor")}>
+              {isNumber(room.floor) && (
+                <div
+                  className={cn(ROOM_STAT, "max-3xs:col-span-full")}
+                  title={t("classroom.floor")}
+                >
                   <dt className="flex text-18 text-muted">
                     <Icon name="stairs-01" />
                     <span className="sr-only">{t("classroom.floor")}</span>
                   </dt>
                   <dd className="text-16 font-bold tabular-nums">
-                    {room.floor === 0 ? t("classroom.groundFloor") : room.floor}
+                    {room.floor === 0
+                      ? t("classroom.groundFloor")
+                      : room.floor === -1
+                        ? t("classroom.basementFloor")
+                        : room.floor}
                   </dd>
                 </div>
               )}
@@ -361,10 +407,10 @@ export function ClassroomPage({
 
         <div className="grid min-w-0 gap-4 lg:gap-6">
           <Card className={CONTENT_CARD} aria-labelledby="schedule-title">
-            <SectionTitle id="schedule-title">
+            <PanelTitle id="schedule-title">
               <Icon name="calendar-03" />
               {t("schedule.title")}
-            </SectionTitle>
+            </PanelTitle>
             <Schedule key={room.id} roomId={room.id} context={context} />
           </Card>
 
