@@ -1,38 +1,33 @@
 import { cn } from "../../lib/cn";
 import { closePage } from "../../lib/navigation";
 import { leavePage, openInApp } from "../state/navigation-context";
-import { LOCALES, setLocale, t, useLocale } from "../i18n";
+import { type Locale, LOCALES, setLocale, t, useLocale } from "../i18n";
 import { setThemePreference, THEME_PREFERENCES, useThemePreference } from "../theme";
 import { IconButton } from "./button";
 import { Icon } from "./icon";
 
+const LOCALE_NAMES: Record<Locale, string> = { it: "Italiano", en: "English" };
+
+/** One button that switches to the other language, showing the current one. */
 function LanguageToggle() {
   const locale = useLocale();
+  const next = LOCALES[(LOCALES.indexOf(locale) + 1) % LOCALES.length];
+  const label = `${t("header.language")}: ${LOCALE_NAMES[locale]}`;
 
   return (
-    <div
-      className="inline-flex rounded-full border border-border bg-surface-muted p-[3px]"
-      role="group"
-      aria-label={t("header.language")}
+    <button
+      type="button"
+      className={cn(
+        "inline-flex h-10 items-center gap-1 rounded-md px-2.5 text-14 font-bold tracking-wide text-muted",
+        "transition-[background-color,color] hover:bg-surface-muted hover:text-foreground",
+      )}
+      aria-label={label}
+      title={label}
+      onClick={() => setLocale(next)}
     >
-      {LOCALES.map((option) => (
-        <button
-          key={option}
-          type="button"
-          className={cn(
-            "h-7 w-[34px] rounded-full text-12 font-bold tracking-wide text-muted",
-            "transition-[background-color,color] hover:text-foreground",
-            "aria-pressed:bg-surface aria-pressed:text-accent-strong aria-pressed:shadow-sm",
-          )}
-          aria-pressed={option === locale}
-          lang={option}
-          aria-label={option === "it" ? "Italiano" : "English"}
-          onClick={() => setLocale(option)}
-        >
-          {option.toUpperCase()}
-        </button>
-      ))}
-    </div>
+      <Icon name="globe-02" className="text-18 max-3xs:hidden" />
+      <span lang={locale}>{locale.toUpperCase()}</span>
+    </button>
   );
 }
 
@@ -53,21 +48,37 @@ const THEME_OPTIONS = {
   },
 };
 
-/** One button that cycles light → dark → system, showing the current choice. */
+/** Light, dark and system side by side, the current choice highlighted. */
 function ThemeToggle() {
   useLocale();
   const preference = useThemePreference();
-  const label = `${t("header.theme")}: ${t(THEME_OPTIONS[preference].label)}`;
-
-  const next =
-    THEME_PREFERENCES[(THEME_PREFERENCES.indexOf(preference) + 1) % THEME_PREFERENCES.length];
 
   return (
-    <IconButton aria-label={label} title={label} onClick={() => setThemePreference(next)}>
-      <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor" aria-hidden="true">
-        <path fillRule="evenodd" d={THEME_OPTIONS[preference].path} />
-      </svg>
-    </IconButton>
+    <div
+      className="inline-flex rounded-full border border-border bg-surface-muted p-[3px]"
+      role="group"
+      aria-label={t("header.theme")}
+    >
+      {THEME_PREFERENCES.map((option) => (
+        <button
+          key={option}
+          type="button"
+          className={cn(
+            "grid h-7 w-[34px] place-items-center rounded-full text-muted",
+            "transition-[background-color,color] hover:text-foreground",
+            "aria-pressed:bg-surface aria-pressed:text-accent-strong aria-pressed:shadow-sm",
+          )}
+          aria-pressed={option === preference}
+          aria-label={t(THEME_OPTIONS[option].label)}
+          title={t(THEME_OPTIONS[option].label)}
+          onClick={() => setThemePreference(option)}
+        >
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
+            <path fillRule="evenodd" d={THEME_OPTIONS[option].path} />
+          </svg>
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -102,8 +113,8 @@ export function Header({ page }: { page: "home" | "classroom" | "info" }) {
         </a>
 
         <div className="ml-auto flex min-w-0 items-center gap-1">
-          <LanguageToggle />
           <ThemeToggle />
+          <LanguageToggle />
           <IconButton
             aria-label={t("header.info")}
             title={t("header.info")}

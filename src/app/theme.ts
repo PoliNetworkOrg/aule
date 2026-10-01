@@ -7,7 +7,11 @@ export type ThemePreference = Theme | "system";
 
 export const THEME_PREFERENCES: ThemePreference[] = ["light", "dark", "system"];
 
-const STORAGE_KEY = "poliAule_theme";
+// A new key: "poliAule_theme" was written by the old light/dark toggle, so
+// everyone who ever clicked it would never see the system theme again.
+const STORAGE_KEY = "poliAule_themePreference";
+
+localStorage.removeItem("poliAule_theme");
 
 const systemTheme = matchMedia("(prefers-color-scheme: dark)");
 
