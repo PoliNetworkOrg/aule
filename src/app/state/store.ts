@@ -9,7 +9,7 @@ import {
 } from "./time";
 
 // The whole home screen is driven by this one store: what the user is looking
-// for (campus, day, time window, filters, free-text query) plus the data
+// for (campuses, day, time window, filters, free-text query) plus the data
 // lifecycle. Components read slices with useStore(); writes go through the
 // setters below, which also persist the choices worth remembering.
 
@@ -29,7 +29,7 @@ export interface Filters {
   /** Feature 143: seats with a wired network socket. */
   network: boolean;
   minSeats: SeatsFilter;
-  /** Restrict results to one building (by name) of the selected campus. */
+  /** Restrict results to one building (by buildingKey) of the selected campuses. */
   building: string;
 }
 
@@ -41,14 +41,15 @@ export interface AppState {
   /** Bumped whenever occupancy data is (re)loaded, so derived data recomputes. */
   dataRevision: number;
   generatedAt: Date | null;
-  campusId: string;
+  /** Never empty, in directory order (see sortCampuses). */
+  campusIds: string[];
   date: string;
   from: string;
   to: string;
   filters: Filters;
   query: string;
   view: ResultsView;
-  /** Building focused on the 3D map (by name), shown in the map's side panel. */
+  /** Building focused on the 3D map (by buildingKey), shown in the map's side panel. */
   mapBuilding: string | null;
   /** Phones/tablets: controls folded into a one-line summary while browsing results. */
   controlsCollapsed: boolean;
@@ -62,6 +63,10 @@ export const DEFAULT_FILTERS: Filters = {
   minSeats: 0,
   building: "",
 };
+
+// The selection, as a JSON array. The single campus of older versions is still
+// written to CAMPUS_KEY (first selected one), so rolling back keeps a valid choice.
+const CAMPUSES_KEY = "poliAule_campusIds";
 
 const CAMPUS_KEY = "poliAule_lastCampusId";
 
@@ -122,6 +127,61 @@ function readInitialCampus() {
   return readStorage(CAMPUS_KEY) ?? "MIA01";
 }
 
+/** The saved selection, or the last single campus of older versions. Unknown ids are dropped at boot. */
+export function readInitialCampuses(): string[] {
+  try {
+    const saved: unknown = JSON.parse(readStorage(CAMPUSES_KEY) ?? "null");
+
+    if (
+      Array.isArray(saved) &&
+      saved.length > 0 &&
+      saved.every((id): id is string => typeof id === "string")
+    )
+      return saved;
+  } catch {
+    /* corrupted value: fall back to the single campus */
+  }
+
+  return [readInitialCampus()];
+}
+
+/** Buildings are named per campus ("8" exists in Leonardo and Lecco), so they're keyed by both. */
+export function buildingKey(campusId: string, name: string) {
+  return `${campusId}/${name}`;
+}
+
+export function splitBuildingKey(key: string) {
+  const slash = key.indexOf("/");
+
+  return { campusId: key.slice(0, slash), name: key.slice(slash + 1) };
+}
+
+/** `ids` deduplicated, in the order of `order` (the directory's); ids not in it go last. */
+export function sortCampuses(ids: string[], order: string[]) {
+  const rank = (id: string) => {
+    const index = order.indexOf(id);
+
+    return index === -1 ? order.length : index;
+  };
+
+  return [...new Set(ids)].sort((a, b) => rank(a) - rank(b));
+}
+
+/**
+ * The selection after toggling `ids` on (`selected`) or off. Turning off is
+ * ignored when it would leave nothing selected.
+ */
+export function toggledCampuses(
+  current: string[],
+  ids: string[],
+  selected: boolean,
+  order: string[],
+) {
+  const next = selected ? [...current, ...ids] : current.filter((id) => !ids.includes(id));
+
+  return next.length ? sortCampuses(next, order) : current;
+}
+
 const initialWindow = defaultWindow(false);
 
 let state: AppState = {
@@ -130,7 +190,7 @@ let state: AppState = {
   openingHours: true,
   dataRevision: 0,
   generatedAt: null,
-  campusId: readInitialCampus(),
+  campusIds: readInitialCampuses(),
   date: "",
   from: initialWindow.from,
   to: initialWindow.to,
@@ -168,13 +228,19 @@ export function useStore<T>(selector: (current: AppState) => T): T {
   return useSyncExternalStore(subscribe, () => selector(getState()));
 }
 
-export function setCampus(campusId: string) {
-  if (campusId === state.campusId) return;
-  writeStorage(CAMPUS_KEY, campusId);
+/** Replaces the selection (never empty). A building of a campus left out stops being filtered on or focused. */
+export function setCampuses(campusIds: string[]) {
+  if (!campusIds.length || campusIds.join() === state.campusIds.join()) return;
+
+  writeStorage(CAMPUSES_KEY, JSON.stringify(campusIds));
+  writeStorage(CAMPUS_KEY, campusIds[0]);
+
+  const kept = (key: string | null) => !!key && campusIds.includes(splitBuildingKey(key).campusId);
+
   setState({
-    campusId,
-    mapBuilding: null,
-    filters: { ...state.filters, building: "" },
+    campusIds,
+    mapBuilding: kept(state.mapBuilding) ? state.mapBuilding : null,
+    filters: kept(state.filters.building) ? state.filters : { ...state.filters, building: "" },
   });
 }
 

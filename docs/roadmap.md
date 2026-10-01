@@ -1,37 +1,29 @@
-# Complete frontend migration — roadmap
+# Multiple campuses at once — roadmap
 
-The user authorized implementation of the complete conversion. The existing stack integration and request-recovery fixes are committed; they are the starting point, not the definition of completion.
+Behavior: `docs/product-spec.md`. Design: `docs/technical-spec.md`. Each milestone leaves the
+app building and working with a single campus.
 
-1. **Typed foundations:** domain/API contracts, data calculations, preferences, localization, and animation utilities. Verify TypeScript and lint; preserve outputs and requests.
-2. **React controls:** render shared cards, toggles, segmented controls, pickers, popovers, and navigation with React; retain typed gesture and animation functions. Verify controls and layout against the source.
-3. **React views:** availability/building results, search, favourites, classroom detail/schedules, info, settings, and campus map/sheet. Preserve routes, storage and loading/error states; verify each slice.
-4. **React startup and final gate:** remove legacy application bootstrap and unchecked JavaScript, enable TypeScript-only compilation, run production/beta builds and full lint, repeat desktop/mobile parity and failure-recovery checks, and commit the completed migration.
+1. **State and availability (no UI change).**
+   `campusIds` in the store with `toggleCampus` / `setCampusGroup` / `applyCampuses`,
+   `poliAule_campusIds` with the `poliAule_lastCampusId` fallback, boot validation.
+   `buildingKey`, `BuildingAvailability.campus` + `key`, multi-campus `findAvailability`,
+   `closedBuildings`, `campusClosed`, `filterImpact`. Move every reader to `campusIds` and
+   building keys (building filter, `mapBuilding`, React keys, header ids), still with one
+   campus selectable. Add `multi-campus.test.ts`.
+   Verify: typecheck, lint, tests; browser pass with one campus showing no visible change.
+2. **Selection UI.**
+   `CheckList` in `popup.tsx` (shared row classes), `where-panel.tsx` toggles and group
+   "Tutti", `campusSelectionLabel` used by the trigger, results summary and phone summary,
+   locale strings. Verify: R1–R3, R9 in the browser (it + en, desktop + 390px).
+3. **Results and filters across campuses.**
+   Campus name in building headers and filter chips when several are selected; building
+   filter grouped by campus. Verify: R4–R6, R8 with Leonardo + Lecco and Leonardo +
+   Colombo.
+4. **Map.**
+   Markers across campuses, `fitBounds` for several, panel title. Verify: R7 with
+   Leonardo + Colombo and Leonardo + Lecco, selected-building fly-to, campus removal
+   closing the panel, light/dark.
+5. **Final gate.** `pnpm build`, full lint and tests, single-campus regression pass,
+   update these docs with what was verified.
 
-Each item depends on the preceding contracts and is complete only after its implementation and verification. Update progress here at verified checkpoints; do not mark the migration complete while legacy modules remain.
-
-## Verified progress
-
-- `fe03016` completed the typed data and animation foundations.
-- Settings now renders through a React portal, including switches, segmented controls, the interval stepper, warnings, and campus preferences. The shared pill drag engine and settings motion controller are checked TypeScript. React owns the control markup and translated text; effects release observers, listeners, timers, and springs when the popup unmounts.
-- The settings slice preserves the source's storage keys, defaults, native events, popup geometry, and gesture calculations. Desktop/mobile comparisons and keyboard, drag, dismiss, remount, and locale failure/recovery checks accompany this checkpoint.
-- Date selection now renders in React, including the compact trigger, popup contents, day cells, active labels, and hidden form field. Typed controllers retain popup motion, responsive docking, and the shared date indicator used by classroom details. Desktop/mobile comparisons cover selection, dragging, Sunday visibility, and language changes.
-
-- Time range selection and typed-entry popups now render in React. Date/time popup motion shares a typed controller, native input subscriptions restore correctly when either consumer unmounts, and shared glass pointer interactions are checked TypeScript. Desktop/mobile comparisons cover keyboard selection, drags, time entry, popup switching, presets, time format, and language.
-
-- Campus pickers now render both shadow-root option lists and triggers in React. Typed controllers preserve selection, docking, keyboard navigation, and cross-tab synchronization. Popover positioning and cleanup are checked TypeScript. Desktop/mobile comparisons match the source without browser errors.
-
-- Bottom navigation, keyboard shortcut help, and tooltips now render in React. Navigation retains its springs, pointer dragging, keyboard controls, saved tab, and responsive layout. Initial dictionary loading now notifies React subscribers separately from language-switch callbacks. Desktop/mobile comparisons match the source.
-
-- Search results, lesson/exam cards, favourites, and the data-status popup now render in React. Typed controllers retain search transitions, viewport tracking, retry timing, popup geometry, and reload behavior. Desktop/mobile comparisons cover result ordering, highlights, detail navigation, favourite state, reloads, and locale changes.
-
-- The Campus sheet, building browser, floor groups, and map marker content now render in React. The sheet gestures, page transitions, Mapbox camera integration, and event contracts are checked TypeScript. Desktop/mobile comparisons and live map marker/recenter checks match the source.
-
-- Availability sections, partial-free filtering, and the building overview now render in React. The overview keeps its original typed zoom and scroll geometry, and all classroom-card consumers now use the shared React component. Desktop/mobile comparisons match result ordering, query context, filters, overview counts, and Campus links.
-
-- Info content and GitHub statistics now render in React. Desktop/mobile comparisons preserve formatted translations, installation tabs, partial-response retries, and completed-cache reuse.
-
-- Classroom detail, photos, weekly timelines, day selectors, favourite icons, and occupation popovers now render in React. Numeric/named bookmarks, mobile selection, metadata, refresh, and Info return checks preserve the source. Shared pill controls no longer clone HTML.
-
-- React now owns application startup, route activation, shell translations, splash errors, and teardown. The legacy bootstrap bridge, HTML renderers, label-cloning path, and last frontend JavaScript module are removed. `allowJs` is disabled.
-
-All four steps are complete. Production and beta builds, strict application TypeScript, Oxlint/Oxfmt, and both worker typechecks pass. Final desktop/mobile browser comparisons cover availability, classroom details, Info, search, favourites, time controls, locale failure/recovery, partial occupancy reloads, live maps, native hash navigation, and browser back/forward. Startup error/reload and timeout recovery match the source. Temporary production harnesses verify full-app unmount/remount and interruption of Info/classroom transitions. No dependencies or committed tests were added. Physical-device haptics and Safari-specific behavior remain unverified.
+Dependencies: 2–4 need 1; 3 and 4 are independent of each other; 5 needs all.
