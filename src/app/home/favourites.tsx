@@ -48,7 +48,9 @@ export function Favourites() {
         </PanelTitle>
       </PanelHeader>
       {entries.length ? (
-        <ul className="flex flex-wrap gap-2">
+        // Desktop: two per row in the narrow sidebar, where natural-width chips would
+        // wrap one per line; the labels truncate instead.
+        <ul className="flex flex-wrap gap-2 lg:grid lg:grid-cols-2">
           {entries.map((entry) => {
             const availability = date ? roomWindowStatus(entry.room.id, date, from, to) : null;
             const status = availability?.status ?? "unknown";
@@ -56,18 +58,19 @@ export function Favourites() {
             return (
               <li
                 key={entry.room.id}
-                className="flex items-stretch overflow-hidden rounded-md border border-border bg-surface hover:border-accent-soft-border"
+                className="flex min-w-0 items-stretch overflow-hidden rounded-md border border-border bg-surface hover:border-accent-soft-border"
               >
                 <button
                   type="button"
-                  className="grid grid-cols-[auto_1fr] items-center gap-x-2 py-1.5 pr-1 pl-3 text-left"
+                  className="grid min-w-0 flex-1 grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2 py-1.5 pr-1 pl-3 text-left"
+                  title={`${entry.room.name} · ${t("building.prefix")} ${entry.building.name} · ${entry.campus.name}`}
                   onClick={() =>
                     openClassroom(entry, date ? { date, from, to, highlight: false } : null)
                   }
                 >
                   <StatusDot status={status} className="row-[1/3]" />
-                  <span className="font-bold">{entry.room.name}</span>
-                  <span className="col-start-2 text-12 text-muted">
+                  <span className="truncate font-bold">{entry.room.name}</span>
+                  <span className="col-start-2 truncate text-12 text-muted">
                     {t("building.prefix")} {entry.building.name} · {entry.campus.name}
                   </span>
                   <span className="sr-only">
