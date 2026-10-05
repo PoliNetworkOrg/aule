@@ -99,7 +99,7 @@ function RoomResults({ query }: { query: string }) {
                   idfoto={room.idfoto}
                   className="col-start-1 row-[1/3] size-14 rounded-sm"
                 />
-                <span className="text-16 font-bold group-has-data-[slot=thumbnail]/room:col-start-2">
+                <span className="min-w-0 text-16 font-bold wrap-break-word group-has-data-[slot=thumbnail]/room:col-start-2">
                   <Highlight text={room.name} query={query} />
                 </span>
                 <span className="col-start-1 text-13 text-muted group-has-data-[slot=thumbnail]/room:col-start-2">
