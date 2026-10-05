@@ -92,6 +92,13 @@ export function StatusTag({
       </Tag>
     );
 
+  if (status === "unknown")
+    return (
+      <Tag tone="closed" className={className}>
+        {t("status.unknown")}
+      </Tag>
+    );
+
   if (status === "occupied")
     return (
       <Tag tone="occupied" className={className}>

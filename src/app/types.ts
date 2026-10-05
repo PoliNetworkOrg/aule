@@ -26,7 +26,8 @@ export interface Classroom {
   seats?: number;
   accessible_seats?: number;
   workstations?: number;
-  occupancy?: Occupation[];
+  /** Null when no source had the schedule that day: unknown, never free. */
+  occupancy?: Occupation[] | null;
 }
 
 export interface BuildingHours {
@@ -60,7 +61,7 @@ export interface Campus<Room extends Classroom = Classroom> {
 export interface OccupancyDay {
   date: string;
   generated_at: string;
-  campuses: Campus<Classroom & { occupancy: Occupation[] }>[];
+  campuses: Campus<Classroom & { occupancy: Occupation[] | null }>[];
 }
 
 export interface HolidayPeriod {

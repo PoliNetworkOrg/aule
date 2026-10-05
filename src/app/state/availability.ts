@@ -25,8 +25,12 @@ import {
 
 export type OpenWindowStatus = "free" | "partial" | "occupied";
 
-/** `closed`: the building is shut for the whole window, whatever the bookings say. */
-export type WindowStatus = OpenWindowStatus | "closed";
+/**
+ * `closed`: the building is shut for the whole window, whatever the bookings say.
+ * `unknown`: no source had the room's schedule that day (occupancy `null`, see
+ * scripts/fetch.py). Never free: claiming it is could send someone to a full room.
+ */
+export type WindowStatus = OpenWindowStatus | "closed" | "unknown";
 
 /**
  * When a building is open on one day. `null` means its hours never loaded: the
@@ -60,7 +64,7 @@ interface WindowAvailability {
 export interface BuildingAvailability {
   building: Building;
   rooms: RoomAvailability[];
-  /** Rooms in the building before filters, for "n of m" counts. */
+  /** Bookable rooms in the building before filters, for "n of m" counts. */
   total: number;
 }
 
@@ -154,9 +158,13 @@ function clipToOpening(opening: BuildingOpening | null, from: string, to: string
 
 /**
  * One room on one ISO date: its bookings and its building's opening hours.
- * Null when that day has no data. A room missing from the day's data has no bookings.
+ * Null when that day has no data. `occupancy` is null when the room's schedule
+ * that day is unknown, including when the day's data doesn't list the room.
  */
-export function roomDay(roomId: number, isoDate: string) {
+export function roomDay(
+  roomId: number,
+  isoDate: string,
+): { occupancy: Occupation[] | null; opening: BuildingOpening | null } | null {
   const day = occupancyDays.find((entry) => entry.date === isoToDateKey(isoDate));
 
   if (!day) return null;
@@ -165,12 +173,9 @@ export function roomDay(roomId: number, isoDate: string) {
     for (const building of campus.buildings)
       for (const room of building.classrooms)
         if (room.id === roomId)
-          return {
-            occupancy: room.occupancy ?? [],
-            opening: buildingOpening(building, isoDate),
-          };
+          return { occupancy: room.occupancy, opening: buildingOpening(building, isoDate) };
 
-  return { occupancy: [], opening: null };
+  return { occupancy: null, opening: null };
 }
 
 /** Free intervals of `occupancy` inside [from, to]. */
@@ -213,7 +218,7 @@ function slotMinutes(slots: FreeSlot[]) {
  * Results, favourites, the map and the room page all go through this.
  */
 function windowAvailability(
-  occupancy: Occupation[],
+  occupancy: Occupation[] | null,
   opening: BuildingOpening | null,
   from: string,
   to: string,
@@ -221,6 +226,8 @@ function windowAvailability(
   const open = clipToOpening(opening, from, to);
 
   if (!open) return { status: "closed", slots: [] };
+
+  if (!occupancy) return { status: "unknown", slots: [] };
 
   const slots = freeSlots(occupancy, open.from, open.to);
 
@@ -284,16 +291,23 @@ export function findAvailability(
 
     const opening = buildingOpening(building, isoDate);
     const rooms: RoomAvailability[] = [];
+    let bookable = 0;
 
     for (const occupied of building.classrooms) {
       const entry = entryIndex?.get(occupied.id);
       const room = entry?.room ?? occupied;
+      const { occupancy } = occupied;
+
+      // Unknown schedule: the room can't be offered, nor counted as bookable.
+      if (!occupancy) continue;
+
+      bookable++;
 
       if (!matchesFilters(room, filters)) continue;
 
-      const { status, slots } = windowAvailability(occupied.occupancy ?? [], opening, from, to);
+      const { status, slots } = windowAvailability(occupancy, opening, from, to);
 
-      if (status === "occupied" || status === "closed") continue;
+      if (status !== "free" && status !== "partial") continue;
 
       rooms.push({
         room,
@@ -301,7 +315,7 @@ export function findAvailability(
         status,
         slots,
         freeMinutes: slotMinutes(slots),
-        freeUntil: status === "free" ? freeUntil(occupied.occupancy ?? [], opening, to) : undefined,
+        freeUntil: status === "free" ? freeUntil(occupancy, opening, to) : undefined,
       });
     }
 
@@ -313,7 +327,7 @@ export function findAvailability(
         b.freeMinutes - a.freeMinutes ||
         a.room.name.localeCompare(b.room.name, undefined, { numeric: true }),
     );
-    results.push({ building, rooms, total: building.classrooms.length });
+    results.push({ building, rooms, total: bookable });
   }
 
   return results;
@@ -381,6 +395,9 @@ export function roomNowStatus(roomId: number, isoDate: string, now: string): Now
   if (opening && now >= opening.closes) return { state: "closed", detail: null };
 
   if (now < fromMinutes(DAY_START) || now >= fromMinutes(DAY_END)) return null;
+
+  // Open, but whether the room is booked is unknown: say nothing rather than "free".
+  if (!occupancy) return null;
 
   const closes = opening?.closes ?? null;
   const sorted = [...occupancy].sort((a, b) => a.inizio.localeCompare(b.inizio));
