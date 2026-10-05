@@ -34,6 +34,7 @@ const statusDotVariants = cva("size-2 flex-none rounded-full bg-neutral", {
       partial: "bg-partial",
       occupied: "bg-busy",
       closed: "bg-neutral",
+      eventsOnly: "bg-neutral",
       unknown: "",
     },
   },

@@ -92,6 +92,13 @@ export function StatusTag({
       </Tag>
     );
 
+  if (status === "eventsOnly")
+    return (
+      <Tag tone="closed" className={className}>
+        {t("status.eventsOnly")}
+      </Tag>
+    );
+
   if (status === "unknown")
     return (
       <Tag tone="closed" className={className}>

@@ -55,7 +55,13 @@ export const SEARCH_MAX_RESULTS = 40;
 
 async function loadData() {
   if (classroomsData) return;
-  classroomsData = await fetchJson<Campus[]>(`${getApiBase()}/v1/classrooms`, Infinity);
+  setClassroomDirectory(await fetchJson<Campus[]>(`${getApiBase()}/v1/classrooms`, Infinity));
+}
+
+/** Replaces the directory and drops the search index built from the old one. Tests seed it here. */
+export function setClassroomDirectory(data: Campus[]) {
+  classroomsData = data;
+  searchIndex = null;
 }
 
 // Loads the static classroom directory. Blocks the splash: the campus switcher,
