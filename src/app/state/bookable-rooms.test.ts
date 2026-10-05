@@ -172,3 +172,25 @@ describe("an events-only room", () => {
     expect(regular && availability.isUsuallyClosed(regular)).toBe(false);
   });
 });
+
+describe("a building's rooms that are never offered", () => {
+  const listed = (building: string) =>
+    availability
+      .unbookableRooms(CAMPUS, building, TUESDAY)
+      .map(({ entry, status }) => [entry.room.name, status]);
+
+  it("lists events-only rooms and rooms in secondary buildings as usually closed", () => {
+    expect(listed("24")).toEqual([["Aula Magna", "eventsOnly"]]);
+    expect(listed("1")).toEqual([["Aula Rogers", "eventsOnly"]]);
+    expect(listed("OFF")).toEqual([]);
+  });
+
+  it("lists a regular room whose schedule is unknown that day", () => {
+    script.classroomsData[0].campuses[0].buildings[0].classrooms[0].occupancy = null;
+
+    expect(listed("24")).toEqual([
+      ["24.1", "unknown"],
+      ["Aula Magna", "eventsOnly"],
+    ]);
+  });
+});

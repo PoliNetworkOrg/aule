@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { t, tf, useLocale } from "../i18n";
 import type { BuildingAvailability } from "../state/availability";
-import { closedBuildings, findCampus } from "../state/availability";
+import { closedBuildings, findCampus, unbookableRooms } from "../state/availability";
+import { openClassroom } from "../state/navigation-context";
 import { setMapBuilding, useStore } from "../state/store";
-import type { Building } from "../types";
+import type { Building, Campus } from "../types";
 import type { Map as MapLibreMap, Marker as MapLibreMarker } from "maplibre-gl";
 import { cn } from "../../lib/cn";
 import { IconButton } from "../ui/button";
 import { Icon } from "../ui/icon";
+import { pressable } from "../ui/motion";
 import { useTheme } from "../theme";
 import {
   applyMapTheme,
@@ -21,11 +23,13 @@ import {
   toLngLat,
   type MapLibreLibrary,
 } from "../map/maplibre";
-import { RoomCard, roomGrid } from "./room-card";
+import { RoomCard, roomGrid, StatusTag } from "./room-card";
 
 // The campus in 3D (MapLibre over OpenFreeMap), shown in place of the results list. Each
 // building gets a marker with its number of free rooms for the current search;
 // picking one lists those rooms in a panel next to (or, on phones, under) the map.
+// Secondary buildings (nothing to book: offices, residences, aule magne…) are
+// small dots, there to find your way around; their panel says so.
 
 const CAMPUS_ZOOM = 16.5;
 
@@ -33,11 +37,24 @@ const BUILDING_ZOOM = 18;
 
 const PITCH = 55;
 
+// Below this zoom the map stays flat: tilted, the far side of a campus framed
+// from that high sinks into the horizon.
+const FLAT_BELOW_ZOOM = 15;
+
+/** Where a campus is framed: its own `zoom` when its buildings are too far apart for the default. */
+function campusZoom(campus: Campus) {
+  return campus.zoom ?? CAMPUS_ZOOM;
+}
+
+function pitchAt(zoom: number) {
+  return zoom < FLAT_BELOW_ZOOM ? 0 : PITCH;
+}
+
 function flyTo(map: MapLibreMap, target: { lat: number; long: number }, zoom: number) {
   map.flyTo({
     center: toLngLat(target),
     zoom,
-    pitch: PITCH,
+    pitch: pitchAt(zoom),
     bearing: 0,
     duration: reduceMotion.matches ? 0 : 1000,
     essential: true,
@@ -58,6 +75,7 @@ function BuildingPanel({
   const campusId = useStore((state) => state.campusId);
   const rooms = group?.rooms ?? [];
   const closed = !!date && closedBuildings(campusId, date, from, to).has(building.name);
+  const others = date ? unbookableRooms(campusId, building.name, date) : [];
 
   return (
     <aside
@@ -73,11 +91,13 @@ function BuildingPanel({
             {t("building.prefix")} {building.name}
           </h3>
           <p className="text-13 text-muted">
-            {closed
-              ? t("map.closed")
-              : tf(rooms.length === 1 ? "results.oneAvailable" : "results.available", {
-                  n: rooms.length,
-                })}
+            {building.secondary
+              ? t("map.noClassrooms")
+              : closed
+                ? t("map.closed")
+                : tf(rooms.length === 1 ? "results.oneAvailable" : "results.available", {
+                    n: rooms.length,
+                  })}
             {building.address ? ` · ${building.address}` : ""}
           </p>
         </div>
@@ -107,8 +127,38 @@ function BuildingPanel({
             />
           ))}
         </ul>
+      ) : building.secondary ? (
+        !others.length && <p className="text-14 text-muted">{t("map.secondaryNote")}</p>
       ) : (
         <p className="text-14 text-muted">{t(closed ? "map.closedNote" : "map.noRooms")}</p>
+      )}
+      {others.length > 0 && (
+        // Rooms never offered as free, each with the reason: usually closed, or no schedule.
+        <section className="flex flex-col gap-1.5" aria-labelledby="map-other-rooms">
+          <h4 className="mt-1 text-13 font-bold text-muted" id="map-other-rooms">
+            {t("map.otherRooms")}
+          </h4>
+          <ul className="flex flex-col gap-1.5">
+            {others.map(({ entry, status }) => (
+              <li key={entry.room.id}>
+                <button
+                  type="button"
+                  className={cn(
+                    "flex w-full items-center justify-between gap-2 rounded-md border border-border bg-surface px-3 py-2 text-left",
+                    "transition-[border-color,scale] hover:border-accent-soft-border",
+                    pressable,
+                  )}
+                  onClick={() =>
+                    openClassroom(entry, date ? { date, from, to, highlight: false } : null)
+                  }
+                >
+                  <span className="truncate font-bold">{entry.room.name}</span>
+                  <StatusTag status={status} slots={[]} compact />
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
     </aside>
   );
@@ -143,7 +193,7 @@ export default function CampusMap({ results }: { results: BuildingAvailability[]
         const map = new maplibregl.Map({
           container: host.current,
           center: [start.long, start.lat],
-          zoom: campus ? CAMPUS_ZOOM : 11.3,
+          zoom: campus ? campusZoom(campus) : 11.3,
           minZoom: 8.5,
           // Whole number on purpose: MapLibre caps vector tiles at
           // maxZoom − zoomLevelsToOverscale (4), and a fractional cap (18.5 →
@@ -151,7 +201,7 @@ export default function CampusMap({ results }: { results: BuildingAvailability[]
           // overscaling, dropping every layer with minzoom ≥ 16 (toilets,
           // most POIs).
           maxZoom: 19,
-          pitch: campus ? PITCH : 0,
+          pitch: campus ? pitchAt(campusZoom(campus)) : 0,
           maxPitch: 70,
           pitchWithRotate: true,
           touchPitch: true,
@@ -213,7 +263,7 @@ export default function CampusMap({ results }: { results: BuildingAvailability[]
 
     if (selectedBuilding && hasCoordinates(selectedBuilding))
       flyTo(map, selectedBuilding, BUILDING_ZOOM);
-    else if (campus && hasCoordinates(campus)) flyTo(map, campus, CAMPUS_ZOOM);
+    else if (campus && hasCoordinates(campus)) flyTo(map, campus, campusZoom(campus));
   }, [library, campus, selectedBuilding]);
 
   // Building markers labelled with their free-room count for the current search.
@@ -229,6 +279,31 @@ export default function CampusMap({ results }: { results: BuildingAvailability[]
 
     for (const building of campus.buildings) {
       if (!hasCoordinates(building)) continue;
+
+      const toggle = () => setMapBuilding(building.name === selected ? null : building.name);
+
+      if (building.secondary) {
+        // Nothing to book: a small dot with no count, named on hover and in its panel.
+        const dot = document.createElement("button");
+
+        dot.type = "button";
+        dot.className = cn(
+          "size-3 rounded-full border-2 border-surface bg-neutral shadow-sm hover:bg-accent",
+          building.name === selected && "size-3.5 bg-accent",
+        );
+        dot.title = building.altName ? `${building.name} · ${building.altName}` : building.name;
+        dot.setAttribute(
+          "aria-label",
+          `${t("building.prefix")} ${building.name}: ${t("map.noClassrooms")}`,
+        );
+        dot.addEventListener("click", toggle);
+        markers.current.push(
+          new library.Marker({ element: dot, anchor: "center" })
+            .setLngLat([building.long, building.lat])
+            .addTo(map),
+        );
+        continue;
+      }
 
       const free =
         results.find((group) => group.building.name === building.name)?.rooms.length ?? 0;
@@ -261,9 +336,7 @@ export default function CampusMap({ results }: { results: BuildingAvailability[]
       );
       count.textContent = String(free);
       element.append(label, count);
-      element.addEventListener("click", () =>
-        setMapBuilding(building.name === selected ? null : building.name),
-      );
+      element.addEventListener("click", toggle);
       markers.current.push(
         new library.Marker({ element, anchor: "bottom" })
           .setLngLat([building.long, building.lat])

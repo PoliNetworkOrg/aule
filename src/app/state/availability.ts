@@ -381,6 +381,40 @@ export function findAvailability(
   return results;
 }
 
+export interface UnbookableRoom {
+  entry: ClassroomEntry;
+  status: "eventsOnly" | "unknown";
+}
+
+/**
+ * The rooms of a building that are never offered as free on `isoDate`, and why:
+ * usually closed, or no schedule that day. The map's building panel lists them
+ * under the free ones, so a room missing from the results is never a mystery.
+ */
+export function unbookableRooms(campusId: string, buildingName: string, isoDate: string) {
+  buildIndexes();
+
+  const building = directory
+    ?.find((campus) => campus.id === campusId)
+    ?.buildings.find((candidate) => candidate.name === buildingName);
+
+  const rooms: UnbookableRoom[] = [];
+
+  for (const room of building?.classrooms ?? []) {
+    const entry = entryIndex?.get(room.id);
+
+    if (!entry) continue;
+
+    if (isUsuallyClosed(entry)) rooms.push({ entry, status: "eventsOnly" });
+    else if (roomDay(room.id, isoDate)?.occupancy === null)
+      rooms.push({ entry, status: "unknown" });
+  }
+
+  return rooms.sort((a, b) =>
+    a.entry.room.name.localeCompare(b.entry.room.name, undefined, { numeric: true }),
+  );
+}
+
 /** A room's availability for the given window, for favourites and single-room views. */
 export function roomWindowStatus(
   roomId: number,
