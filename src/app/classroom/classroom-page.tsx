@@ -5,6 +5,7 @@ import { t, tf, useLocale } from "../i18n";
 import {
   findClassroom,
   findClassroomBySlug,
+  isUsuallyClosed,
   roomNowStatus,
   type ClassroomEntry,
 } from "../state/availability";
@@ -92,6 +93,24 @@ function NowStatus({ entry }: { entry: ClassroomEntry }) {
           {tf(`now.${status.detail}`, { time: status.time ? formatTime(status.time) : "" })}
         </span>
       )}
+    </p>
+  );
+}
+
+/** Events-only rooms: why the room never shows up among the free ones. */
+function UsuallyClosedNote() {
+  useLocale();
+
+  return (
+    <p
+      className="flex items-start gap-2 rounded-md bg-surface-muted px-3 py-2.5 text-14 text-muted icon:mt-0.5"
+      role="note"
+    >
+      <Icon name="information-circle" />
+      <span>
+        <strong className="text-foreground">{t("classroom.eventsOnlyTitle")}</strong>{" "}
+        {t("classroom.eventsOnlyText")}
+      </span>
     </p>
   );
 }
@@ -344,6 +363,7 @@ export function ClassroomPage({
             </div>
 
             <NowStatus entry={entry} />
+            {isUsuallyClosed(entry) && <UsuallyClosedNote />}
 
             {/* Icons label the values; the text stays for screen readers and as a tooltip.
                 Full width, one equal column per stat (two when the floor is unknown); a

@@ -180,8 +180,11 @@ export default function LocationMap({
   const near = useNearViewport(host);
   const label = buildingLabel(building);
 
+  // Secondary buildings (offices, residences…) are left out: on the bigger
+  // campuses they would outnumber the teaching ones and zoom the 2D view out.
   const siblings = campusBuildings.filter(
-    (other): other is Building & Point => other.name !== building.name && hasCoordinates(other),
+    (other): other is Building & Point =>
+      other.name !== building.name && !other.secondary && hasCoordinates(other),
   );
 
   // Boot once in range. MapLibre's own strings (control tooltips, the gesture

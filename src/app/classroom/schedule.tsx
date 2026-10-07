@@ -258,7 +258,10 @@ export function Schedule({
     );
 
   const { occupancy, opening } = roomDay(roomId, day) ?? { occupancy: [], opening: null };
-  const items = buildAgenda(occupancy, opening);
+  // Null occupancy: no source had this room's schedule that day. Say so rather
+  // than draw an empty, free-looking day, unless the building is shut anyway.
+  const unknown = !occupancy && !opening?.closed;
+  const items = unknown ? [] : buildAgenda(occupancy ?? [], opening);
   const isToday = day === today;
   const nowInDay = isToday && nowMinutes >= DAY_START && nowMinutes <= DAY_END ? nowMinutes : null;
 
@@ -315,19 +318,28 @@ export function Schedule({
             {capitalise(longDay.format(parseIsoDate(day)), locale)}
           </h3>
           <span className="text-13 text-muted">
-            {lessons
-              ? tf(lessons === 1 ? "schedule.oneEvent" : "schedule.events", { n: lessons })
-              : t(noLessonsKey)}
+            {unknown
+              ? t("schedule.unknown")
+              : lessons
+                ? tf(lessons === 1 ? "schedule.oneEvent" : "schedule.events", { n: lessons })
+                : t(noLessonsKey)}
           </span>
         </div>
-        {!hasOpeningHours() && (
+        {!unknown && !hasOpeningHours() && (
           <p className="mt-2 flex items-start gap-1.5 text-13 text-partial">
             <Icon name="alert-02" />
             {t("schedule.hoursUnavailable")}
           </p>
         )}
-        <DayTimeline items={items} searchWindow={searchWindow} nowMinutes={nowInDay} />
-        {searchWindow && (
+        {unknown ? (
+          <p className="flex items-start gap-2 rounded-md bg-surface-muted px-3 py-2.5 text-14 text-muted">
+            <Icon name="calendar-remove-01" />
+            {t("schedule.unknownNote")}
+          </p>
+        ) : (
+          <DayTimeline items={items} searchWindow={searchWindow} nowMinutes={nowInDay} />
+        )}
+        {!unknown && searchWindow && (
           <p className="flex items-center gap-1.5 text-13 text-muted">
             <span
               className="h-2.5 w-3.5 rounded-[calc(var(--radius-sm)/2)] border-[1.5px] border-accent bg-accent-soft"

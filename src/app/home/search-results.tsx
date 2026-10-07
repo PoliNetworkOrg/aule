@@ -85,10 +85,10 @@ function RoomResults({ query }: { query: string }) {
               <button
                 type="button"
                 className={cn(
-                  "group/room grid w-full grid-cols-[1fr_auto] items-center gap-x-2 rounded-md border border-border bg-surface px-3.5 py-3 text-left",
+                  "group/room grid w-full grid-cols-[minmax(0,1fr)] items-center gap-x-2 rounded-md border border-border bg-surface px-3.5 py-3 text-left",
                   "transition-[border-color,scale] hover:border-accent-soft-border",
                   pressable,
-                  "has-data-[slot=thumbnail]:grid-cols-[56px_minmax(0,1fr)_auto]",
+                  "has-data-[slot=thumbnail]:grid-cols-[56px_minmax(0,1fr)]",
                 )}
                 onClick={() =>
                   openClassroom(entry, date ? { date, from, to, highlight: false } : null)
@@ -97,9 +97,9 @@ function RoomResults({ query }: { query: string }) {
                 <RoomThumbnail
                   id={room.id}
                   idfoto={room.idfoto}
-                  className="col-start-1 row-[1/3] size-14 rounded-sm"
+                  className="col-start-1 row-[1/4] size-14 rounded-sm"
                 />
-                <span className="text-16 font-bold group-has-data-[slot=thumbnail]/room:col-start-2">
+                <span className="min-w-0 text-16 font-bold wrap-break-word group-has-data-[slot=thumbnail]/room:col-start-2">
                   <Highlight text={room.name} query={query} />
                 </span>
                 <span className="col-start-1 text-13 text-muted group-has-data-[slot=thumbnail]/room:col-start-2">
@@ -112,7 +112,7 @@ function RoomResults({ query }: { query: string }) {
                     status={availability.status}
                     slots={availability.slots}
                     compact
-                    className="col-start-2 row-[1/3] group-has-data-[slot=thumbnail]/room:col-start-3"
+                    className="col-start-1 mt-1.5 justify-self-start group-has-data-[slot=thumbnail]/room:col-start-2"
                   />
                 )}
               </button>

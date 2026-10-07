@@ -59,7 +59,11 @@ function ToggleChip({
 function MoreFilters({ filters }: { filters: FilterState }) {
   useLocale();
   const campusId = useStore((state) => state.campusId);
-  const buildings = findCampus(campusId)?.buildings ?? [];
+
+  // Only buildings with something to book: filtering on any other can only empty the results.
+  const buildings = (findCampus(campusId)?.buildings ?? []).filter(
+    (building) => !building.secondary,
+  );
 
   return (
     <div
