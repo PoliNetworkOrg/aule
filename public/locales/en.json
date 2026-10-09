@@ -69,6 +69,7 @@
   "status.occupied": "Occupied",
   "status.closed": "Closed",
   "building.prefix": "Building",
+  "map.viewCampus": "View {campus}",
   "map.hint": "Tap a building to see its free rooms",
   "map.noRooms": "No free rooms in this building at the chosen time.",
   "map.closed": "Closed",

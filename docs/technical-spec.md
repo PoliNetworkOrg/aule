@@ -72,8 +72,11 @@ changes: every day's occupancy file already contains all campuses.
   active-filter chip text (`results.tsx` hint chips too).
 - `campus-map.tsx`: markers over all selected campuses' buildings, matched to results by
   key. Camera effect: selected building → `flyTo` (unchanged); one campus → `flyTo` campus
-  (unchanged); several → `map.fitBounds(bounds of all building coordinates, { padding,
-maxZoom: CAMPUS_ZOOM, pitch: PITCH, duration })`, honouring `reduceMotion` like `flyTo`.
+  (unchanged); several → focus one campus at `CAMPUS_ZOOM`, honouring `reduceMotion`.
+  A top notice names the focused campus and offers a button for each other selected campus.
+  Local map state keeps the focused campus while selected; removing it falls back to the
+  first remaining campus. Switching campus clears `mapBuilding`; closing a building panel
+  keeps its campus in focus. Campuses without centre coordinates use a building coordinate.
   Initial centre: the first campus with coordinates. Building panel title follows R4.
 - Locales (`public/locales/it.json`, `en.json`): `campus.choose` becomes "Scegli i campus" /
   "Choose campuses"; add `campus.selectAll` ("Tutti" / "All") and `campus.count`
@@ -90,8 +93,8 @@ maxZoom: CAMPUS_ZOOM, pitch: PITCH, duration })`, honouring `reduceMotion` like 
 - Opening hours are resolved by building number alone (`buildingHoursKey`), so Lecco "8"
   and Leonardo "8" share an explicit entry if one exists. Pre-existing, unchanged here;
   noted for a follow-up.
-- `fitBounds` with far campuses (Milano + Mantova) zooms far out with pitch: acceptable per
-  R7; verify markers stay readable.
+- With many selected campuses, verify the top map notice scrolls horizontally on phones without covering
+  the map controls.
 - Every reader of `campusId` must move; TypeScript will flag them once the field is renamed.
 
 ## Verification

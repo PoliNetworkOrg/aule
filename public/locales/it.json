@@ -69,6 +69,7 @@
   "status.occupied": "Occupata",
   "status.closed": "Chiuso",
   "building.prefix": "Edificio",
+  "map.viewCampus": "Vedi {campus}",
   "map.hint": "Tocca un edificio per vedere le aule libere",
   "map.noRooms": "Nessuna aula libera in questo edificio per l'orario scelto.",
   "map.closed": "Chiuso",

@@ -46,8 +46,11 @@ Anyone looking for a free room on the home screen.
   (campus name as a small label) when two or more are selected. Removing a campus clears the
   building filter only if the chosen building belongs to it.
 - **R7 Map.** Markers for every building of every selected campus. With one campus the
-  camera behaves as today. With several, it fits all their buildings (capped at today's
-  campus zoom). A selected building still flies to that building; its panel title follows R4.
+  camera behaves as today. With several, it focuses the first selected campus at the usual
+  campus zoom. A notice at the top names the focused campus and offers "View {campus}"
+  for each other selected campus; switching closes the building panel. The focused campus
+  is kept while selected, falling back to the first remaining campus when removed.
+  A selected building still flies to that building; its panel title follows R4.
   Removing the campus of the selected building closes the panel.
 - **R8 Closed state.** "Tutto chiuso" only when every building of every selected campus is
   shut for the window.
@@ -67,7 +70,6 @@ Anyone looking for a free room on the home screen.
 - Campus in the URL / shareable selections (the campus isn't in the URL today).
 - Fixing opening-hours resolution for same-named buildings in different campuses (see the
   technical spec, risks).
-- A per-campus switcher on the map.
 
 ## Acceptance criteria
 
@@ -79,6 +81,6 @@ Anyone looking for a free room on the home screen.
 | R4  | Leonardo + Lecco: one list, Leonardo first, headers carry the campus name                                  | Unit test (ordering), browser   |
 | R5  | Leonardo + Lecco show two "Edificio 8" groups with their own rooms and markers                             | Unit test, browser (list + map) |
 | R6  | Building filter on Lecco's "8" shows only Lecco rooms; removing Lecco clears it, removing Leonardo doesn't | Unit test, browser              |
-| R7  | Leonardo + Colombo: map fits both, markers for both                                                        | Browser (map)                   |
+| R7  | Leonardo + Mantova: focus one campus, switch from the top notice, markers for both                         | Browser (map)                   |
 | R8  | Closed only when all selected campuses are closed                                                          | Unit test                       |
 | R9  | Reload keeps the selection; a user with only `poliAule_lastCampusId` starts with that campus               | Unit test, browser              |

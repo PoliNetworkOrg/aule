@@ -20,9 +20,10 @@ app building and working with a single campus.
    filter grouped by campus. Verify: R4–R6, R8 with Leonardo + Lecco and Leonardo +
    Colombo.
 4. **Map.**
-   Markers across campuses, `fitBounds` for several, panel title. Verify: R7 with
-   Leonardo + Colombo and Leonardo + Lecco, selected-building fly-to, campus removal
-   closing the panel, light/dark.
+   Markers across campuses, focus one campus with a top notice to switch to the others,
+   panel title. Verify: R7 with Leonardo + Colombo and Leonardo + Mantova, switching
+   campus closes the panel, selected-building fly-to, campus removal closing the panel
+   and falling back to a remaining campus, light/dark.
 5. **Final gate.** `pnpm build`, full lint and tests, single-campus regression pass,
    update these docs with what was verified.
 

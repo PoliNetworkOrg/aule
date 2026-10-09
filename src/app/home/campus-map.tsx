@@ -6,7 +6,7 @@ import { buildingKey, setMapBuilding, useStore } from "../state/store";
 import type { Building, Campus } from "../types";
 import type { Map as MapLibreMap, Marker as MapLibreMarker } from "maplibre-gl";
 import { cn } from "../../lib/cn";
-import { IconButton } from "../ui/button";
+import { Button, IconButton } from "../ui/button";
 import { Icon } from "../ui/icon";
 import { useTheme } from "../theme";
 import {
@@ -22,6 +22,7 @@ import {
   type MapLibreLibrary,
 } from "../map/maplibre";
 import { buildingLabel } from "./campus-label";
+import { focusedMapCampus } from "./campus-map-focus";
 import { RoomCard, roomGrid } from "./room-card";
 
 // The campuses in 3D (MapLibre over OpenFreeMap), shown in place of the results list. Each
@@ -45,34 +46,6 @@ function flyTo(map: MapLibreMap, target: { lat: number; long: number }, zoom: nu
   });
 }
 
-/** Several campuses: frame all their buildings, never closer than one campus is shown. */
-function fitCampuses(map: MapLibreMap, library: MapLibreLibrary, campuses: Campus[]) {
-  const bounds = new library.LngLatBounds();
-
-  for (const campus of campuses) {
-    let placed = false;
-
-    for (const building of campus.buildings)
-      if (hasCoordinates(building)) {
-        bounds.extend(toLngLat(building));
-        placed = true;
-      }
-
-    if (!placed && hasCoordinates(campus)) bounds.extend(toLngLat(campus));
-  }
-
-  if (bounds.isEmpty()) return;
-
-  map.fitBounds(bounds, {
-    padding: 60,
-    maxZoom: CAMPUS_ZOOM,
-    pitch: PITCH,
-    bearing: 0,
-    duration: reduceMotion.matches ? 0 : 1000,
-    essential: true,
-  });
-}
-
 interface MapBuilding {
   key: string;
   campus: Campus;
@@ -82,9 +55,11 @@ interface MapBuilding {
 function BuildingPanel({
   group,
   entry: { key, building },
+  onClose,
 }: {
   group: BuildingAvailability | undefined;
   entry: MapBuilding;
+  onClose: () => void;
 }) {
   useLocale();
   const date = useStore((state) => state.date);
@@ -115,11 +90,7 @@ function BuildingPanel({
             {building.address ? ` · ${building.address}` : ""}
           </p>
         </div>
-        <IconButton
-          size="small"
-          aria-label={t("common.close")}
-          onClick={() => setMapBuilding(null)}
-        >
+        <IconButton size="small" aria-label={t("common.close")} onClick={onClose}>
           <Icon name="cancel-01" />
         </IconButton>
       </header>
@@ -156,12 +127,14 @@ export default function CampusMap({ results }: { results: BuildingAvailability[]
   const markers = useRef<MapLibreMarker[]>([]);
   const [library, setLibrary] = useState<MapLibreLibrary | null>(null);
   const [error, setError] = useState(false);
+  const [focusedCampusId, setFocusedCampusId] = useState<string | null>(null);
   const campusIds = useStore((state) => state.campusIds);
   const selected = useStore((state) => state.mapBuilding);
   const date = useStore((state) => state.date);
   const from = useStore((state) => state.from);
   const to = useStore((state) => state.to);
   const severalCampuses = campusIds.length > 1;
+  const selection = useMemo(() => campusIds.flatMap((id) => findCampus(id) ?? []), [campusIds]);
 
   const entries = useMemo(
     () =>
@@ -182,6 +155,7 @@ export default function CampusMap({ results }: { results: BuildingAvailability[]
   const selectedEntry = entries.find((entry) => entry.key === selected) ?? null;
   // The directory's own object, stable across renders, for the camera effect.
   const selectedBuilding = selectedEntry?.building ?? null;
+  const focusedCampus = focusedMapCampus(selection, focusedCampusId, selectedEntry?.campus.id);
 
   // Boot the map once.
   useEffect(() => {
@@ -265,14 +239,16 @@ export default function CampusMap({ results }: { results: BuildingAvailability[]
 
     map.resize();
 
-    const selection = campusIds.flatMap((id) => findCampus(id) ?? []);
-    const campus = selection[0];
-
     if (selectedBuilding && hasCoordinates(selectedBuilding))
       flyTo(map, selectedBuilding, BUILDING_ZOOM);
-    else if (selection.length > 1) fitCampuses(map, library, selection);
-    else if (campus && hasCoordinates(campus)) flyTo(map, campus, CAMPUS_ZOOM);
-  }, [library, campusIds, selectedBuilding]);
+    else if (focusedCampus) {
+      const target = hasCoordinates(focusedCampus)
+        ? focusedCampus
+        : focusedCampus.buildings.find(hasCoordinates);
+
+      if (target && hasCoordinates(target)) flyTo(map, target, CAMPUS_ZOOM);
+    }
+  }, [library, focusedCampus, selectedBuilding]);
 
   // Building markers labelled with their free-room count for the current search.
   useEffect(() => {
@@ -285,7 +261,7 @@ export default function CampusMap({ results }: { results: BuildingAvailability[]
 
     const closed = date ? closedBuildings(campusIds, date, from, to) : new Set<string>();
 
-    for (const { key, building } of entries) {
+    for (const { key, campus, building } of entries) {
       if (!hasCoordinates(building)) continue;
 
       const free = results.find((group) => group.key === key)?.rooms.length ?? 0;
@@ -318,7 +294,10 @@ export default function CampusMap({ results }: { results: BuildingAvailability[]
       );
       count.textContent = String(free);
       element.append(label, count);
-      element.addEventListener("click", () => setMapBuilding(key === selected ? null : key));
+      element.addEventListener("click", () => {
+        setFocusedCampusId(campus.id);
+        setMapBuilding(key === selected ? null : key);
+      });
       markers.current.push(
         new library.Marker({ element, anchor: "bottom" })
           .setLngLat([building.long, building.lat])
@@ -329,12 +308,39 @@ export default function CampusMap({ results }: { results: BuildingAvailability[]
 
   return (
     <div className={cn("relative flex min-h-0 flex-1 max-md:flex-col", MAP_CONTROLS)}>
-      <div
-        className="min-w-0 flex-1 bg-surface-muted"
-        ref={host}
-        role="application"
-        aria-label={t("results.map")}
-      />
+      <div className="relative min-h-0 min-w-0 flex-1 bg-surface-muted">
+        {/* MapLibre's unlayered stylesheet sets position: relative; keep the canvas filling this wrapper. */}
+        <div
+          className="absolute! inset-0"
+          ref={host}
+          role="application"
+          aria-label={t("results.map")}
+        />
+        {severalCampuses && !error && (
+          <div className="absolute top-3 right-14 left-3 flex flex-col gap-2 rounded-lg border border-border bg-surface p-2.5 shadow-md sm:flex-row sm:items-center">
+            <span className="shrink-0 text-13 font-semibold" aria-live="polite">
+              {focusedCampus?.name}
+            </span>
+            <div className="flex min-w-0 gap-2 overflow-x-auto">
+              {selection.map((campus) =>
+                campus.id === focusedCampus?.id ? null : (
+                  <Button
+                    key={campus.id}
+                    variant="ghost"
+                    className="shrink-0"
+                    onClick={() => {
+                      setFocusedCampusId(campus.id);
+                      setMapBuilding(null);
+                    }}
+                  >
+                    {tf("map.viewCampus", { campus: campus.name })}
+                  </Button>
+                ),
+              )}
+            </div>
+          </div>
+        )}
+      </div>
       {error && (
         <div className="absolute inset-0 flex items-center justify-center gap-2 text-muted">
           <Icon name="alert-02" />
@@ -350,6 +356,10 @@ export default function CampusMap({ results }: { results: BuildingAvailability[]
         <BuildingPanel
           entry={selectedEntry}
           group={results.find((group) => group.key === selectedEntry.key)}
+          onClose={() => {
+            setFocusedCampusId(selectedEntry.campus.id);
+            setMapBuilding(null);
+          }}
         />
       )}
     </div>
