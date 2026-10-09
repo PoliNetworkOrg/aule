@@ -12,7 +12,8 @@ import { SearchResults } from "./search-results";
 import { WhenPanel } from "./when-controls";
 import { WherePanel } from "./where-panel";
 import { useVisibleResults } from "./results";
-import { countRooms, findCampus } from "../state/availability";
+import { countRooms } from "../state/availability";
+import { campusSelectionLabel } from "./campus-label";
 
 /** Phones/tablets: the folded controls, as "Today · 12:00–14:00 · 2 filters". */
 function ControlsSummary() {
@@ -23,7 +24,7 @@ function ControlsSummary() {
   const to = useStore((state) => state.to);
   const filters = useStore((state) => state.filters);
   const active = countActiveFilters(filters);
-  const campus = findCampus(useStore((state) => state.campusId));
+  const campusIds = useStore((state) => state.campusIds);
 
   // Weekday and day formatted apart: en-US would otherwise order them "30 Wed".
   const day =
@@ -52,7 +53,7 @@ function ControlsSummary() {
     >
       <Icon name="filter-horizontal" />
       <span className="min-w-0 flex-1 truncate tabular-nums">
-        <strong>{campus?.name}</strong> · {day} · {formatRange(from, to)}
+        <strong>{campusSelectionLabel(campusIds).title}</strong> · {day} · {formatRange(from, to)}
         {active > 0 && (
           <> · {tf(active === 1 ? "filters.oneActive" : "filters.active", { n: active })}</>
         )}
