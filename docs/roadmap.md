@@ -28,3 +28,15 @@ app building and working with a single campus.
    update these docs with what was verified.
 
 Dependencies: 2–4 need 1; 3 and 4 are independent of each other; 5 needs all.
+
+## Map focus regression check (2026-10-11)
+
+Verified in the browser at 1280 × 800:
+
+1. Select Leonardo, Lecco and Mantova; open the 3D map and focus Mantova.
+2. Remove Mantova: Leonardo becomes the focused campus.
+3. Add Mantova again: Leonardo stays focused, without a camera jump to Mantova.
+4. Switch explicitly to Lecco: Lecco becomes the focused campus.
+
+`pnpm test` (49 tests), `pnpm build` (including typecheck) and `pnpm lint` passed.
+This records the focus regression only; the full acceptance pass above is still pending.

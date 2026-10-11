@@ -159,6 +159,11 @@ export default function CampusMap({ results }: { results: BuildingAvailability[]
   const selectedBuilding = selectedEntry?.building ?? null;
   const focusedCampus = focusedMapCampus(selection, focusedCampusId, selectedEntry?.campus.id);
 
+  // Remember the fallback too: re-adding a removed campus must not revive its old focus.
+  const activeCampusId = focusedCampus?.id ?? null;
+
+  if (focusedCampusId !== activeCampusId) setFocusedCampusId(activeCampusId);
+
   // A marker can switch campuses too: keep its active segment in view on narrow screens.
   useEffect(() => {
     const active = campusSwitch.current?.querySelector<HTMLElement>("[aria-pressed='true']");
