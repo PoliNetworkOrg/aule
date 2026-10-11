@@ -7,7 +7,6 @@ import {
   countRooms,
   filterImpact,
   findAvailability,
-  findCampus,
   visibleResults,
   type BuildingAvailability,
 } from "../state/availability";
@@ -31,13 +30,14 @@ import { Icon } from "../ui/icon";
 import { Notice, noticeAction } from "../ui/notice";
 import { Segmented, SegmentedOption } from "../ui/segmented";
 import { Skeleton } from "../ui/skeleton";
+import { buildingDomId, buildingLabel, campusSelectionLabel } from "./campus-label";
 import { RoomCard, roomGrid } from "./room-card";
 import { StableText } from "../ui/stable";
 
 const CampusMap = lazy(() => import("./campus-map"));
 
 export function useAvailability() {
-  const campusId = useStore((state) => state.campusId);
+  const campusIds = useStore((state) => state.campusIds);
   const date = useStore((state) => state.date);
   const from = useStore((state) => state.from);
   const to = useStore((state) => state.to);
@@ -45,8 +45,8 @@ export function useAvailability() {
   const revision = useStore((state) => state.dataRevision);
 
   return useMemo(
-    () => (date && revision ? findAvailability(campusId, date, from, to, filters) : []),
-    [campusId, date, from, to, filters, revision],
+    () => (date && revision ? findAvailability(campusIds, date, from, to, filters) : []),
+    [campusIds, date, from, to, filters, revision],
   );
 }
 
@@ -91,7 +91,7 @@ function Summary({ results }: { results: BuildingAvailability[] }) {
   const date = useStore((state) => state.date);
   const from = useStore((state) => state.from);
   const to = useStore((state) => state.to);
-  const campus = findCampus(useStore((state) => state.campusId));
+  const campusIds = useStore((state) => state.campusIds);
   const occupancy = useStore((state) => state.occupancy);
   const filters = useStore((state) => state.filters);
   const rooms = results.flatMap((building) => building.rooms);
@@ -145,7 +145,7 @@ function Summary({ results }: { results: BuildingAvailability[] }) {
       </p>
       {/* Phones: campus, day and time are right above in the controls summary. */}
       <p className="truncate text-13 text-muted tabular-nums max-sm:hidden">
-        {campus?.name} · {day} · {formatRange(from, to)}
+        {campusSelectionLabel(campusIds).title} · {day} · {formatRange(from, to)}
       </p>
     </div>
   );
@@ -197,21 +197,25 @@ function BuildingGroup({ group }: { group: BuildingAvailability }) {
   const date = useStore((state) => state.date);
   const from = useStore((state) => state.from);
   const to = useStore((state) => state.to);
+  const severalCampuses = useStore((state) => state.campusIds.length > 1);
   const { building, rooms } = group;
+  const id = buildingDomId(group.key);
+  const mapName = severalCampuses ? `${building.name} · ${group.campus.name}` : building.name;
 
   return (
-    <section className="flex flex-col" aria-labelledby={`building-${building.name}`}>
+    <section className="flex flex-col" aria-labelledby={id}>
       {/* Sticks 8px above the scrollport with 8px of extra top padding: the header's
           own background covers the edge, where the scrollport's fractional offset
           (and iOS momentum scrolling) would otherwise leave a sliver of rows. */}
       <header className="sticky -top-2 z-1 -mx-gutter -mt-2 flex items-center gap-2.5 bg-surface px-gutter pt-4 pb-2 lg:-mx-5 lg:px-5">
-        <h3
-          className="flex items-baseline gap-2 text-16 font-bold"
-          id={`building-${building.name}`}
-        >
+        <h3 className="flex items-baseline gap-2 text-16 font-bold" id={id}>
           {t("building.prefix")} {building.name}
           {building.altName && (
             <span className="text-14 font-medium text-muted">{building.altName}</span>
+          )}
+          {/* Several campuses: whose building this is ("8" is in Leonardo and Lecco). */}
+          {severalCampuses && (
+            <span className="text-14 font-medium text-muted">· {group.campus.name}</span>
           )}
         </h3>
         <span className="text-13 text-subtle">
@@ -223,11 +227,11 @@ function BuildingGroup({ group }: { group: BuildingAvailability }) {
         <IconButton
           size="small"
           className="-ml-1"
-          aria-label={tf("results.showOnMap", { name: building.name })}
-          title={tf("results.showOnMap", { name: building.name })}
+          aria-label={tf("results.showOnMap", { name: mapName })}
+          title={tf("results.showOnMap", { name: mapName })}
           onClick={() => {
             setView("map");
-            setMapBuilding(building.name);
+            setMapBuilding(group.key);
           }}
         >
           <Icon name="maps-location-01" />
@@ -264,7 +268,7 @@ const hintAction = "col-start-2 justify-self-start";
  */
 function ResultsHints({ all, shown }: { all: BuildingAvailability[]; shown: number }) {
   useLocale();
-  const campusId = useStore((state) => state.campusId);
+  const campusIds = useStore((state) => state.campusIds);
   const date = useStore((state) => state.date);
   const from = useStore((state) => state.from);
   const to = useStore((state) => state.to);
@@ -272,8 +276,8 @@ function ResultsHints({ all, shown }: { all: BuildingAvailability[]; shown: numb
   const partial = countRooms(all) - countRooms(visibleResults(all, { ...filters, partial: false }));
 
   const impact = useMemo(
-    () => (shown < 8 && date ? filterImpact(campusId, date, from, to, filters) : []),
-    [shown, campusId, date, from, to, filters],
+    () => (shown < 8 && date ? filterImpact(campusIds, date, from, to, filters) : []),
+    [shown, campusIds, date, from, to, filters],
   );
 
   const offerPartial = !filters.partial && shown === 0 && partial > 0;
@@ -308,7 +312,7 @@ function ResultsHints({ all, shown }: { all: BuildingAvailability[]; shown: numb
                 {key === "minSeats"
                   ? tf("filters.seatsValue", { n: filters.minSeats })
                   : key === "building"
-                    ? `${t("building.prefix")} ${filters.building}`
+                    ? buildingLabel(filters.building, campusIds.length > 1)
                     : t(FILTER_LABELS[key])}
                 <span className="font-bold text-free">+{gain}</span>
               </Chip>
@@ -329,12 +333,12 @@ function ResultsList({
 }) {
   const occupancy = useStore((state) => state.occupancy);
   const filters = useStore((state) => state.filters);
-  const campusId = useStore((state) => state.campusId);
+  const campusIds = useStore((state) => state.campusIds);
   const date = useStore((state) => state.date);
   const from = useStore((state) => state.from);
   const to = useStore((state) => state.to);
   const shown = countRooms(results);
-  const allClosed = !!date && campusClosed(campusId, date, from, to);
+  const allClosed = !!date && campusClosed(campusIds, date, from, to);
 
   if (occupancy === "loading" && !all.length)
     return (
@@ -356,7 +360,7 @@ function ResultsList({
     <div className={resultsList}>
       <ResultsHints all={all} shown={shown} />
       {results.length ? (
-        results.map((group) => <BuildingGroup key={group.building.name} group={group} />)
+        results.map((group) => <BuildingGroup key={group.key} group={group} />)
       ) : (
         <EmptyState
           icon="door-01"

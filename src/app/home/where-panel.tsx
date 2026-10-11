@@ -1,32 +1,54 @@
 import { useCallback, useRef, useState } from "react";
 import { cn } from "../../lib/cn";
-import { t, useLocale } from "../i18n";
+import { t, tf, useLocale } from "../i18n";
 import { campuses } from "../state/availability";
-import { setCampus, useStore } from "../state/store";
+import { setCampuses, toggledCampuses, useStore } from "../state/store";
 import { Icon } from "../ui/icon";
 import { pressableLarge } from "../ui/motion";
 import { Panel, PanelHeader, PanelTitle } from "../ui/panel";
-import { OptionList, Popup, type MenuGroup } from "../ui/popup";
+import { CheckList, Popup, type CheckGroup } from "../ui/popup";
+import { campusSelectionLabel } from "./campus-label";
 import { hiddenByMoreFilters } from "./filters";
 
-/** "Where": the campus, first of the search parameters. */
+/** "Where": the campuses, first of the search parameters. */
 export function WherePanel() {
   useLocale();
-  const campusId = useStore((state) => state.campusId);
+  const campusIds = useStore((state) => state.campusIds);
   const ready = useStore((state) => state.directory === "ready");
   const trigger = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   const close = useCallback(() => setOpen(false), []);
   const list = ready ? campuses() : [];
-  const current = list.find((campus) => campus.id === campusId);
-  const groups = new Map<string, MenuGroup>();
+  const order = list.map((campus) => campus.id);
+  const label = ready ? campusSelectionLabel(campusIds) : null;
+  const groups = new Map<string, CheckGroup>();
 
+  const toggle = (ids: string[], selected: boolean) =>
+    setCampuses(toggledCampuses(campusIds, ids, selected, order));
+
+  // Grouped by area (Città Studi, Bovisa), the campuses of other cities together.
   for (const campus of list) {
-    const label = campus.group ? (campus.city ?? "") : t("campus.otherCities");
-    const group = groups.get(label) ?? { label, options: [] };
+    const area = campus.group ?? "";
+    const group = groups.get(area) ?? { label: area || t("campus.otherCities"), options: [] };
 
-    group.options.push({ value: campus.id, label: campus.name, description: campus.group });
-    groups.set(label, group);
+    group.options.push({ value: campus.id, label: campus.name });
+    groups.set(area, group);
+  }
+
+  // An area with several campuses can be picked whole.
+  for (const [area, group] of groups) {
+    const ids = group.options.map((option) => option.value);
+
+    if (!area || ids.length < 2) continue;
+
+    const pressed = ids.every((id) => campusIds.includes(id));
+
+    group.toggleAll = {
+      text: t("campus.selectAll"),
+      label: tf("campus.selectAllLabel", { group: area }),
+      pressed,
+      onToggle: () => toggle(ids, !pressed),
+    };
   }
 
   return (
@@ -47,15 +69,13 @@ export function WherePanel() {
         )}
         aria-haspopup="dialog"
         aria-expanded={open}
-        aria-label={`${t("campus.label")}: ${current?.name ?? ""}`}
+        aria-label={`${t("campus.label")}: ${label?.title ?? ""}`}
         disabled={!ready}
         onClick={() => setOpen(!open)}
       >
         <span className="flex min-w-0 flex-1 flex-col leading-tight">
-          <span className="text-17 font-bold">{current?.name ?? "…"}</span>
-          <span className="text-13 text-muted">
-            {current ? [current.group, current.city].filter(Boolean).join(" · ") : ""}
-          </span>
+          <span className="truncate text-17 font-bold">{label?.title || "…"}</span>
+          <span className="truncate text-13 text-muted">{label?.subtitle}</span>
         </span>
         <span className="inline-flex items-center gap-1 text-13 font-bold text-accent-strong">
           {t("where.change")}
@@ -63,13 +83,11 @@ export function WherePanel() {
         </span>
       </button>
       <Popup open={open} anchor={trigger} title={t("campus.choose")} onClose={close}>
-        <OptionList
+        <CheckList
           groups={[...groups.values()]}
-          value={campusId}
-          onSelect={(value) => {
-            setCampus(value);
-            close();
-          }}
+          values={campusIds}
+          locked={campusIds.length === 1 ? campusIds[0] : null}
+          onToggle={(id) => toggle([id], !campusIds.includes(id))}
         />
       </Popup>
     </Panel>

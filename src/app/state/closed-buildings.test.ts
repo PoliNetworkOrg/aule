@@ -65,7 +65,7 @@ function seed(hours: BuildingHours | undefined, dates: string[], occupancy: Occu
 }
 
 function search(date: string, from: string, to: string) {
-  return availability.findAvailability(CAMPUS, date, from, to, filters);
+  return availability.findAvailability([CAMPUS], date, from, to, filters);
 }
 
 beforeEach(() => script.classroomsData.splice(0));
