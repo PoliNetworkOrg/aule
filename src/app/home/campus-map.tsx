@@ -6,7 +6,8 @@ import { buildingKey, setMapBuilding, useStore } from "../state/store";
 import type { Building, Campus } from "../types";
 import type { Map as MapLibreMap, Marker as MapLibreMarker } from "maplibre-gl";
 import { cn } from "../../lib/cn";
-import { Button, IconButton } from "../ui/button";
+import { IconButton } from "../ui/button";
+import { Segmented, SegmentedOption } from "../ui/segmented";
 import { Icon } from "../ui/icon";
 import { useTheme } from "../theme";
 import {
@@ -123,6 +124,7 @@ export default function CampusMap({ results }: { results: BuildingAvailability[]
   useLocale();
   const theme = useTheme();
   const host = useRef<HTMLDivElement>(null);
+  const campusSwitch = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const markers = useRef<MapLibreMarker[]>([]);
   const [library, setLibrary] = useState<MapLibreLibrary | null>(null);
@@ -156,6 +158,14 @@ export default function CampusMap({ results }: { results: BuildingAvailability[]
   // The directory's own object, stable across renders, for the camera effect.
   const selectedBuilding = selectedEntry?.building ?? null;
   const focusedCampus = focusedMapCampus(selection, focusedCampusId, selectedEntry?.campus.id);
+
+  // A marker can switch campuses too: keep its active segment in view on narrow screens.
+  useEffect(() => {
+    const active = campusSwitch.current?.querySelector<HTMLElement>("[aria-pressed='true']");
+
+    if (active?.getClientRects().length)
+      active.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [focusedCampus]);
 
   // Boot the map once.
   useEffect(() => {
@@ -317,28 +327,27 @@ export default function CampusMap({ results }: { results: BuildingAvailability[]
           aria-label={t("results.map")}
         />
         {severalCampuses && !error && (
-          <div className="absolute top-3 right-14 left-3 flex flex-col gap-2 rounded-lg border border-border bg-surface p-2.5 shadow-md sm:flex-row sm:items-center">
-            <span className="shrink-0 text-13 font-semibold" aria-live="polite">
-              {focusedCampus?.name}
-            </span>
-            <div className="flex min-w-0 gap-2 overflow-x-auto">
-              {selection.map((campus) =>
-                campus.id === focusedCampus?.id ? null : (
-                  <Button
-                    key={campus.id}
-                    variant="ghost"
-                    className="shrink-0"
-                    onClick={() => {
-                      setFocusedCampusId(campus.id);
-                      setMapBuilding(null);
-                    }}
-                  >
-                    {tf("map.viewCampus", { campus: campus.name })}
-                  </Button>
-                ),
-              )}
-            </div>
-          </div>
+          <Segmented
+            ref={campusSwitch}
+            className="absolute top-3 right-14 left-3 overflow-x-auto overscroll-contain shadow-md"
+            role="group"
+            aria-label={t("campus.label")}
+          >
+            {selection.map((campus) => (
+              <SegmentedOption
+                key={campus.id}
+                className="min-h-11 shrink-0"
+                aria-pressed={campus.id === focusedCampus?.id}
+                aria-label={tf("map.viewCampus", { campus: campus.name })}
+                onClick={() => {
+                  setFocusedCampusId(campus.id);
+                  setMapBuilding(null);
+                }}
+              >
+                {campus.name}
+              </SegmentedOption>
+            ))}
+          </Segmented>
         )}
       </div>
       {error && (

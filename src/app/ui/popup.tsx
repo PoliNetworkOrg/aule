@@ -109,6 +109,16 @@ export function Popup({
     if (!open) return;
 
     const trigger = anchor.current;
+    const previousOverflow = document.documentElement.style.overflow;
+
+    document.documentElement.style.overflow = "hidden";
+
+    const focusable = () =>
+      Array.from(
+        panel.current?.querySelectorAll<HTMLElement>(
+          "button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex='0']",
+        ) ?? [],
+      ).filter((element) => element.getClientRects().length > 0);
 
     const selected = panel.current?.querySelector<HTMLElement>(
       "[aria-pressed='true'], [aria-selected='true']",
@@ -117,19 +127,46 @@ export function Popup({
     const first = panel.current?.querySelector<HTMLElement>("button:not(:disabled)");
 
     (selected ?? first)?.focus({ preventScroll: true });
-    selected?.scrollIntoView({ block: "center" });
+    selected?.scrollIntoView({ block: "nearest" });
 
     function onKey(event: KeyboardEvent) {
       if (event.key === "Escape") {
+        event.preventDefault();
         event.stopPropagation();
         onClose();
+      } else if (event.key === "Tab") {
+        const options = focusable();
+        const first = options[0];
+        const last = options.at(-1);
+
+        if (!first || !last) {
+          event.preventDefault();
+
+          return;
+        }
+
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
       }
     }
 
+    function onFocus(event: FocusEvent) {
+      if (event.target instanceof Node && !panel.current?.contains(event.target))
+        focusable()[0]?.focus({ preventScroll: true });
+    }
+
     document.addEventListener("keydown", onKey, true);
+    document.addEventListener("focusin", onFocus);
 
     return () => {
       document.removeEventListener("keydown", onKey, true);
+      document.removeEventListener("focusin", onFocus);
+      document.documentElement.style.overflow = previousOverflow;
       trigger?.focus({ preventScroll: true });
     };
   }, [open, anchor, onClose]);
@@ -175,14 +212,14 @@ export function Popup({
       >
         <div
           ref={header}
-          className="flex items-center justify-between gap-2 pt-2.5 pr-2.5 pb-1.5 pl-4"
+          className="flex shrink-0 items-center justify-between gap-2 pt-2.5 pr-2.5 pb-1.5 pl-4"
         >
           <span className="text-15 font-bold">{title}</span>
           <IconButton size="small" aria-label={t("common.close")} onClick={onClose}>
             <Icon name="cancel-01" />
           </IconButton>
         </div>
-        <div ref={body} className="overflow-y-auto overscroll-contain px-4 pt-1 pb-4">
+        <div ref={body} className="min-h-0 overflow-y-auto overscroll-contain px-4 pt-1 pb-4">
           {children}
         </div>
       </div>
