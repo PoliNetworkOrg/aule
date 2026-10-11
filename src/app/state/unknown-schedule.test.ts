@@ -62,13 +62,13 @@ beforeEach(() => seed([TUESDAY, SATURDAY]));
 
 describe("a room whose schedule is unknown", () => {
   it("is never listed as free", () => {
-    const [group] = availability.findAvailability(CAMPUS, TUESDAY, "09:00", "11:00", filters);
+    const [group] = availability.findAvailability([CAMPUS], TUESDAY, "09:00", "11:00", filters);
 
     expect(group.rooms.map((room) => room.room.name)).toEqual(["24.1"]);
   });
 
   it("is not counted among the building's bookable rooms", () => {
-    const [group] = availability.findAvailability(CAMPUS, TUESDAY, "09:00", "11:00", filters);
+    const [group] = availability.findAvailability([CAMPUS], TUESDAY, "09:00", "11:00", filters);
 
     expect(group.total).toBe(1);
   });

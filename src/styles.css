@@ -192,6 +192,36 @@
     box-sizing: border-box;
   }
 
+  /* Shared by the page, pickers, result panels and horizontal control strips. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-border-strong) var(--color-surface-muted);
+  }
+
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: var(--color-surface-muted);
+    border-radius: var(--radius-sm);
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background: var(--color-border-strong);
+    border: 2px solid var(--color-surface-muted);
+    border-radius: var(--radius-sm);
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background: var(--color-muted);
+  }
+
+  *::-webkit-scrollbar-button {
+    display: none;
+  }
+
   html {
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;

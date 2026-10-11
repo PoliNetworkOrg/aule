@@ -119,7 +119,7 @@ beforeEach(() => {
 
 describe("free-room search", () => {
   it("offers neither events-only rooms nor rooms in secondary buildings", () => {
-    const results = availability.findAvailability(CAMPUS, TUESDAY, "08:00", "09:00", filters);
+    const results = availability.findAvailability([CAMPUS], TUESDAY, "08:00", "09:00", filters);
 
     expect(results.map((group) => group.building.name)).toEqual(["24"]);
     expect(results[0].rooms.map((room) => room.room.name)).toEqual(["24.1"]);
@@ -134,8 +134,10 @@ describe("free-room search", () => {
 
 describe("closures", () => {
   it("ignore secondary buildings, whatever their hours", () => {
-    expect(availability.campusClosed(CAMPUS, SATURDAY, "09:00", "11:00")).toBe(true);
-    expect([...availability.closedBuildings(CAMPUS, SATURDAY, "09:00", "11:00")]).toEqual(["24"]);
+    expect(availability.campusClosed([CAMPUS], SATURDAY, "09:00", "11:00")).toBe(true);
+    expect([...availability.closedBuildings([CAMPUS], SATURDAY, "09:00", "11:00")]).toEqual([
+      "MIA01/24",
+    ]);
   });
 });
 

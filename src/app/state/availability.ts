@@ -6,6 +6,7 @@ import {
 import { classroomsData as directory } from "../classroom-search-data";
 import type { Building, Campus, Classroom, Occupation } from "../types";
 import {
+  buildingKey,
   DEFAULT_FILTERS,
   isFilterActive,
   RESTRICTIVE_FILTERS,
@@ -64,6 +65,9 @@ interface WindowAvailability {
 }
 
 export interface BuildingAvailability {
+  /** buildingKey: names repeat across campuses. */
+  key: string;
+  campus: Campus;
   building: Building;
   rooms: RoomAvailability[];
   /** Bookable rooms in the building before filters, for "n of m" counts. */
@@ -310,32 +314,51 @@ export function matchesFilters(room: Classroom, filters: Filters) {
   return true;
 }
 
+/** The day's data for each of `campusIds` that has some, in the given order. */
+function dayCampuses(campusIds: string[], isoDate: string) {
+  const day = occupancyDays.find((entry) => entry.date === isoToDateKey(isoDate));
+
+  return campusIds.flatMap((id) => day?.campuses.find((entry) => entry.id === id) ?? []);
+}
+
 /**
- * Rooms of a campus that are free for at least part of [from, to] on `isoDate`
+ * Rooms of the campuses that are free for at least part of [from, to] on `isoDate`
  * (partially free ones included regardless of the `partial` filter: see visibleResults),
- * grouped by building. Room metadata (seats, features) comes from the static
- * directory; occupancy from the day's data.
+ * grouped by building, campus by campus. Room metadata (seats, features) comes from
+ * the static directory; occupancy from the day's data.
  */
 export function findAvailability(
-  campusId: string,
+  campusIds: string[],
   isoDate: string,
   from: string,
   to: string,
   filters: Filters,
 ): BuildingAvailability[] {
-  const day = occupancyDays.find((entry) => entry.date === isoToDateKey(isoDate));
-  const campus = day?.campuses.find((entry) => entry.id === campusId);
-
-  if (!campus) return [];
-
   buildIndexes();
 
   const results: BuildingAvailability[] = [];
 
-  for (const building of campus.buildings) {
-    if (filters.building && building.name !== filters.building) continue;
+  for (const campus of dayCampuses(campusIds, isoDate))
+    results.push(...campusAvailability(campus, isoDate, from, to, filters));
 
-    if (isSecondaryBuilding(campusId, building.name)) continue;
+  return results;
+}
+
+function campusAvailability(
+  campus: Campus<Classroom & { occupancy: Occupation[] | null }>,
+  isoDate: string,
+  from: string,
+  to: string,
+  filters: Filters,
+) {
+  const results: BuildingAvailability[] = [];
+
+  for (const building of campus.buildings) {
+    const key = buildingKey(campus.id, building.name);
+
+    if (filters.building && key !== filters.building) continue;
+
+    if (isSecondaryBuilding(campus.id, building.name)) continue;
 
     const opening = buildingOpening(building, isoDate);
     const rooms: RoomAvailability[] = [];
@@ -375,7 +398,13 @@ export function findAvailability(
         b.freeMinutes - a.freeMinutes ||
         a.room.name.localeCompare(b.room.name, undefined, { numeric: true }),
     );
-    results.push({ building, rooms, total: bookable });
+    results.push({
+      key,
+      campus: findCampus(campus.id) ?? campus,
+      building,
+      rooms,
+      total: bookable,
+    });
   }
 
   return results;
@@ -436,35 +465,31 @@ export function roomWindowStatus(
   return result;
 }
 
-/**
- * Names of the campus buildings that are shut for the whole window, for map and
- * empty states. Secondary buildings are left out: there is nothing to book anyway.
- */
-export function closedBuildings(campusId: string, isoDate: string, from: string, to: string) {
-  const day = occupancyDays.find((entry) => entry.date === isoToDateKey(isoDate));
-  const campus = day?.campuses.find((entry) => entry.id === campusId);
+/** Keys (buildingKey) of bookable buildings shut for the whole window, for map and empty states. */
+export function closedBuildings(campusIds: string[], isoDate: string, from: string, to: string) {
   const closed = new Set<string>();
 
-  for (const building of campus?.buildings ?? [])
-    if (
-      !isSecondaryBuilding(campusId, building.name) &&
-      !clipToOpening(buildingOpening(building, isoDate), from, to)
-    )
-      closed.add(building.name);
+  for (const campus of dayCampuses(campusIds, isoDate))
+    for (const building of campus.buildings)
+      if (
+        !isSecondaryBuilding(campus.id, building.name) &&
+        !clipToOpening(buildingOpening(building, isoDate), from, to)
+      )
+        closed.add(buildingKey(campus.id, building.name));
 
   return closed;
 }
 
-/**
- * Whether every bookable building the day has data for on this campus is shut
- * for the whole window. Secondary buildings keep their own hours (offices,
- * residences) and must not keep a closed campus looking open, or vice versa.
- */
-export function campusClosed(campusId: string, isoDate: string, from: string, to: string) {
-  const day = occupancyDays.find((entry) => entry.date === isoToDateKey(isoDate));
+/** Whether every bookable building on the selected campuses is shut for the whole window. */
+export function campusClosed(campusIds: string[], isoDate: string, from: string, to: string) {
+  const campuses = dayCampuses(campusIds, isoDate);
 
-  const buildings = (day?.campuses.find((entry) => entry.id === campusId)?.buildings ?? []).filter(
-    (building) => !isSecondaryBuilding(campusId, building.name),
+  // A missing campus is unknown, not closed: otherwise an incomplete daily
+  // response could incorrectly replace the generic empty state with "all closed".
+  if (campusIds.some((id) => !campuses.some((campus) => campus.id === id))) return false;
+
+  const buildings = campuses.flatMap((campus) =>
+    campus.buildings.filter((building) => !isSecondaryBuilding(campus.id, building.name)),
   );
 
   return (
@@ -563,14 +588,14 @@ export interface FilterImpact {
 
 /** For each active filter, how many rooms it hides on its own: the biggest culprit first. */
 export function filterImpact(
-  campusId: string,
+  campusIds: string[],
   isoDate: string,
   from: string,
   to: string,
   filters: Filters,
 ): FilterImpact[] {
   const shown = countRooms(
-    visibleResults(findAvailability(campusId, isoDate, from, to, filters), filters),
+    visibleResults(findAvailability(campusIds, isoDate, from, to, filters), filters),
   );
 
   return RESTRICTIVE_FILTERS.filter((key) => isFilterActive(filters, key))
@@ -578,7 +603,7 @@ export function filterImpact(
       const relaxed = { ...filters, [key]: DEFAULT_FILTERS[key] };
 
       const total = countRooms(
-        visibleResults(findAvailability(campusId, isoDate, from, to, relaxed), relaxed),
+        visibleResults(findAvailability(campusIds, isoDate, from, to, relaxed), relaxed),
       );
 
       return { key, gain: total - shown };
