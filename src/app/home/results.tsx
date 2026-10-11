@@ -33,6 +33,7 @@ import { Skeleton } from "../ui/skeleton";
 import { buildingDomId, buildingLabel, campusSelectionLabel } from "./campus-label";
 import { RoomCard, roomGrid } from "./room-card";
 import { StableText } from "../ui/stable";
+import { StaleDataWarning } from "./stale-data-warning";
 
 const CampusMap = lazy(() => import("./campus-map"));
 
@@ -168,12 +169,7 @@ function DataNotice() {
     );
 
   if (generatedAt && formatRomeYYYYMMDD(generatedAt) !== formatRomeYYYYMMDD(new Date()))
-    return (
-      <Notice tone="warning" className={noticeMargin}>
-        <Icon name="alert-02" />
-        <span>{t("data.stale")}</span>
-      </Notice>
-    );
+    return null;
 
   // Occupancy loaded but opening hours did not: rooms are listed as if every
   // building were open, so say so and let the user retry.
@@ -413,7 +409,10 @@ export function Results({ className }: { className?: string }) {
         )}
       >
         <Summary results={all} />
-        <ViewSwitch />
+        <div className="flex shrink-0 items-center gap-1">
+          <StaleDataWarning />
+          <ViewSwitch />
+        </div>
       </div>
       <DataNotice />
       <div
