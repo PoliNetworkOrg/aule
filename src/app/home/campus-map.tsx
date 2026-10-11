@@ -329,7 +329,7 @@ export default function CampusMap({ results }: { results: BuildingAvailability[]
         {severalCampuses && !error && (
           <Segmented
             ref={campusSwitch}
-            className="absolute top-3 right-14 left-3 overflow-x-auto overscroll-contain shadow-md"
+            className="absolute top-0 left-1/2 w-max max-w-[calc(100%-112px)] -translate-x-1/2 overflow-x-auto overscroll-contain rounded-t-none rounded-b-lg border-t-0 shadow-md"
             role="group"
             aria-label={t("campus.label")}
           >
