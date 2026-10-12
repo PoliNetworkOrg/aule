@@ -65,14 +65,22 @@ function DayTimeline({
   items,
   searchWindow,
   nowMinutes,
+  eventsOnly,
 }: {
   items: AgendaItem[];
   searchWindow: { from: string; to: string } | null;
   nowMinutes: number | null;
+  eventsOnly: boolean;
 }) {
   return (
     <div className="relative" aria-hidden="true">
-      <div className="relative h-8 overflow-hidden rounded-sm border border-free-border bg-free-soft">
+      <div
+        className={cn(
+          "relative h-8 overflow-hidden rounded-sm border",
+          // Events-only rooms aren't free between events, just unbooked.
+          eventsOnly ? "border-border bg-surface-muted" : "border-free-border bg-free-soft",
+        )}
+      >
         {TICKS.map((hour) => (
           <span
             key={hour}
@@ -138,11 +146,13 @@ function AgendaRow({
   inWindow,
   highlighted,
   current,
+  eventsOnly,
 }: {
   item: AgendaItem;
   inWindow: boolean;
   highlighted: boolean;
   current: boolean;
+  eventsOnly: boolean;
 }) {
   const locale = useLocale();
   const row = useRef<HTMLLIElement>(null);
@@ -173,7 +183,10 @@ function AgendaRow({
         "max-xs:grid-cols-[92px_minmax(0,1fr)] max-xs:gap-2.5 max-xs:px-2.5",
         item.kind === "busy" && "border-l-busy",
         // Free and closed intervals are tinted bands, only their left edge drawn.
-        item.kind === "free" && "border-transparent border-l-free bg-free-soft py-1.5",
+        item.kind === "free" &&
+          (eventsOnly
+            ? "border-transparent border-l-neutral bg-surface-muted py-1.5"
+            : "border-transparent border-l-free bg-free-soft py-1.5"),
         item.kind === "closed" && "border-transparent border-l-neutral bg-surface-muted py-1.5",
         inWindow &&
           "bg-[linear-gradient(var(--color-accent-soft),var(--color-accent-soft))] shadow-[inset_0_0_0_1px_var(--color-accent-soft-border)]",
@@ -188,7 +201,9 @@ function AgendaRow({
       </div>
       <div className="relative flex min-w-0 flex-col gap-0.5">
         {item.kind === "free" ? (
-          <p className={cn(title, "text-free")}>{t("schedule.free")}</p>
+          <p className={cn(title, eventsOnly ? "text-muted" : "text-free")}>
+            {t(eventsOnly ? "schedule.noEvents" : "schedule.free")}
+          </p>
         ) : item.kind === "closed" ? (
           <p className={cn(title, "text-muted")}>{t("schedule.closed")}</p>
         ) : (
@@ -224,9 +239,12 @@ function AgendaRow({
 export function Schedule({
   roomId,
   context,
+  eventsOnly,
 }: {
   roomId: number;
   context: ClassroomContext | null;
+  /** Usually closed outside events: gaps read "no events scheduled", not "free". */
+  eventsOnly: boolean;
 }) {
   const locale = useLocale();
   const revision = useStore((state) => state.dataRevision);
@@ -280,11 +298,13 @@ export function Schedule({
   const lessons = items.filter((item) => item.kind === "busy").length;
   const closedTime = items.some((item) => item.kind === "closed");
 
-  const noLessonsKey = !closedTime
-    ? "schedule.allDayFree"
-    : items.every((item) => item.kind === "closed")
-      ? "schedule.closedAllDay"
-      : "schedule.freeWhenOpen";
+  const noLessonsKey = items.every((item) => item.kind === "closed")
+    ? "schedule.closedAllDay"
+    : eventsOnly
+      ? "schedule.noEvents"
+      : closedTime
+        ? "schedule.freeWhenOpen"
+        : "schedule.allDayFree";
 
   const daysStyle: DaysStyle = { "--days": dates.length };
 
@@ -337,7 +357,12 @@ export function Schedule({
             {t("schedule.unknownNote")}
           </p>
         ) : (
-          <DayTimeline items={items} searchWindow={searchWindow} nowMinutes={nowInDay} />
+          <DayTimeline
+            items={items}
+            searchWindow={searchWindow}
+            nowMinutes={nowInDay}
+            eventsOnly={eventsOnly}
+          />
         )}
         {!unknown && searchWindow && (
           <p className="flex items-center gap-1.5 text-13 text-muted">
@@ -369,6 +394,7 @@ export function Schedule({
                 item.end === context.to
               }
               current={isToday && item.start <= now && item.end > now}
+              eventsOnly={eventsOnly}
             />
           ))}
         </ol>

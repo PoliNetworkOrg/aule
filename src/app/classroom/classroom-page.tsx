@@ -431,7 +431,12 @@ export function ClassroomPage({
               <Icon name="calendar-03" />
               {t("schedule.title")}
             </PanelTitle>
-            <Schedule key={room.id} roomId={room.id} context={context} />
+            <Schedule
+              key={room.id}
+              roomId={room.id}
+              context={context}
+              eventsOnly={isUsuallyClosed(entry)}
+            />
           </Card>
 
           {(building.address || hasCoordinates(building)) && (

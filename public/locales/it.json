@@ -113,6 +113,7 @@
   "schedule.title": "Orario dell'aula",
   "schedule.days": "Giorni",
   "schedule.free": "Libera",
+  "schedule.noEvents": "Nessun evento in programma",
   "schedule.occupied": "Occupata",
   "schedule.closed": "Chiuso",
   "schedule.exam": "Esame",
