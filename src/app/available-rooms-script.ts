@@ -153,8 +153,6 @@ export async function fetchClassroomsData() {
       `${apiBase}/v1/occupations`,
     );
 
-    lastFetchedAt = generated_at ?? null;
-
     const [results, openingHours] = await Promise.all([
       Promise.allSettled(
         dates.map((date) => {
@@ -171,6 +169,11 @@ export async function fetchClassroomsData() {
         return null;
       }),
     ]);
+
+    // The list timestamp describes this fetch, but the UI must not call the
+    // retained previous data fresh when any per-day refresh failed. Keep the
+    // last timestamp that corresponds to a complete set of fetched day files.
+    if (results.length === dates.length) lastFetchedAt = generated_at ?? null;
 
     // A failed refresh keeps the hours we already had; only a first-ever failure
     // leaves buildings without hours (see hasOpeningHours).
