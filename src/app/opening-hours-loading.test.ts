@@ -30,7 +30,7 @@ function day(date: string): OccupancyDay {
   };
 }
 
-type Payload = OccupancyDay | OpeningHours | { dates: string[] };
+type Payload = OccupancyDay | OpeningHours | { dates: string[]; generated_at?: string };
 
 function api(date: string, hours?: OpeningHours) {
   const iso = `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6)}`;
@@ -131,5 +131,21 @@ describe("opening hours that fail to load", () => {
 
     expect(script.hasOpeningHours()).toBe(true);
     expect(script.classroomsData[0].campuses[0].buildings[0].hours?.mon_fri?.[0]).toBe("08:00");
+  });
+});
+
+describe("data freshness", () => {
+  it("reads the last fetch from the date list, not from unchanged day files", async () => {
+    const responses = api("20261007", HOURS);
+
+    responses.set("/v1/occupations", { dates: ["20261007"], generated_at: "2026-10-07T09:00:00" });
+    stubApi(responses);
+
+    const script = await freshScript();
+
+    await script.fetchClassroomsData();
+
+    expect(script.classroomsData[0].generated_at).toBe("2026-10-05T03:00:00");
+    expect(script.getLastFetchedAt()).toBe("2026-10-07T09:00:00");
   });
 });
