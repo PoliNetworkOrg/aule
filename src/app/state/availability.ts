@@ -26,8 +26,14 @@ import {
 
 export type OpenWindowStatus = "free" | "partial" | "occupied";
 
-/** `closed`: the building is shut for the whole window, whatever the bookings say. */
-export type WindowStatus = OpenWindowStatus | "closed";
+/**
+ * `closed`: the building is shut for the whole window, whatever the bookings say.
+ * `unknown`: no source had the room's schedule that day (occupancy `null`, see
+ * scripts/fetch.py). Never free: claiming it is could send someone to a full room.
+ * `eventsOnly`: the room is generally closed outside official events (see
+ * isUsuallyClosed), so it is never offered as free whatever its bookings say.
+ */
+export type WindowStatus = OpenWindowStatus | "closed" | "unknown" | "eventsOnly";
 
 /**
  * When a building is open on one day. `null` means its hours never loaded: the
@@ -64,7 +70,7 @@ export interface BuildingAvailability {
   campus: Campus;
   building: Building;
   rooms: RoomAvailability[];
-  /** Rooms in the building before filters, for "n of m" counts. */
+  /** Bookable rooms in the building before filters, for "n of m" counts. */
   total: number;
 }
 
@@ -78,19 +84,62 @@ let entryIndex: Map<number, ClassroomEntry> | null = null;
 
 let slugIndex: Map<string, ClassroomEntry> | null = null;
 
+/** `campusId\0buildingName` of every building with nothing to book: see isSecondaryBuilding. */
+let secondaryIndex = new Set<string>();
+
+/** The directory the indexes were built from: a new one (tests) rebuilds them. */
+let indexedDirectory: Campus[] | null = null;
+
 function buildIndexes() {
-  if (entryIndex || !directory) return;
+  if (!directory || directory === indexedDirectory) return;
+  indexedDirectory = directory;
   entryIndex = new Map();
   slugIndex = new Map();
+  secondaryIndex = new Set();
 
   for (const campus of directory)
-    for (const building of campus.buildings)
+    for (const building of campus.buildings) {
+      if (campus.secondary || building.secondary)
+        secondaryIndex.add(`${campus.id}\u0000${building.name}`);
+
       for (const room of building.classrooms) {
         const entry = { room, building, campus };
 
         entryIndex.set(room.id, entry);
         slugIndex.set(`${campus.slug}\u0000${room.name.toLowerCase()}`, entry);
       }
+    }
+}
+
+// The directory (/v1/classrooms) marks what isn't a place to study; the
+// occupation files don't repeat those flags, so they are always read from here.
+
+/**
+ * Whether nothing can be booked in a building: the directory marks it, or its
+ * whole campus, `secondary` (no classrooms, or only events-only ones). Such
+ * buildings stay on the map, but never count towards results or closures.
+ */
+export function isSecondaryBuilding(campusId: string, buildingName: string) {
+  buildIndexes();
+
+  return secondaryIndex.has(`${campusId}\u0000${buildingName}`);
+}
+
+/**
+ * Whether a room is generally closed outside official events (aule magne,
+ * auditoriums, department rooms, labs): `eventsOnly` in the directory, or in a
+ * secondary building. It has real bookings, but is never offered as free.
+ */
+export function isUsuallyClosed(entry: ClassroomEntry) {
+  return !!(entry.room.eventsOnly || entry.building.secondary || entry.campus.secondary);
+}
+
+function isUsuallyClosedRoom(roomId: number) {
+  buildIndexes();
+
+  const entry = entryIndex?.get(roomId);
+
+  return !!entry && isUsuallyClosed(entry);
 }
 
 export function findClassroom(id: number) {
@@ -111,8 +160,9 @@ export function classroomPath(entry: ClassroomEntry) {
     : `/classroom/${entry.room.id}`;
 }
 
+/** Campuses to search for free rooms: secondary ones have nothing to book and are left out. */
 export function campuses() {
-  return (directory ?? []).filter((campus) => campus.buildings.length > 0);
+  return (directory ?? []).filter((campus) => !campus.secondary && campus.buildings.length > 0);
 }
 
 export function findCampus(id: string) {
@@ -158,9 +208,13 @@ function clipToOpening(opening: BuildingOpening | null, from: string, to: string
 
 /**
  * One room on one ISO date: its bookings and its building's opening hours.
- * Null when that day has no data. A room missing from the day's data has no bookings.
+ * Null when that day has no data. `occupancy` is null when the room's schedule
+ * that day is unknown, including when the day's data doesn't list the room.
  */
-export function roomDay(roomId: number, isoDate: string) {
+export function roomDay(
+  roomId: number,
+  isoDate: string,
+): { occupancy: Occupation[] | null; opening: BuildingOpening | null } | null {
   const day = occupancyDays.find((entry) => entry.date === isoToDateKey(isoDate));
 
   if (!day) return null;
@@ -169,12 +223,9 @@ export function roomDay(roomId: number, isoDate: string) {
     for (const building of campus.buildings)
       for (const room of building.classrooms)
         if (room.id === roomId)
-          return {
-            occupancy: room.occupancy ?? [],
-            opening: buildingOpening(building, isoDate),
-          };
+          return { occupancy: room.occupancy, opening: buildingOpening(building, isoDate) };
 
-  return { occupancy: [], opening: null };
+  return { occupancy: null, opening: null };
 }
 
 /** Free intervals of `occupancy` inside [from, to]. */
@@ -217,7 +268,7 @@ function slotMinutes(slots: FreeSlot[]) {
  * Results, favourites, the map and the room page all go through this.
  */
 function windowAvailability(
-  occupancy: Occupation[],
+  occupancy: Occupation[] | null,
   opening: BuildingOpening | null,
   from: string,
   to: string,
@@ -225,6 +276,8 @@ function windowAvailability(
   const open = clipToOpening(opening, from, to);
 
   if (!open) return { status: "closed", slots: [] };
+
+  if (!occupancy) return { status: "unknown", slots: [] };
 
   const slots = freeSlots(occupancy, open.from, open.to);
 
@@ -292,7 +345,7 @@ export function findAvailability(
 }
 
 function campusAvailability(
-  campus: Campus<Classroom & { occupancy: Occupation[] }>,
+  campus: Campus<Classroom & { occupancy: Occupation[] | null }>,
   isoDate: string,
   from: string,
   to: string,
@@ -305,18 +358,27 @@ function campusAvailability(
 
     if (filters.building && key !== filters.building) continue;
 
+    if (isSecondaryBuilding(campus.id, building.name)) continue;
+
     const opening = buildingOpening(building, isoDate);
     const rooms: RoomAvailability[] = [];
+    let bookable = 0;
 
     for (const occupied of building.classrooms) {
       const entry = entryIndex?.get(occupied.id);
       const room = entry?.room ?? occupied;
+      const { occupancy } = occupied;
+
+      // Usually closed, or unknown schedule: never offered, nor counted as bookable.
+      if (!occupancy || (entry && isUsuallyClosed(entry))) continue;
+
+      bookable++;
 
       if (!matchesFilters(room, filters)) continue;
 
-      const { status, slots } = windowAvailability(occupied.occupancy ?? [], opening, from, to);
+      const { status, slots } = windowAvailability(occupancy, opening, from, to);
 
-      if (status === "occupied" || status === "closed") continue;
+      if (status !== "free" && status !== "partial") continue;
 
       rooms.push({
         room,
@@ -324,7 +386,7 @@ function campusAvailability(
         status,
         slots,
         freeMinutes: slotMinutes(slots),
-        freeUntil: status === "free" ? freeUntil(occupied.occupancy ?? [], opening, to) : undefined,
+        freeUntil: status === "free" ? freeUntil(occupancy, opening, to) : undefined,
       });
     }
 
@@ -341,35 +403,84 @@ function campusAvailability(
       campus: findCampus(campus.id) ?? campus,
       building,
       rooms,
-      total: building.classrooms.length,
+      total: bookable,
     });
   }
 
   return results;
 }
 
+export interface UnbookableRoom {
+  entry: ClassroomEntry;
+  status: "eventsOnly" | "unknown";
+}
+
+/**
+ * The rooms of a building that are never offered as free on `isoDate`, and why:
+ * usually closed, or no schedule that day. The map's building panel lists them
+ * under the free ones, so a room missing from the results is never a mystery.
+ */
+export function unbookableRooms(campusId: string, buildingName: string, isoDate: string) {
+  buildIndexes();
+
+  const building = directory
+    ?.find((campus) => campus.id === campusId)
+    ?.buildings.find((candidate) => candidate.name === buildingName);
+
+  const rooms: UnbookableRoom[] = [];
+
+  for (const room of building?.classrooms ?? []) {
+    const entry = entryIndex?.get(room.id);
+
+    if (!entry) continue;
+
+    if (isUsuallyClosed(entry)) rooms.push({ entry, status: "eventsOnly" });
+    else if (roomDay(room.id, isoDate)?.occupancy === null)
+      rooms.push({ entry, status: "unknown" });
+  }
+
+  return rooms.sort((a, b) =>
+    a.entry.room.name.localeCompare(b.entry.room.name, undefined, { numeric: true }),
+  );
+}
+
 /** A room's availability for the given window, for favourites and single-room views. */
-export function roomWindowStatus(roomId: number, isoDate: string, from: string, to: string) {
+export function roomWindowStatus(
+  roomId: number,
+  isoDate: string,
+  from: string,
+  to: string,
+): WindowAvailability | null {
   const day = roomDay(roomId, isoDate);
 
   if (!day) return null;
 
-  return windowAvailability(day.occupancy, day.opening, from, to);
+  const result = windowAvailability(day.occupancy, day.opening, from, to);
+
+  // A shut building is closed whatever the room; otherwise an events-only one
+  // is "usually closed", even when it happens to have no event booked.
+  if (result.status !== "closed" && isUsuallyClosedRoom(roomId))
+    return { status: "eventsOnly", slots: [] };
+
+  return result;
 }
 
-/** Keys (buildingKey) of the campuses' buildings shut for the whole window, for map and empty states. */
+/** Keys (buildingKey) of bookable buildings shut for the whole window, for map and empty states. */
 export function closedBuildings(campusIds: string[], isoDate: string, from: string, to: string) {
   const closed = new Set<string>();
 
   for (const campus of dayCampuses(campusIds, isoDate))
     for (const building of campus.buildings)
-      if (!clipToOpening(buildingOpening(building, isoDate), from, to))
+      if (
+        !isSecondaryBuilding(campus.id, building.name) &&
+        !clipToOpening(buildingOpening(building, isoDate), from, to)
+      )
         closed.add(buildingKey(campus.id, building.name));
 
   return closed;
 }
 
-/** Whether every building the day has data for on these campuses is shut for the whole window. */
+/** Whether every bookable building on the selected campuses is shut for the whole window. */
 export function campusClosed(campusIds: string[], isoDate: string, from: string, to: string) {
   const campuses = dayCampuses(campusIds, isoDate);
 
@@ -377,7 +488,9 @@ export function campusClosed(campusIds: string[], isoDate: string, from: string,
   // response could incorrectly replace the generic empty state with "all closed".
   if (campusIds.some((id) => !campuses.some((campus) => campus.id === id))) return false;
 
-  const buildings = campuses.flatMap((campus) => campus.buildings);
+  const buildings = campuses.flatMap((campus) =>
+    campus.buildings.filter((building) => !isSecondaryBuilding(campus.id, building.name)),
+  );
 
   return (
     buildings.length > 0 &&
@@ -387,6 +500,7 @@ export function campusClosed(campusIds: string[], isoDate: string, from: string,
 
 export type NowDetail =
   | "opensAt"
+  | "busyUntil"
   | "closesAt"
   | "closedToday"
   | "freeFrom"
@@ -399,7 +513,11 @@ export interface NowStatus {
   time?: string;
 }
 
-/** A room's state at `now` ("HH:MM") on `isoDate`, or null when unknown or outside the grid. */
+/**
+ * A room's state at `now` ("HH:MM") on `isoDate`, or null when unknown or outside
+ * the grid. An events-only room is only ever "busy" (an event is on) or null:
+ * outside events it is usually closed, which its page says on its own.
+ */
 export function roomNowStatus(roomId: number, isoDate: string, now: string): NowStatus | null {
   const day = roomDay(roomId, isoDate);
 
@@ -416,8 +534,12 @@ export function roomNowStatus(roomId: number, isoDate: string, now: string): Now
 
   if (now < fromMinutes(DAY_START) || now >= fromMinutes(DAY_END)) return null;
 
+  // Open, but whether the room is booked is unknown: say nothing rather than "free".
+  if (!occupancy) return null;
+
   const closes = opening?.closes ?? null;
   const sorted = [...occupancy].sort((a, b) => a.inizio.localeCompare(b.inizio));
+  const usuallyClosed = isUsuallyClosedRoom(roomId);
 
   if (sorted.some((slot) => slot.inizio <= now && slot.fine > now)) {
     // Back-to-back lessons count as one busy stretch.
@@ -427,8 +549,11 @@ export function roomNowStatus(roomId: number, isoDate: string, now: string): Now
 
     if (closes && end >= closes) return { state: "busy", detail: "closesAt", time: closes };
 
-    return { state: "busy", detail: "freeFrom", time: end };
+    // After the event an events-only room closes again: it doesn't "free up".
+    return { state: "busy", detail: usuallyClosed ? "busyUntil" : "freeFrom", time: end };
   }
+
+  if (usuallyClosed) return null;
 
   const next = sorted.find((slot) => slot.inizio > now);
 

@@ -110,23 +110,25 @@ function MoreFilters({ filters }: { filters: FilterState }) {
               {selected.length > 1 && (
                 <p className="col-span-full pt-1 text-12 font-bold text-subtle">{campus.name}</p>
               )}
-              {campus.buildings.map((building) => {
-                const key = buildingKey(campus.id, building.name);
+              {campus.buildings
+                .filter((building) => !building.secondary)
+                .map((building) => {
+                  const key = buildingKey(campus.id, building.name);
 
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    className={choice}
-                    aria-pressed={filters.building === key}
-                    aria-label={buildingLabel(key, selected.length > 1)}
-                    title={building.altName || undefined}
-                    onClick={() => setFilters({ building: filters.building === key ? "" : key })}
-                  >
-                    {building.name}
-                  </button>
-                );
-              })}
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      className={choice}
+                      aria-pressed={filters.building === key}
+                      aria-label={buildingLabel(key, selected.length > 1)}
+                      title={building.altName || undefined}
+                      onClick={() => setFilters({ building: filters.building === key ? "" : key })}
+                    >
+                      {building.name}
+                    </button>
+                  );
+                })}
             </Fragment>
           ))}
         </div>

@@ -75,6 +75,15 @@ export function romeMinutesOfDay() {
 // one entry per day inside the array, starting with 0 = today.
 export const classroomsData: OccupancyDay[] = [];
 
+// When the backend last ran (/v1/occupations' generated_at). A day file's own
+// generated_at only moves when its contents change (scripts/fetch.py keeps it
+// otherwise, so its ETag holds), so it can't tell how fresh the data is.
+let lastFetchedAt: string | null = null;
+
+export function getLastFetchedAt() {
+  return lastFetchedAt;
+}
+
 // The last opening hours that loaded. Holiday closures apply to every building
 // at once, so they live here rather than on building.hours; kept between
 // reloads so a failed refresh doesn't make every building look open again.
@@ -139,7 +148,10 @@ export function applyOpeningHours(days: OccupancyDay[], openingHours: OpeningHou
 export async function fetchClassroomsData() {
   try {
     const apiBase = getApiBase();
-    const { dates } = await fetchJson<{ dates: string[] }>(`${apiBase}/v1/occupations`);
+
+    const { dates, generated_at } = await fetchJson<{ dates: string[]; generated_at?: string }>(
+      `${apiBase}/v1/occupations`,
+    );
 
     const [results, openingHours] = await Promise.all([
       Promise.allSettled(
@@ -157,6 +169,11 @@ export async function fetchClassroomsData() {
         return null;
       }),
     ]);
+
+    // The list timestamp describes this fetch, but the UI must not call the
+    // retained previous data fresh when any per-day refresh failed. Keep the
+    // last timestamp that corresponds to a complete set of fetched day files.
+    if (results.length === dates.length) lastFetchedAt = generated_at ?? null;
 
     // A failed refresh keeps the hours we already had; only a first-ever failure
     // leaves buildings without hours (see hasOpeningHours).

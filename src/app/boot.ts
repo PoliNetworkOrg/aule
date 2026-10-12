@@ -1,6 +1,7 @@
 import {
   classroomsData as occupancyDays,
   fetchClassroomsData,
+  getLastFetchedAt,
   hasOpeningHours,
 } from "./available-rooms-script";
 import { ensureClassroomDirectory } from "./classroom-search-data";
@@ -48,15 +49,21 @@ function showSplashError() {
   splash.append(title, subtitle, reload);
 }
 
-function oldestGeneratedAt() {
+/**
+ * When the backend last ran. Day files keep their generated_at while their data
+ * is unchanged, so the oldest of them is only a fallback for a list without one.
+ */
+function lastFetchedAt() {
   if (!occupancyDays.length) return null;
 
-  const oldest = occupancyDays.reduce(
-    (current, day) => (day.generated_at < current ? day.generated_at : current),
-    occupancyDays[0].generated_at,
-  );
+  const stamp =
+    getLastFetchedAt() ??
+    occupancyDays.reduce(
+      (current, day) => (day.generated_at < current ? day.generated_at : current),
+      occupancyDays[0].generated_at,
+    );
 
-  return new Date(`${oldest}Z`);
+  return new Date(`${stamp}Z`);
 }
 
 /** Picks the day to show: keep a still-valid choice, else today, else the next day with data. */
@@ -84,7 +91,7 @@ function applyOccupancy() {
     date,
     occupancy: dates.length ? "ready" : "error",
     openingHours: hasOpeningHours(),
-    generatedAt: oldestGeneratedAt(),
+    generatedAt: lastFetchedAt(),
     dataRevision: readState().dataRevision + 1,
   });
 }

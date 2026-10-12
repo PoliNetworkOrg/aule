@@ -26,7 +26,12 @@ export interface Classroom {
   seats?: number;
   accessible_seats?: number;
   workstations?: number;
-  occupancy?: Occupation[];
+  /** Generally closed outside official events: never offered as available. */
+  eventsOnly?: boolean;
+  /** On neither PoliMi's occupancy page nor its REST API: occupancy is usually null. */
+  noSchedule?: boolean;
+  /** Null when no source had the schedule that day: unknown, never free. */
+  occupancy?: Occupation[] | null;
 }
 
 export interface BuildingHours {
@@ -43,6 +48,8 @@ export interface Building<Room extends Classroom = Classroom> {
   long?: number;
   address?: string;
   hours?: BuildingHours;
+  /** Nothing to book here: no classrooms, or only events-only ones. */
+  secondary?: boolean;
   classrooms: Room[];
 }
 
@@ -54,13 +61,17 @@ export interface Campus<Room extends Classroom = Classroom> {
   group?: string;
   lat?: number;
   long?: number;
+  /** Map zoom framing the whole campus, when its buildings are too far apart for the default. */
+  zoom?: number;
+  /** Nothing to book anywhere on the campus. */
+  secondary?: boolean;
   buildings: Building<Room>[];
 }
 
 export interface OccupancyDay {
   date: string;
   generated_at: string;
-  campuses: Campus<Classroom & { occupancy: Occupation[] }>[];
+  campuses: Campus<Classroom & { occupancy: Occupation[] | null }>[];
 }
 
 export interface HolidayPeriod {
