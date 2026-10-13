@@ -214,7 +214,9 @@ export default function LocationMap({
           attributionControl: { compact: true, customAttribution: OPENFREEMAP_ATTRIBUTION },
         });
 
-        const fullscreen = new maplibregl.FullscreenControl({ container: frame.current ?? undefined });
+        const fullscreen = new maplibregl.FullscreenControl({
+          container: frame.current ?? undefined,
+        });
 
         map.addControl(
           new maplibregl.NavigationControl({
