@@ -42,6 +42,11 @@ const LOCATION_CONTROLS = [
   "[&_.maplibregl-cooperative-gesture-screen]:bg-scrim/55! [&_.maplibregl-cooperative-gesture-screen]:p-4!",
   "[&_.maplibregl-cooperative-gesture-screen]:font-sans! [&_.maplibregl-cooperative-gesture-screen]:text-15!",
   "[&_.maplibregl-cooperative-gesture-screen]:font-semibold!",
+  // Fullscreen is the whole frame (map and controls), whatever size, aspect
+  // ratio or radius the page gave it.
+  "[&:fullscreen]:size-full! [&:fullscreen]:max-h-none! [&:fullscreen]:rounded-none! [&:fullscreen]:border-0!",
+  "[&:-webkit-full-screen]:size-full! [&:-webkit-full-screen]:max-h-none! [&:-webkit-full-screen]:rounded-none!",
+  "[&:-webkit-full-screen]:border-0!",
 ].join(" ");
 
 const CAMERA = {
@@ -170,6 +175,7 @@ export default function LocationMap({
 }) {
   const locale = useLocale();
   const theme = useTheme();
+  const frame = useRef<HTMLDivElement>(null);
   const host = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const markers = useRef<MapLibreMarker[]>([]);
@@ -208,7 +214,9 @@ export default function LocationMap({
           attributionControl: { compact: true, customAttribution: OPENFREEMAP_ATTRIBUTION },
         });
 
-        const fullscreen = new maplibregl.FullscreenControl({});
+        const fullscreen = new maplibregl.FullscreenControl({
+          container: frame.current ?? undefined,
+        });
 
         map.addControl(
           new maplibregl.NavigationControl({
@@ -332,7 +340,7 @@ export default function LocationMap({
   }
 
   return (
-    <div className={cn(className, MAP_CONTROLS, LOCATION_CONTROLS)}>
+    <div className={cn(className, MAP_CONTROLS, LOCATION_CONTROLS)} ref={frame}>
       {/* Sized, not absolutely positioned: MapLibre's own stylesheet (loaded
           later) makes its container `position: relative`. */}
       <div
