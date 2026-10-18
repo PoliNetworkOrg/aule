@@ -179,7 +179,12 @@ function Photo({ roomId, roomName }: { roomId: number; roomName: string }) {
           />
         )}
         {state === "ready" && (
-          <span className="absolute right-3 bottom-3 inline-flex items-center gap-1.5 rounded-md bg-scrim/82 px-2.5 py-[7px] text-13 font-bold text-white">
+          <span
+            className={cn(
+              "absolute right-3 bottom-3 inline-flex items-center gap-1.5 rounded-md bg-scrim/82 px-2.5 py-[7px] text-13 font-bold text-white",
+              "transition-opacity duration-250 ease-in-out starting:opacity-0",
+            )}
+          >
             <Icon name="full-screen" />
             {t("classroom.enlarge")}
           </span>
