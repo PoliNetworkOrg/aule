@@ -28,6 +28,7 @@ import { Chip, ChipRow } from "../ui/chip";
 import { EmptyState, emptyStateAction } from "../ui/empty-state";
 import { Icon } from "../ui/icon";
 import { Notice, noticeAction } from "../ui/notice";
+import { Reveal } from "../ui/reveal";
 import { Segmented, SegmentedOption } from "../ui/segmented";
 import { Skeleton } from "../ui/skeleton";
 import { buildingDomId, buildingLabel, campusSelectionLabel } from "./campus-label";
@@ -153,6 +154,12 @@ function Summary({ results }: { results: BuildingAvailability[] }) {
 }
 
 function DataNotice() {
+  const notice = useDataNotice();
+
+  return <Reveal show={notice !== null}>{notice}</Reveal>;
+}
+
+function useDataNotice() {
   const generatedAt = useStore((state) => state.generatedAt);
   const occupancy = useStore((state) => state.occupancy);
   const openingHours = useStore((state) => state.openingHours);
