@@ -328,6 +328,62 @@
     outline-offset: 2px;
   }
 
+  /* ---------- Page transitions ---------- */
+
+  /* Opening a page: it slides in from the right as the current one slides out
+     to the left; leaving, the other way round (see navigate() in
+     lib/navigation.ts, which sets data-transition). A short travel and a quick
+     fade: a nudge in the direction of travel, not a carousel. */
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 250ms;
+    animation-timing-function: var(--ease-smooth-out);
+  }
+
+  html[data-transition="forward"]::view-transition-old(root) {
+    animation-name: page-out-left;
+  }
+
+  html[data-transition="forward"]::view-transition-new(root) {
+    animation-name: page-in-right;
+  }
+
+  html[data-transition="back"]::view-transition-old(root) {
+    animation-name: page-out-right;
+  }
+
+  html[data-transition="back"]::view-transition-new(root) {
+    animation-name: page-in-left;
+  }
+
+  @keyframes page-out-left {
+    to {
+      opacity: 0;
+      translate: -32px 0;
+    }
+  }
+
+  @keyframes page-in-right {
+    from {
+      opacity: 0;
+      translate: 32px 0;
+    }
+  }
+
+  @keyframes page-out-right {
+    to {
+      opacity: 0;
+      translate: 32px 0;
+    }
+  }
+
+  @keyframes page-in-left {
+    from {
+      opacity: 0;
+      translate: -32px 0;
+    }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     *,
     *::before,

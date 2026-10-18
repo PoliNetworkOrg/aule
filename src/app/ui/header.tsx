@@ -91,7 +91,10 @@ export function Header({ page }: { page: "home" | "classroom" | "info" }) {
   useLocale();
 
   return (
-    <header className="sticky top-0 z-20 border-b border-border bg-surface pt-[env(safe-area-inset-top)]">
+    <header
+      // Its own view transition group, so it stays put while the pages slide.
+      className="sticky top-0 z-20 border-b border-border bg-surface pt-[env(safe-area-inset-top)] [view-transition-name:site-header]"
+    >
       <div className="mx-auto flex h-header max-w-content items-center gap-3 px-gutter max-xs:gap-2">
         <a
           className="flex min-w-0 items-center gap-2.5 text-foreground no-underline"
