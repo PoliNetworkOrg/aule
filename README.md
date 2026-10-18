@@ -15,7 +15,7 @@ pnpm lint
 
 `pnpm preview` serves the production build. `pnpm build:beta` uses the beta API preconnect with the same branding as the production build. `pnpm lint:fix` applies Oxlint fixes and Oxfmt formatting; `pnpm format` only formats. Build includes TypeScript checking. There is no new test suite: upstream has no application tests to port.
 
-The frontend uses the existing hosted APIs. Production hosts use the stable backend; other hosts default to beta and expose a switch on the info page. The 3D campus map renders with MapLibre GL JS over OpenFreeMap's keyless vector tiles (no token or usage caps). Google Fonts (DM Sans), OpenFreeMap tiles and classroom photos are the only third-party requests.
+The frontend uses the existing hosted APIs. Production hosts use the stable backend; other hosts default to beta and expose a switch on the info page. The 3D campus map renders with MapLibre GL JS over OpenFreeMap's keyless vector tiles (no token or usage caps). OpenFreeMap tiles and classroom photos are the only third-party requests; fonts (DM Sans, HugeIcons) are self-hosted under `public/fonts`.
 
 ## Structure
 

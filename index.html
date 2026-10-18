@@ -19,7 +19,7 @@
     -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://api.poliaule.com https://api-beta.poliaule.com; connect-src 'self' https://api.poliaule.com https://api-beta.poliaule.com https://tiles.openfreemap.org; worker-src 'self' blob:; base-uri 'self'; object-src 'none'"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: https://api.poliaule.com https://api-beta.poliaule.com; connect-src 'self' https://api.poliaule.com https://api-beta.poliaule.com https://tiles.openfreemap.org; worker-src 'self' blob:; base-uri 'self'; object-src 'none'"
     />
 
     <!-- Matches the header (--surface); kept in sync by the script below and theme.ts. -->
@@ -142,23 +142,17 @@
       };
     </script>
 
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!-- The beta build rewrites this to api-beta, matching its default backend. -->
     <link rel="preconnect" href="https://api.poliaule.com" crossorigin />
 
-    <!-- DM Sans, the PoliNetwork web font; non-blocking, the fallback stack covers the gap. -->
+    <!-- DM Sans, the PoliNetwork web font, self-hosted; non-blocking, the fallback stack covers the gap. -->
     <link
-      href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400..700&display=swap"
       rel="stylesheet"
+      href="/fonts/dm-sans/dm-sans.css"
       media="print"
       onload="this.media = 'all'"
     />
-    <noscript
-      ><link
-        href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400..700&display=swap"
-        rel="stylesheet"
-    /></noscript>
+    <noscript><link rel="stylesheet" href="/fonts/dm-sans/dm-sans.css" /></noscript>
 
     <!-- HugeIcons (stroke-rounded), self-hosted icon font; non-blocking. -->
     <link
