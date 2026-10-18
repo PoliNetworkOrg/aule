@@ -411,6 +411,8 @@ export function Results({ className }: { className?: string }) {
       className={cn(
         "flex min-h-0 flex-1 flex-col border-t border-border bg-surface",
         "lg:overflow-clip lg:rounded-lg lg:border",
+        // Phones: it shows after the controls step (it only toggles `hidden`).
+        "max-lg:transition-opacity max-lg:duration-250 max-lg:ease-in-out max-lg:starting:opacity-0",
         className,
       )}
       aria-label={t("results.title")}

@@ -123,6 +123,8 @@ export function HomePage({ hidden }: { hidden: boolean }) {
           <aside
             className={cn(
               "group/controls flex flex-none flex-col gap-3 px-gutter pt-3 pb-4.5 max-[600px]:scrollbar-none",
+              // Phones: the two steps fade into each other (they only toggle `hidden`).
+              "max-lg:transition-opacity max-lg:duration-250 max-lg:ease-in-out max-lg:starting:opacity-0",
               // Phones and tablets: two steps. First the parameters, full screen, with a
               // button to see the rooms; then the rooms, with a summary to edit them.
               collapsed
