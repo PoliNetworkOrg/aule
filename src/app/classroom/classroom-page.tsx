@@ -333,10 +333,13 @@ export function ClassroomPage({
     <main className={PAGE}>
       <button
         type="button"
-        className="mb-2 -ml-1.5 inline-flex min-h-10 items-center gap-1.5 rounded-md pr-2.5 pl-1.5 text-14 font-semibold text-muted hover:bg-accent-soft hover:text-accent-strong"
+        className="group mb-2 -ml-1.5 inline-flex min-h-10 items-center gap-1.5 rounded-md pr-2.5 pl-1.5 text-14 font-semibold text-muted hover:bg-accent-soft hover:text-accent-strong"
         onClick={leavePage}
       >
-        <Icon name="arrow-left-01" />
+        <Icon
+          name="arrow-left-01"
+          className="transition-[translate] duration-150 ease-smooth-out group-hover:-translate-x-0.5"
+        />
         {t("classroom.back")}
       </button>
 
