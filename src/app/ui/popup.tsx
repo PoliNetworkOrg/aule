@@ -293,7 +293,10 @@ export function OptionList({
             >
               <OptionText option={option} />
               {option.value === value && (
-                <Icon name="tick-02" className="ml-auto text-18 text-accent" />
+                <Icon
+                  name="tick-02"
+                  className="ml-auto text-18 text-accent transition-opacity starting:opacity-0"
+                />
               )}
             </button>
           ))}
@@ -368,7 +371,12 @@ export function CheckList({
                 }}
               >
                 <OptionText option={option} />
-                {selected && <Icon name="tick-02" className="ml-auto text-18 text-accent" />}
+                {selected && (
+                  <Icon
+                    name="tick-02"
+                    className="ml-auto text-18 text-accent transition-opacity starting:opacity-0"
+                  />
+                )}
               </button>
             );
           })}
