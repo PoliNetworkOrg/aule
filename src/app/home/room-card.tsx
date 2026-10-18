@@ -171,7 +171,7 @@ export function RoomCard({
   const row = layout === "row";
 
   return (
-    <li className="relative">
+    <li className="relative transition-opacity duration-250 ease-in-out starting:opacity-0">
       <button
         type="button"
         className={cn(
