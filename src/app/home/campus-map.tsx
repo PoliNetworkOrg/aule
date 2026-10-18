@@ -95,6 +95,9 @@ function BuildingPanel({
       className={cn(
         "flex w-[340px] flex-none flex-col gap-2.5 overflow-y-auto border-l border-border bg-surface p-3.5",
         "max-md:max-h-[48%] max-md:w-auto max-md:border-t max-md:border-l-0",
+        // Settles in from the side (from below on phones, where it's a lower panel).
+        // Closing is instant; the map is resized once, as the panel takes its room.
+        "transition-[opacity,translate] duration-250 ease-smooth-out starting:translate-x-3 starting:opacity-0 max-md:starting:translate-x-0 max-md:starting:translate-y-3",
       )}
       aria-label={label}
     >
@@ -443,7 +446,7 @@ export default function CampusMap({ results }: { results: BuildingAvailability[]
         </div>
       )}
       {!selectedEntry && !error && (
-        <p className="pointer-events-none absolute bottom-7 left-1/2 -translate-x-1/2 rounded-full border border-border bg-surface px-3 py-1.5 text-13 whitespace-nowrap text-muted shadow-sm">
+        <p className="pointer-events-none absolute bottom-7 left-1/2 -translate-x-1/2 rounded-full border border-border bg-surface px-3 py-1.5 text-13 whitespace-nowrap text-muted shadow-sm transition-opacity duration-250 ease-in-out starting:opacity-0">
           {t("map.hint")}
         </p>
       )}
