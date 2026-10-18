@@ -222,7 +222,12 @@ export function Filters() {
           <Icon name="filter-horizontal" />
           {t("filters.more")}
           {advanced > 0 && (
-            <span className="inline-grid h-5 min-w-5 place-items-center rounded-full bg-accent px-1.5 text-12 font-bold text-on-accent">
+            <span
+              className={cn(
+                "inline-grid h-5 min-w-5 place-items-center rounded-full bg-accent px-1.5 text-12 font-bold text-on-accent",
+                "transition-[opacity,scale] duration-250 ease-smooth-out starting:scale-95 starting:opacity-0",
+              )}
+            >
               {advanced}
             </span>
           )}
