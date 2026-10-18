@@ -32,7 +32,7 @@ export function Reveal({
   return (
     <div
       className={cn(
-        "grid transition-[grid-template-rows,margin,opacity] duration-250 ease-smooth-out",
+        "grid grid-rows-[1fr] transition-[grid-template-rows,margin,opacity] duration-250 ease-smooth-out",
         "starting:grid-rows-[0fr] starting:opacity-0",
         className,
         leaving && ["grid-rows-[0fr] opacity-0 duration-150", folded],
