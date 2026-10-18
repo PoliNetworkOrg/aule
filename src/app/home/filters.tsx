@@ -18,7 +18,7 @@ import { centreStable, insetFocus } from "../ui/focus";
 import { Icon } from "../ui/icon";
 import { pressable } from "../ui/motion";
 import { Panel, PanelHeader, PanelTitle } from "../ui/panel";
-import { usePresence } from "../ui/presence";
+import { Reveal } from "../ui/reveal";
 import { Segmented, SegmentedOption } from "../ui/segmented";
 import { StableText } from "../ui/stable";
 import { buildingLabel } from "./campus-label";
@@ -59,100 +59,88 @@ function ToggleChip({
   );
 }
 
-function MoreFilters({ filters, leaving }: { filters: FilterState; leaving: boolean }) {
+function MoreFilters({ filters }: { filters: FilterState }) {
   useLocale();
   const campusIds = useStore((state) => state.campusIds);
   const selected = campusIds.flatMap((id) => findCampus(id) ?? []);
 
   return (
     <div
-      className={cn(
-        // Opens and closes by height, so the panels below glide with it. The negative
-        // margin takes back the panel's gap while it is folded; closing is quicker.
-        "grid transition-[grid-template-rows,margin,opacity] duration-250 ease-smooth-out",
-        "starting:-mt-2.5 starting:grid-rows-[0fr] starting:opacity-0",
-        leaving && "-mt-2.5 grid-rows-[0fr] opacity-0 duration-150",
-      )}
+      className="grid scroll-mt-4 gap-4.5 rounded-lg border border-border bg-surface p-4"
+      id="more-filters"
     >
-      <div
-        className="grid min-h-0 scroll-mt-4 gap-4.5 overflow-hidden rounded-lg border border-border bg-surface p-4"
-        id="more-filters"
-      >
-        <Field>
-          <FieldLabel>{t("filters.seats")}</FieldLabel>
-          <Segmented fill role="group" aria-label={t("filters.seats")}>
-            {SEAT_OPTIONS.map((seats) => (
-              <SegmentedOption
-                key={seats}
-                fill
-                aria-pressed={filters.minSeats === seats}
-                onClick={() => setFilters({ minSeats: seats })}
-              >
-                {seats ? `${seats}+` : <StableText k="filters.any" />}
-              </SegmentedOption>
-            ))}
-          </Segmented>
-        </Field>
-
-        <Field>
-          <FieldLabel>{t("filters.building")}</FieldLabel>
-          <div
-            className="grid grid-cols-[repeat(auto-fill,minmax(52px,1fr))] gap-1.5"
-            role="group"
-            aria-label={t("filters.building")}
-          >
-            <button
-              type="button"
-              className={cn(choice, "col-[span_2]")}
-              aria-pressed={filters.building === ""}
-              onClick={() => setFilters({ building: "" })}
+      <Field>
+        <FieldLabel>{t("filters.seats")}</FieldLabel>
+        <Segmented fill role="group" aria-label={t("filters.seats")}>
+          {SEAT_OPTIONS.map((seats) => (
+            <SegmentedOption
+              key={seats}
+              fill
+              aria-pressed={filters.minSeats === seats}
+              onClick={() => setFilters({ minSeats: seats })}
             >
-              <StableText k="filters.allBuildings" />
-            </button>
-            {selected.map((campus) => (
-              <Fragment key={campus.id}>
-                {/* Several campuses: each one's buildings under its name ("8" is in two). */}
-                {selected.length > 1 && (
-                  <p className="col-span-full pt-1 text-12 font-bold text-subtle">{campus.name}</p>
-                )}
-                {campus.buildings
-                  .filter((building) => !building.secondary)
-                  .map((building) => {
-                    const key = buildingKey(campus.id, building.name);
+              {seats ? `${seats}+` : <StableText k="filters.any" />}
+            </SegmentedOption>
+          ))}
+        </Segmented>
+      </Field>
 
-                    return (
-                      <button
-                        key={key}
-                        type="button"
-                        className={choice}
-                        aria-pressed={filters.building === key}
-                        aria-label={buildingLabel(key, selected.length > 1)}
-                        title={building.altName || undefined}
-                        onClick={() =>
-                          setFilters({ building: filters.building === key ? "" : key })
-                        }
-                      >
-                        {building.name}
-                      </button>
-                    );
-                  })}
-              </Fragment>
-            ))}
-          </div>
-        </Field>
+      <Field>
+        <FieldLabel>{t("filters.building")}</FieldLabel>
+        <div
+          className="grid grid-cols-[repeat(auto-fill,minmax(52px,1fr))] gap-1.5"
+          role="group"
+          aria-label={t("filters.building")}
+        >
+          <button
+            type="button"
+            className={cn(choice, "col-[span_2]")}
+            aria-pressed={filters.building === ""}
+            onClick={() => setFilters({ building: "" })}
+          >
+            <StableText k="filters.allBuildings" />
+          </button>
+          {selected.map((campus) => (
+            <Fragment key={campus.id}>
+              {/* Several campuses: each one's buildings under its name ("8" is in two). */}
+              {selected.length > 1 && (
+                <p className="col-span-full pt-1 text-12 font-bold text-subtle">{campus.name}</p>
+              )}
+              {campus.buildings
+                .filter((building) => !building.secondary)
+                .map((building) => {
+                  const key = buildingKey(campus.id, building.name);
 
-        <Field>
-          <FieldLabel>{t("filters.equipment")}</FieldLabel>
-          <ChipRow>
-            <ToggleChip
-              active={filters.network}
-              icon="cable"
-              label="filters.network"
-              onToggle={() => setFilters({ network: !filters.network })}
-            />
-          </ChipRow>
-        </Field>
-      </div>
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      className={choice}
+                      aria-pressed={filters.building === key}
+                      aria-label={buildingLabel(key, selected.length > 1)}
+                      title={building.altName || undefined}
+                      onClick={() => setFilters({ building: filters.building === key ? "" : key })}
+                    >
+                      {building.name}
+                    </button>
+                  );
+                })}
+            </Fragment>
+          ))}
+        </div>
+      </Field>
+
+      <Field>
+        <FieldLabel>{t("filters.equipment")}</FieldLabel>
+        <ChipRow>
+          <ToggleChip
+            active={filters.network}
+            icon="cable"
+            label="filters.network"
+            onToggle={() => setFilters({ network: !filters.network })}
+          />
+        </ChipRow>
+      </Field>
     </div>
   );
 }
@@ -163,7 +151,6 @@ export function Filters() {
   const advanced = countAdvancedFilters(filters);
   const active = countActiveFilters(filters);
   const [open, setOpen] = useState(() => advanced > 0);
-  const { mounted, leaving } = usePresence(open);
 
   return (
     <Panel
@@ -244,7 +231,10 @@ export function Filters() {
           />
         </Chip>
       </ChipRow>
-      {mounted && <MoreFilters filters={filters} leaving={leaving} />}
+      {/* Folded, the negative margin takes back the panel's gap. */}
+      <Reveal show={open} className="starting:-mt-2.5" folded="-mt-2.5">
+        <MoreFilters filters={filters} />
+      </Reveal>
     </Panel>
   );
 }
