@@ -431,7 +431,7 @@ export default function CampusMap({ results }: { results: BuildingAvailability[]
         )}
       </div>
       {error && (
-        <div className="absolute inset-0 flex items-center justify-center gap-2 text-muted">
+        <div className="absolute inset-0 flex items-center justify-center gap-2 text-muted transition-opacity duration-250 ease-in-out starting:opacity-0">
           <Icon name="alert-02" />
           {t("map.error")}
         </div>
