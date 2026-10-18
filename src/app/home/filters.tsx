@@ -169,8 +169,13 @@ export function Filters() {
         </PanelTitle>
         <button
           type="button"
-          className="inline-flex h-8 items-center gap-1.5 rounded-full bg-busy-soft px-2.5 text-13 font-bold text-busy hover:bg-busy/16"
-          hidden={active === 0}
+          className={cn(
+            "inline-flex h-8 items-center gap-1.5 rounded-full bg-busy-soft px-2.5 text-13 font-bold text-busy hover:bg-busy/16",
+            // Stays in place and fades; `invisible` only takes effect once the fade is done.
+            "transition-[background-color,opacity,scale,visibility] duration-250 ease-smooth-out",
+            active === 0 && "invisible scale-95 opacity-0 duration-150",
+          )}
+          inert={active === 0}
           aria-label={tf("filters.resetCount", { n: active })}
           onClick={resetFilters}
         >
