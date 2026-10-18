@@ -106,7 +106,10 @@ export function SearchBar() {
         {draft ? (
           <button
             type="button"
-            className="absolute right-1.5 grid size-9 place-items-center rounded-md text-muted hover:bg-surface-muted"
+            className={cn(
+              "absolute right-1.5 grid size-9 place-items-center rounded-md text-muted",
+              "transition-[background-color,opacity] hover:bg-surface-muted starting:opacity-0",
+            )}
             aria-label={t("search.clear")}
             onClick={clear}
           >
