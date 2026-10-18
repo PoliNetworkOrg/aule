@@ -276,11 +276,10 @@ function Location({ entry }: { entry: ClassroomEntry }) {
           rel="noopener noreferrer"
         >
           <Icon name="directions-01" className="text-18" />
-          {t("classroom.directions")}
-          <Icon
-            name="arrow-up-right-01"
-            className="text-14 text-subtle transition-[translate] duration-150 ease-smooth-out group-hover:translate-x-px group-hover:-translate-y-px"
-          />
+          <Nudge direction="right">
+            {t("classroom.directions")}
+            <Icon name="arrow-up-right-01" className="text-14 text-subtle" />
+          </Nudge>
         </a>
       </div>
     </Card>
