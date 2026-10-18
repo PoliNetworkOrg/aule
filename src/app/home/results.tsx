@@ -34,6 +34,7 @@ import { Skeleton } from "../ui/skeleton";
 import { buildingDomId, buildingLabel, campusSelectionLabel } from "./campus-label";
 import { RoomCard, roomGrid } from "./room-card";
 import { StableText } from "../ui/stable";
+import { Swap } from "../ui/swap";
 import { StaleDataWarning } from "./stale-data-warning";
 
 const CampusMap = lazy(() => import("./campus-map"));
@@ -116,11 +117,15 @@ function Summary({ results }: { results: BuildingAvailability[] }) {
   return (
     <div className="min-w-0 flex-1">
       <p className="text-16 font-bold max-sm:flex max-sm:flex-wrap max-sm:items-center max-sm:gap-x-2 max-sm:gap-y-1">
-        {occupancy === "loading" && !rooms.length
-          ? t("results.loading")
-          : free === 1
-            ? t("results.oneRoom")
-            : tf("results.rooms", { n: free })}
+        <Swap
+          value={
+            occupancy === "loading" && !rooms.length
+              ? t("results.loading")
+              : free === 1
+                ? t("results.oneRoom")
+                : tf("results.rooms", { n: free })
+          }
+        />
         {partial > 0 && (
           // Off (grey) while partly free rooms are hidden, lit in the partial colour once
           // listed. A dashed edge, like the other chips that add or drop results, so it

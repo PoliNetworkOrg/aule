@@ -122,11 +122,21 @@
   --animate-spin: spin 0.9s linear infinite;
   --animate-shimmer: shimmer 1.4s linear infinite;
   --animate-pop: pop 200ms var(--ease-smooth-out);
+  --animate-swap-in: swap-in 200ms var(--ease-smooth-out);
 
   /* A brief swell for something just switched on (the favourite star). */
   @keyframes pop {
     50% {
       scale: 1.18;
+    }
+  }
+
+  /* A value that just changed: rises in from a little below, out of focus. */
+  @keyframes swap-in {
+    from {
+      opacity: 0;
+      translate: 0 4px;
+      filter: blur(2px);
     }
   }
 
