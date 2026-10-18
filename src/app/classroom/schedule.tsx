@@ -346,13 +346,13 @@ export function Schedule({
           </span>
         </div>
         {!unknown && !hasOpeningHours() && (
-          <p className="mt-2 flex items-start gap-1.5 text-13 text-partial">
+          <p className="mt-2 flex items-start gap-1.5 text-13 text-partial transition-opacity duration-250 ease-in-out starting:opacity-0">
             <Icon name="alert-02" />
             {t("schedule.hoursUnavailable")}
           </p>
         )}
         {unknown ? (
-          <p className="flex items-start gap-2 rounded-md bg-surface-muted px-3 py-2.5 text-14 text-muted">
+          <p className="flex items-start gap-2 rounded-md bg-surface-muted px-3 py-2.5 text-14 text-muted transition-opacity duration-250 ease-in-out starting:opacity-0">
             <Icon name="calendar-remove-01" />
             {t("schedule.unknownNote")}
           </p>
@@ -365,7 +365,7 @@ export function Schedule({
           />
         )}
         {!unknown && searchWindow && (
-          <p className="flex items-center gap-1.5 text-13 text-muted">
+          <p className="flex items-center gap-1.5 text-13 text-muted transition-opacity duration-250 ease-in-out starting:opacity-0">
             <span
               className="h-2.5 w-3.5 rounded-[calc(var(--radius-sm)/2)] border-[1.5px] border-accent bg-accent-soft"
               aria-hidden="true"
