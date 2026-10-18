@@ -121,6 +121,14 @@
 
   --animate-spin: spin 0.9s linear infinite;
   --animate-shimmer: shimmer 1.4s linear infinite;
+  --animate-pop: pop 200ms var(--ease-smooth-out);
+
+  /* A brief swell for something just switched on (the favourite star). */
+  @keyframes pop {
+    50% {
+      scale: 1.18;
+    }
+  }
 
   @keyframes shimmer {
     from {

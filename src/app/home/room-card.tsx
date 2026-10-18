@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { t, tf, useLocale } from "../i18n";
 import { isFavourite, toggleFavourite } from "../utils/favourites";
 import type { FreeSlot, RoomAvailability, WindowStatus } from "../state/availability";
@@ -36,6 +36,7 @@ export function FavouriteButton({
 }) {
   useLocale();
   const active = useIsFavourite(id);
+  const [popping, setPopping] = useState(false);
   const label = tf(active ? "favourites.remove" : "favourites.add", { name });
 
   return (
@@ -51,14 +52,20 @@ export function FavouriteButton({
       aria-pressed={active}
       aria-label={label}
       title={label}
-      onClick={() => toggleFavourite(id)}
+      onClick={() => {
+        setPopping(!active);
+        toggleFavourite(id);
+      }}
     >
       <svg
         className={cn(
           // Transparent rather than none, so the fill can fade in with the colour.
           "size-5 fill-transparent stroke-current stroke-[1.7] transition-[fill] [stroke-linejoin:round]",
           active && "fill-current",
+          // Only when switched on here, not for every star already lit on mount.
+          popping && "animate-pop",
         )}
+        onAnimationEnd={() => setPopping(false)}
         viewBox="0 0 24 24"
         aria-hidden="true"
       >
