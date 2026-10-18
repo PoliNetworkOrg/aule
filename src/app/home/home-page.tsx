@@ -4,6 +4,7 @@ import { capitalise, formatRange, parseIsoDate, romeTodayIso } from "../state/ti
 import { Button, IconButton } from "../ui/button";
 import { Icon } from "../ui/icon";
 import { Nudge } from "../ui/nudge";
+import { usePresence } from "../ui/presence";
 import { Swap } from "../ui/swap";
 import { countActiveFilters, setControlsCollapsed, useStore } from "../state/store";
 import { Favourites } from "./favourites";
@@ -110,6 +111,8 @@ export function HomePage({ hidden }: { hidden: boolean }) {
   useLocale();
   const searching = useStore((state) => state.query.trim() !== "");
   const collapsed = useStore((state) => state.controlsCollapsed);
+  // Phones: the controls stay on screen a moment as they close.
+  const { leaving } = usePresence(!collapsed);
 
   return (
     <main className="mx-auto flex min-h-0 w-full max-w-content flex-1 flex-col" hidden={hidden}>
@@ -121,7 +124,7 @@ export function HomePage({ hidden }: { hidden: boolean }) {
       ) : (
         <div
           className={cn(
-            "flex min-h-0 flex-1 flex-col transition-opacity duration-150 ease-in-out starting:opacity-0",
+            "flex min-h-0 flex-1 flex-col transition-opacity duration-150 ease-in-out starting:opacity-0 max-lg:relative",
             "lg:grid lg:grid-cols-[384px_minmax(0,1fr)] lg:gap-9 lg:px-gutter lg:py-6",
             // Very short viewports (landscape phones): the page scrolls instead of squeezing results.
             "max-lg:short:flex-none max-lg:short:overflow-visible",
@@ -132,12 +135,15 @@ export function HomePage({ hidden }: { hidden: boolean }) {
             className={cn(
               "group/controls flex flex-none flex-col gap-3 px-gutter pt-3 pb-4.5 max-[600px]:scrollbar-none",
               // Phones: the controls open like a drawer, dropping in from the summary bar
-              // above (they only toggle `hidden`; closing is instant).
+              // above, and close by lifting back into it. Closing is quicker, and the
+              // drawer leaves the flow while it does so, over the results fading in.
               "max-lg:transition-[opacity,translate] max-lg:duration-250 max-lg:ease-smooth-out max-lg:starting:-translate-y-4 max-lg:starting:opacity-0",
               // Phones and tablets: two steps. First the parameters, full screen, with a
               // button to see the rooms; then the rooms, with a summary to edit them.
               collapsed
-                ? "max-lg:hidden"
+                ? leaving
+                  ? "max-lg:pointer-events-none max-lg:absolute max-lg:inset-x-0 max-lg:max-h-full max-lg:-translate-y-4 max-lg:overflow-y-hidden max-lg:opacity-0 max-lg:duration-150"
+                  : "max-lg:hidden"
                 : // The "Show n rooms" bar reaches the bottom edge itself, safe area included.
                   "max-lg:min-h-0 max-lg:flex-1 max-lg:gap-4 max-lg:overflow-y-auto max-lg:overscroll-contain max-lg:pt-4 max-lg:pb-0",
               // The inline padding leaves room for the range handles (and their focus
