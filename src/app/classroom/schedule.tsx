@@ -332,7 +332,11 @@ export function Schedule({
         })}
       </div>
 
-      <div className="flex flex-col gap-3">
+      {/* Keyed by day: picking another day fades its schedule in, not swaps it. */}
+      <div
+        key={day}
+        className="flex flex-col gap-3 transition-opacity duration-250 ease-in-out starting:opacity-0"
+      >
         <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
           <h3 className="text-18 font-bold">
             {capitalise(longDay.format(parseIsoDate(day)), locale)}
