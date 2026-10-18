@@ -9,6 +9,7 @@ import { Button, buttonVariants } from "../ui/button";
 import { Card, SectionTitle } from "../ui/card";
 import { RichText } from "../ui/rich-text";
 import { Icon } from "../ui/icon";
+import { Swap } from "../ui/swap";
 
 const REPOSITORY = "https://github.com/PoliNetworkOrg/aule";
 
@@ -40,7 +41,7 @@ function DataStatus() {
         onClick={() => void reloadOccupancy()}
       >
         <Icon name="refresh" className={cn(occupancy === "loading" && "animate-spin")} />
-        {occupancy === "loading" ? t("info.reloading") : t("info.reload")}
+        <Swap value={occupancy === "loading" ? t("info.reloading") : t("info.reload")} />
       </Button>
     </div>
   );
