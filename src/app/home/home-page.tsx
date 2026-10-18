@@ -87,21 +87,20 @@ function ShowResultsButton() {
       )}
     >
       <Button size="large" className="group" onClick={() => setControlsCollapsed(true)}>
-        <Swap
-          value={
-            loading
-              ? t("results.loading")
-              : count === 0
-                ? t("results.showNone")
-                : count === 1
-                  ? t("results.showOneResult")
-                  : tf("results.showResults", { n: count })
-          }
-        />
-        <Icon
-          name="arrow-right-02"
-          className="transition-[translate] duration-150 ease-smooth-out group-hover:translate-x-0.5"
-        />
+        <Nudge direction="right">
+          <Swap
+            value={
+              loading
+                ? t("results.loading")
+                : count === 0
+                  ? t("results.showNone")
+                  : count === 1
+                    ? t("results.showOneResult")
+                    : tf("results.showResults", { n: count })
+            }
+          />
+          <Icon name="arrow-right-02" />
+        </Nudge>
       </Button>
     </div>
   );
