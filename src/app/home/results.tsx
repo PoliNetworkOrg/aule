@@ -350,7 +350,7 @@ function ResultsList({
 
   if (occupancy === "loading" && !all.length)
     return (
-      <div className={resultsList} aria-busy="true">
+      <div key="loading" className={resultsList} aria-busy="true">
         {Array.from({ length: 3 }, (_, index) => (
           <div key={index}>
             <Skeleton className="mb-3 h-[18px] w-[140px]" />
@@ -365,7 +365,12 @@ function ResultsList({
     );
 
   return (
-    <div className={resultsList}>
+    // Keyed apart from the skeleton so it is a new element that fades in, as it does
+    // when the list comes back from the map.
+    <div
+      key="results"
+      className={cn(resultsList, "transition-opacity duration-250 ease-in-out starting:opacity-0")}
+    >
       <ResultsHints all={all} shown={shown} />
       {results.length ? (
         results.map((group) => <BuildingGroup key={group.key} group={group} />)
