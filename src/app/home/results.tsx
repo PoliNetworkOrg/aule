@@ -285,45 +285,50 @@ function ResultsHints({ all, shown }: { all: BuildingAvailability[]; shown: numb
 
   const offerPartial = !filters.partial && shown === 0 && partial > 0;
 
-  if (!offerPartial && !impact.length) return null;
-
   // The building header below adds its sticky padding on top of the list gap:
   // pull it closer so the hints sit 20px from both the toolbar and the header.
+  // Folded, the margins cancel the list gap so nothing is left of them.
   return (
-    <div className="mt-2 -mb-3 grid gap-2.5">
-      {offerPartial && (
-        <div className={hint}>
-          <Icon name="time-quarter-pass" className={hintIcon} />
-          <p className="text-14">{tf("results.onlyPartial", { n: partial })}</p>
-          <Button
-            variant="primary"
-            className={hintAction}
-            onClick={() => setFilters({ partial: true })}
-          >
-            <StableText k="results.showPartialButton" />
-          </Button>
-        </div>
-      )}
-      {impact.length > 0 && (
-        <div className={hint}>
-          <Icon name="filter-horizontal" className={hintIcon} />
-          <p className="text-14">{t("results.filterImpact")}</p>
-          <ChipRow className={hintAction}>
-            {impact.map(({ key, gain }) => (
-              <Chip key={key} variant="impact" onClick={() => clearFilter(key)}>
-                <Icon name="cancel-01" />
-                {key === "minSeats"
-                  ? tf("filters.seatsValue", { n: filters.minSeats })
-                  : key === "building"
-                    ? buildingLabel(filters.building, campusIds.length > 1)
-                    : t(FILTER_LABELS[key])}
-                <span className="font-bold text-free">+{gain}</span>
-              </Chip>
-            ))}
-          </ChipRow>
-        </div>
-      )}
-    </div>
+    <Reveal
+      show={offerPartial || impact.length > 0}
+      className="mt-2 -mb-3 starting:-mt-5 starting:mb-0"
+      folded="-mt-5 mb-0"
+    >
+      <div className="grid gap-2.5">
+        {offerPartial && (
+          <div className={hint}>
+            <Icon name="time-quarter-pass" className={hintIcon} />
+            <p className="text-14">{tf("results.onlyPartial", { n: partial })}</p>
+            <Button
+              variant="primary"
+              className={hintAction}
+              onClick={() => setFilters({ partial: true })}
+            >
+              <StableText k="results.showPartialButton" />
+            </Button>
+          </div>
+        )}
+        {impact.length > 0 && (
+          <div className={hint}>
+            <Icon name="filter-horizontal" className={hintIcon} />
+            <p className="text-14">{t("results.filterImpact")}</p>
+            <ChipRow className={hintAction}>
+              {impact.map(({ key, gain }) => (
+                <Chip key={key} variant="impact" onClick={() => clearFilter(key)}>
+                  <Icon name="cancel-01" />
+                  {key === "minSeats"
+                    ? tf("filters.seatsValue", { n: filters.minSeats })
+                    : key === "building"
+                      ? buildingLabel(filters.building, campusIds.length > 1)
+                      : t(FILTER_LABELS[key])}
+                  <span className="font-bold text-free">+{gain}</span>
+                </Chip>
+              ))}
+            </ChipRow>
+          </div>
+        )}
+      </div>
+    </Reveal>
   );
 }
 
