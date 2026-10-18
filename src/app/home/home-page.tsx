@@ -85,7 +85,7 @@ function ShowResultsButton() {
         "max-lg:border-t max-lg:border-t-border max-lg:bg-background",
       )}
     >
-      <Button size="large" onClick={() => setControlsCollapsed(true)}>
+      <Button size="large" className="group" onClick={() => setControlsCollapsed(true)}>
         <Swap
           value={
             loading
@@ -97,7 +97,10 @@ function ShowResultsButton() {
                   : tf("results.showResults", { n: count })
           }
         />
-        <Icon name="arrow-right-02" />
+        <Icon
+          name="arrow-right-02"
+          className="transition-[translate] duration-150 ease-smooth-out group-hover:translate-x-0.5"
+        />
       </Button>
     </div>
   );

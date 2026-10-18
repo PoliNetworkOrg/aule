@@ -222,7 +222,10 @@ function EventResults({ query }: { query: string }) {
                           {session.roomName} · {session.buildingAltName || session.buildingName} ·{" "}
                           {session.campusName}
                         </span>
-                        <Icon name="arrow-right-01" className="col-start-2 row-[1/3] text-subtle" />
+                        <Icon
+                          name="arrow-right-01"
+                          className="col-start-2 row-[1/3] text-subtle transition-[translate] duration-150 ease-smooth-out group-hover/session:translate-x-0.5"
+                        />
                       </button>
                     </li>
                   );
