@@ -446,7 +446,9 @@ export default function CampusMap({ results }: { results: BuildingAvailability[]
 
   return (
     <div className={cn("relative flex min-h-0 flex-1 max-md:flex-col", MAP_CONTROLS)}>
-      <div className="relative min-h-0 min-w-0 flex-1 bg-surface-muted">
+      {/* Clips what MapLibre draws past the canvas: markers of buildings off screen,
+          mid-flight, would otherwise sit over the building panel. */}
+      <div className="relative min-h-0 min-w-0 flex-1 overflow-clip bg-surface-muted">
         {/* MapLibre's unlayered stylesheet sets position: relative; keep the canvas filling this wrapper. */}
         <div
           className={cn(
