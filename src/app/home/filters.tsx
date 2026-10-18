@@ -16,6 +16,7 @@ import { Chip, ChipRow } from "../ui/chip";
 import { Field, FieldLabel } from "../ui/field";
 import { centreStable, insetFocus } from "../ui/focus";
 import { Icon } from "../ui/icon";
+import { IconSwap } from "../ui/icon-swap";
 import { pressable } from "../ui/motion";
 import { Panel, PanelHeader, PanelTitle } from "../ui/panel";
 import { Reveal } from "../ui/reveal";
@@ -53,7 +54,7 @@ function ToggleChip({
 }) {
   return (
     <Chip aria-pressed={active} onClick={onToggle}>
-      <Icon name={active ? "checkmark-circle-02" : icon} />
+      <IconSwap icon={icon} swapped={active} to="checkmark-circle-02" />
       {t(label)}
     </Chip>
   );
