@@ -27,18 +27,21 @@ export function Tag({
   return <span className={cn(tagVariants({ tone }), className)} {...props} />;
 }
 
-const statusDotVariants = cva("size-2 flex-none rounded-full bg-neutral", {
-  variants: {
-    status: {
-      free: "bg-free",
-      partial: "bg-partial",
-      occupied: "bg-busy",
-      closed: "bg-neutral",
-      eventsOnly: "bg-neutral",
-      unknown: "",
+const statusDotVariants = cva(
+  "size-2 flex-none rounded-full bg-neutral transition-[background-color]",
+  {
+    variants: {
+      status: {
+        free: "bg-free",
+        partial: "bg-partial",
+        occupied: "bg-busy",
+        closed: "bg-neutral",
+        eventsOnly: "bg-neutral",
+        unknown: "",
+      },
     },
   },
-});
+);
 
 /** The coloured dot before a room's name; decorative, the status is also spelled out. */
 export function StatusDot({
