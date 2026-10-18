@@ -174,13 +174,43 @@ function BuildingPanel({
   );
 }
 
+interface BuildingMarker {
+  marker: MapLibreMarker;
+  element: HTMLButtonElement;
+  /** The free-room count of a building marker; unused (and detached) on a dot. */
+  count: HTMLSpanElement;
+}
+
+// Marker elements are built outside React: their state is data attributes the
+// classes below react to, and a new one fades and swells in.
+const MARKER_APPEAR =
+  "transition-[background-color,border-color,color,opacity,scale] duration-250 ease-smooth-out starting:scale-90 starting:opacity-0";
+
+const MARKER_DOT = cn(
+  "size-3 rounded-full border-2 border-surface bg-neutral shadow-sm hover:bg-accent",
+  "data-[selected=true]:size-3.5 data-[selected=true]:bg-accent",
+);
+
+const MARKER_PILL = cn(
+  "inline-flex h-[30px] items-center gap-1.5 rounded-full border border-border bg-surface pr-1 pl-2.5",
+  "font-sans text-13 font-bold whitespace-nowrap text-foreground shadow-md hover:border-accent",
+  "data-[closed=true]:border-dashed data-[closed=true]:text-muted",
+  "data-[selected=true]:border-accent data-[selected=true]:bg-accent data-[selected=true]:text-on-accent",
+);
+
+const MARKER_COUNT = cn(
+  "inline-grid h-[22px] min-w-[22px] place-items-center rounded-full bg-free px-1.5 text-12 text-on-status",
+  "data-[empty=true]:bg-surface-muted data-[empty=true]:text-muted",
+);
+
 export default function CampusMap({ results }: { results: BuildingAvailability[] }) {
   useLocale();
   const theme = useTheme();
   const host = useRef<HTMLDivElement>(null);
   const campusSwitch = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
-  const markers = useRef<MapLibreMarker[]>([]);
+  const markers = useRef(new Map<string, BuildingMarker>());
+  const toggleBuilding = useRef<(key: string, campusId: string) => void>(() => {});
   const [library, setLibrary] = useState<MapLibreLibrary | null>(null);
   const [error, setError] = useState(false);
   const [drawn, setDrawn] = useState(false);
@@ -230,6 +260,7 @@ export default function CampusMap({ results }: { results: BuildingAvailability[]
   // Boot the map once.
   useEffect(() => {
     let disposed = false;
+    const live = markers.current;
 
     loadMapLibre()
       .then((maplibregl) => {
@@ -288,8 +319,8 @@ export default function CampusMap({ results }: { results: BuildingAvailability[]
 
     return () => {
       disposed = true;
-      markers.current.forEach((marker) => marker.remove());
-      markers.current = [];
+      live.forEach(({ marker }) => marker.remove());
+      live.clear();
       mapRef.current?.remove();
       mapRef.current = null;
     };
@@ -321,84 +352,95 @@ export default function CampusMap({ results }: { results: BuildingAvailability[]
     }
   }, [library, focusedCampus, selectedBuilding]);
 
+  // What a marker click does, with the selection as of the latest render.
+  useEffect(() => {
+    toggleBuilding.current = (key, campusId) => {
+      setFocusedCampusId(campusId);
+      setMapBuilding(key === selected ? null : key);
+    };
+  }, [selected]);
+
   // Building markers labelled with their free-room count for the current search.
+  // They persist and are updated in place: only buildings that appear or go away
+  // add or remove one, so a change of filters doesn't make every marker flash.
   useEffect(() => {
     const map = mapRef.current;
 
     if (!map || !library) return;
 
-    markers.current.forEach((marker) => marker.remove());
-    markers.current = [];
-
     const closed = date ? closedBuildings(campusIds, date, from, to) : new Set<string>();
+    const wanted = new Set<string>();
 
     for (const { key, campus, building } of entries) {
       if (!hasCoordinates(building)) continue;
 
-      const toggle = () => {
-        setFocusedCampusId(campus.id);
-        setMapBuilding(key === selected ? null : key);
-      };
+      wanted.add(key);
 
-      if (building.secondary) {
-        // Nothing to book: a small dot with no count, named on hover and in its panel.
-        const dot = document.createElement("button");
+      const label = `${buildingLabel(key, severalCampuses)}: `;
+      const free = results.find((group) => group.key === key)?.rooms.length ?? 0;
+      const isClosed = closed.has(key);
+      let entry = markers.current.get(key);
 
-        dot.type = "button";
-        dot.className = cn(
-          "size-3 rounded-full border-2 border-surface bg-neutral shadow-sm hover:bg-accent",
-          key === selected && "size-3.5 bg-accent",
-        );
-        dot.title = building.altName ? `${building.name} · ${building.altName}` : building.name;
-        dot.setAttribute(
-          "aria-label",
-          `${buildingLabel(key, severalCampuses)}: ${t("map.noClassrooms")}`,
-        );
-        dot.addEventListener("click", toggle);
-        markers.current.push(
-          new library.Marker({ element: dot, anchor: "center" })
+      if (!entry) {
+        const element = document.createElement("button");
+        const text = document.createElement("span");
+        const count = document.createElement("span");
+
+        element.type = "button";
+        element.addEventListener("click", () => toggleBuilding.current(key, campus.id));
+
+        if (building.secondary) {
+          // Nothing to book: a small dot with no count, named on hover and in its panel.
+          element.className = cn(MARKER_DOT, MARKER_APPEAR);
+          element.title = building.altName
+            ? `${building.name} · ${building.altName}`
+            : building.name;
+        } else {
+          // MapLibre adds its own classes (position, transform) to the element.
+          element.className = cn(MARKER_PILL, MARKER_APPEAR);
+          count.className = MARKER_COUNT;
+          text.textContent = building.altName || building.name;
+          element.append(text, count);
+        }
+
+        entry = {
+          marker: new library.Marker({
+            element,
+            anchor: building.secondary ? "center" : "bottom",
+          })
             .setLngLat([building.long, building.lat])
             .addTo(map),
-        );
-        continue;
+          element,
+          count,
+        };
+        markers.current.set(key, entry);
       }
 
-      const free = results.find((group) => group.key === key)?.rooms.length ?? 0;
+      const { element } = entry;
 
-      const element = document.createElement("button");
-      const label = document.createElement("span");
-      const count = document.createElement("span");
+      element.dataset.selected = String(key === selected);
+      element.dataset.closed = String(isClosed);
+      entry.count.dataset.empty = String(!free);
+      entry.count.textContent = String(free);
 
-      const isClosed = closed.has(key);
+      if (building.secondary) {
+        element.setAttribute("aria-label", `${label}${t("map.noClassrooms")}`);
+      } else {
+        element.setAttribute(
+          "aria-label",
+          `${label}${isClosed ? t("map.closed") : tf("results.available", { n: free })}`,
+        );
 
-      element.type = "button";
-      // MapLibre adds its own classes (position, transform) to the element.
-      element.className = cn(
-        "inline-flex h-[30px] items-center gap-1.5 rounded-full border border-border bg-surface pr-1 pl-2.5",
-        "font-sans text-13 font-bold whitespace-nowrap text-foreground shadow-md hover:border-accent",
-        isClosed && "border-dashed text-muted",
-        key === selected && "border-accent bg-accent text-on-accent",
-      );
-      element.setAttribute(
-        "aria-label",
-        `${buildingLabel(key, severalCampuses)}: ${isClosed ? t("map.closed") : tf("results.available", { n: free })}`,
-      );
+        if (isClosed) element.title = t("map.closed");
+        else element.removeAttribute("title");
+      }
+    }
 
-      if (isClosed) element.title = t("map.closed");
+    for (const [key, { marker }] of markers.current) {
+      if (wanted.has(key)) continue;
 
-      label.textContent = building.altName || building.name;
-      count.className = cn(
-        "inline-grid h-[22px] min-w-[22px] place-items-center rounded-full bg-free px-1.5 text-12 text-on-status",
-        !free && "bg-surface-muted text-muted",
-      );
-      count.textContent = String(free);
-      element.append(label, count);
-      element.addEventListener("click", toggle);
-      markers.current.push(
-        new library.Marker({ element, anchor: "bottom" })
-          .setLngLat([building.long, building.lat])
-          .addTo(map),
-      );
+      marker.remove();
+      markers.current.delete(key);
     }
   }, [library, entries, campusIds, severalCampuses, results, selected, date, from, to]);
 
