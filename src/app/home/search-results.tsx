@@ -262,7 +262,7 @@ export function SearchResults() {
 
   return (
     <div
-      className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-gutter pt-5 pb-8 lg:pt-7"
+      className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-gutter pt-5 pb-8 transition-opacity duration-150 ease-in-out starting:opacity-0 lg:pt-7"
       aria-live="polite"
     >
       {empty ? (

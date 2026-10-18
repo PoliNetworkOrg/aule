@@ -113,7 +113,7 @@ export function HomePage({ hidden }: { hidden: boolean }) {
       ) : (
         <div
           className={cn(
-            "flex min-h-0 flex-1 flex-col",
+            "flex min-h-0 flex-1 flex-col transition-opacity duration-150 ease-in-out starting:opacity-0",
             "lg:grid lg:grid-cols-[384px_minmax(0,1fr)] lg:gap-9 lg:px-gutter lg:py-6",
             // Very short viewports (landscape phones): the page scrolls instead of squeezing results.
             "max-lg:short:flex-none max-lg:short:overflow-visible",
