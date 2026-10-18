@@ -6,12 +6,15 @@ import { SlidingPill } from "./sliding-pill";
 /** A row of mutually exclusive options (role="group" of aria-pressed buttons). */
 export function Segmented({
   fill = false,
+  pillClassName,
   className,
   children,
   ref,
   ...props
 }: Omit<ComponentProps<"div">, "ref"> & {
   fill?: boolean;
+  /** Restyles the highlight behind the pressed option (an accent one, say). */
+  pillClassName?: string;
   /** The row's element, for callers that need to reach into it. */
   ref?: RefObject<HTMLDivElement | null>;
 }) {
@@ -28,7 +31,10 @@ export function Segmented({
       )}
       {...props}
     >
-      <SlidingPill host={host} className="rounded-[calc(var(--radius-md)-3px)]" />
+      <SlidingPill
+        host={host}
+        className={cn("rounded-[calc(var(--radius-md)-3px)]", pillClassName)}
+      />
       {children}
     </div>
   );

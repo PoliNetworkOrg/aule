@@ -351,13 +351,14 @@ export default function LocationMap({
       />
       <Segmented
         className="absolute top-2.5 left-2.5 z-2 bg-surface shadow-sm"
+        pillClassName="bg-accent shadow-none"
         role="group"
         aria-label={t("classroom.mapView")}
       >
         {VIEWS.map((option) => (
           <SegmentedOption
             key={option}
-            className="min-h-7 px-2.5 text-13 tabular-nums aria-pressed:bg-accent aria-pressed:text-on-accent"
+            className="min-h-7 px-2.5 text-13 tabular-nums aria-pressed:text-on-accent"
             aria-pressed={view === option}
             onClick={() => selectView(option)}
           >
