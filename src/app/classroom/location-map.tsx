@@ -12,6 +12,7 @@ import {
   loadMapLibre,
   MAP_CONTROLS,
   mapControlsLocale,
+  onFirstRender,
   onStyleFailure,
   OPENFREEMAP_ATTRIBUTION,
   reduceMotion,
@@ -182,6 +183,7 @@ export default function LocationMap({
   const placed = useRef(false);
   const [library, setLibrary] = useState<MapLibreLibrary | null>(null);
   const [error, setError] = useState(false);
+  const [drawn, setDrawn] = useState(false);
   const [view, setView] = useState(savedView);
   const near = useNearViewport(host);
   const label = buildingLabel(building);
@@ -242,6 +244,7 @@ export default function LocationMap({
           console.error("Location map style failed to load", reason);
           setError(true);
         });
+        onFirstRender(map, () => !disposed && setDrawn(true));
         applyMapTheme(map);
         mapRef.current = map;
         setLibrary(maplibregl);
@@ -260,6 +263,7 @@ export default function LocationMap({
       mapRef.current = null;
       placed.current = false;
       setLibrary(null);
+      setDrawn(false);
     };
     // The page keys this component by building, and camera moves happen below,
     // so only the language rebuilds the map.
@@ -344,7 +348,10 @@ export default function LocationMap({
       {/* Sized, not absolutely positioned: MapLibre's own stylesheet (loaded
           later) makes its container `position: relative`. */}
       <div
-        className="size-full"
+        className={cn(
+          "size-full transition-opacity duration-250 ease-in-out",
+          !drawn && "opacity-0",
+        )}
         ref={host}
         role="application"
         aria-label={tf("classroom.mapOf", { building: label })}
