@@ -22,6 +22,7 @@ import { Panel, PanelHeader, PanelTitle } from "../ui/panel";
 import { Reveal } from "../ui/reveal";
 import { Segmented, SegmentedOption } from "../ui/segmented";
 import { StableText } from "../ui/stable";
+import { Swap } from "../ui/swap";
 import { buildingLabel } from "./campus-label";
 
 const SEAT_OPTIONS: SeatsFilter[] = [0, 30, 60, 100, 200];
@@ -183,7 +184,7 @@ export function Filters() {
           <Icon name="cancel-01" />
           {t("filters.reset")}
           <span className="inline-grid h-4.5 min-w-4.5 place-items-center rounded-full bg-busy text-11 text-on-status">
-            {active}
+            <Swap value={active} />
           </span>
         </button>
       </PanelHeader>
