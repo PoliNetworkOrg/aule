@@ -3,6 +3,7 @@ import { t, tf, useLocale } from "../i18n";
 import { capitalise, formatRange, parseIsoDate, romeTodayIso } from "../state/time";
 import { Button, IconButton } from "../ui/button";
 import { Icon } from "../ui/icon";
+import { Swap } from "../ui/swap";
 import { countActiveFilters, setControlsCollapsed, useStore } from "../state/store";
 import { Favourites } from "./favourites";
 import { Filters } from "./filters";
@@ -85,13 +86,17 @@ function ShowResultsButton() {
       )}
     >
       <Button size="large" onClick={() => setControlsCollapsed(true)}>
-        {loading
-          ? t("results.loading")
-          : count === 0
-            ? t("results.showNone")
-            : count === 1
-              ? t("results.showOneResult")
-              : tf("results.showResults", { n: count })}
+        <Swap
+          value={
+            loading
+              ? t("results.loading")
+              : count === 0
+                ? t("results.showNone")
+                : count === 1
+                  ? t("results.showOneResult")
+                  : tf("results.showResults", { n: count })
+          }
+        />
         <Icon name="arrow-right-02" />
       </Button>
     </div>
