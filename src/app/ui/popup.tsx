@@ -13,6 +13,7 @@ import { IconButton } from "./button";
 import { insetFocus } from "./focus";
 import { Icon } from "./icon";
 import { pressable } from "./motion";
+import { usePresence } from "./presence";
 
 // One primitive for every picker: a panel anchored under its trigger on
 // desktop, a bottom sheet on phones. Escape, a click outside or the close
@@ -83,6 +84,7 @@ export function Popup({
   const header = useRef<HTMLDivElement>(null);
   const body = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState<Position | null>(null);
+  const { mounted, leaving } = usePresence(open);
 
   useLayoutEffect(() => {
     if (!open || sheet || !anchor.current) return;
@@ -171,7 +173,7 @@ export function Popup({
     };
   }, [open, anchor, onClose]);
 
-  if (!open) return null;
+  if (!mounted) return null;
 
   const style =
     sheet || !position
@@ -185,11 +187,12 @@ export function Popup({
         };
 
   return createPortal(
-    <div className="fixed inset-0 z-50">
+    <div className={cn("fixed inset-0 z-50", leaving && "pointer-events-none")}>
       <div
         className={cn(
           "absolute inset-0",
           sheet && "bg-scrim/40 transition-opacity duration-150 ease-smooth-out starting:opacity-0",
+          sheet && leaving && "opacity-0",
         )}
         onClick={onClose}
       />
@@ -197,13 +200,15 @@ export function Popup({
         ref={panel}
         className={cn(
           "fixed flex flex-col overflow-hidden rounded-lg border border-border bg-surface shadow-md",
-          // Closing (unmount) is instant, as closes should get out of the way.
+          // Opens in 250ms and closes quicker, in 150ms (usePresence keeps it mounted for that).
           "duration-250 ease-smooth-out starting:opacity-0",
+          leaving && "opacity-0 duration-150",
           sheet
             ? // Rises a short way rather than the full sheet height: a nudge, not a drawer.
               "right-0 bottom-0 left-0 max-h-[80dvh] rounded-t-xl rounded-b-none border-b-0 pb-[env(safe-area-inset-bottom)] transition-[opacity,translate] starting:translate-y-2"
             : // Fades and grows out of its trigger's edge (transformOrigin, below).
               "transition-[opacity,scale] starting:scale-97",
+          leaving && (sheet ? "translate-y-2" : "scale-97"),
         )}
         role="dialog"
         aria-modal="true"
