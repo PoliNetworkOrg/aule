@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
+import { cn } from "../../lib/cn";
 import { formatRomeYYYYMMDD } from "../available-rooms-script";
 import { t } from "../i18n";
 import { useStore } from "../state/store";
@@ -74,7 +75,13 @@ export function StaleDataWarning() {
           role="note"
           className="absolute top-full right-gutter z-3 w-80 max-w-[calc(100vw-2rem)] pt-2 lg:right-5"
         >
-          <p className="rounded-md border border-partial-border bg-surface px-3 py-2.5 text-14 text-partial shadow-md">
+          <p
+            className={cn(
+              "rounded-md border border-partial-border bg-surface px-3 py-2.5 text-14 text-partial shadow-md",
+              // Grows out of the button's corner; closing is instant, like a tooltip.
+              "origin-top-right transition-[opacity,scale] duration-150 ease-smooth-out starting:scale-98 starting:opacity-0",
+            )}
+          >
             {t("data.stale")}
           </p>
         </div>
