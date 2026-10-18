@@ -21,6 +21,7 @@ import { Button, buttonVariants } from "../ui/button";
 import { Card } from "../ui/card";
 import { EmptyState, emptyStateAction } from "../ui/empty-state";
 import { Icon } from "../ui/icon";
+import { Nudge } from "../ui/nudge";
 import { PanelTitle } from "../ui/panel";
 import { StatusDot } from "../ui/tag";
 import { Schedule } from "./schedule";
@@ -339,11 +340,10 @@ export function ClassroomPage({
         className="group mb-2 -ml-1.5 inline-flex min-h-10 items-center gap-1.5 rounded-md pr-2.5 pl-1.5 text-14 font-semibold text-muted hover:bg-accent-soft hover:text-accent-strong"
         onClick={leavePage}
       >
-        <Icon
-          name="arrow-left-01"
-          className="transition-[translate] duration-150 ease-smooth-out group-hover:-translate-x-0.5"
-        />
-        {t("classroom.back")}
+        <Nudge direction="left">
+          <Icon name="arrow-left-01" />
+          {t("classroom.back")}
+        </Nudge>
       </button>
 
       <div className="grid gap-4 lg:grid-cols-[380px_minmax(0,1fr)] lg:gap-6 lg:[align-items:start]">
