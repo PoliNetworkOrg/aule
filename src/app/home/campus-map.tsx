@@ -18,6 +18,7 @@ import {
   loadMapLibre,
   MAP_CONTROLS,
   mapControlsLocale,
+  onFirstRender,
   onStyleFailure,
   OPENFREEMAP_ATTRIBUTION,
   reduceMotion,
@@ -179,6 +180,7 @@ export default function CampusMap({ results }: { results: BuildingAvailability[]
   const markers = useRef<MapLibreMarker[]>([]);
   const [library, setLibrary] = useState<MapLibreLibrary | null>(null);
   const [error, setError] = useState(false);
+  const [drawn, setDrawn] = useState(false);
   const [focusedCampusId, setFocusedCampusId] = useState<string | null>(null);
   const campusIds = useStore((state) => state.campusIds);
   const selected = useStore((state) => state.mapBuilding);
@@ -270,6 +272,7 @@ export default function CampusMap({ results }: { results: BuildingAvailability[]
           console.error("Campus map style failed to load", reason);
           setError(true);
         });
+        onFirstRender(map, () => !disposed && setDrawn(true));
         applyMapTheme(map);
         mapRef.current = map;
         setLibrary(maplibregl);
@@ -401,7 +404,10 @@ export default function CampusMap({ results }: { results: BuildingAvailability[]
       <div className="relative min-h-0 min-w-0 flex-1 bg-surface-muted">
         {/* MapLibre's unlayered stylesheet sets position: relative; keep the canvas filling this wrapper. */}
         <div
-          className="absolute! inset-0"
+          className={cn(
+            "absolute! inset-0 transition-opacity duration-250 ease-in-out",
+            !drawn && "opacity-0",
+          )}
           ref={host}
           role="application"
           aria-label={t("results.map")}
