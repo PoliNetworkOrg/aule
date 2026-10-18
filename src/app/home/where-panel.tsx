@@ -63,7 +63,7 @@ export function WherePanel() {
         ref={trigger}
         type="button"
         className={cn(
-          "flex min-h-13 w-full items-center gap-3 rounded-md border border-border-strong bg-surface px-3.5 py-1.5 text-left",
+          "group flex min-h-13 w-full items-center gap-3 rounded-md border border-border-strong bg-surface px-3.5 py-1.5 text-left",
           "transition-[border-color,scale] hover:border-accent aria-expanded:border-accent",
           pressableLarge,
         )}
@@ -79,7 +79,10 @@ export function WherePanel() {
         </span>
         <span className="inline-flex items-center gap-1 text-13 font-bold text-accent-strong">
           {t("where.change")}
-          <Icon name="arrow-down-01" />
+          <Icon
+            name="arrow-down-01"
+            className="transition-[translate] duration-150 ease-smooth-out group-hover:translate-y-0.5"
+          />
         </span>
       </button>
       <Popup open={open} anchor={trigger} title={t("campus.choose")} onClose={close}>

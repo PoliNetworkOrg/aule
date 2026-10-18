@@ -45,7 +45,7 @@ function ControlsSummary() {
       // compact as the search bar above it (see search-bar.tsx). Muted, unlike
       // the white search field: a summary, not an input.
       className={cn(
-        "hidden icon:text-accent max-lg:mx-gutter max-lg:my-2 max-lg:flex max-lg:h-10 max-lg:items-center max-lg:gap-2.5",
+        "group hidden icon:text-accent max-lg:mx-gutter max-lg:my-2 max-lg:flex max-lg:h-10 max-lg:items-center max-lg:gap-2.5",
         "max-lg:rounded-lg max-lg:border max-lg:border-border max-lg:bg-surface-muted max-lg:px-3.5 max-lg:text-left max-lg:text-14",
       )}
       hidden={!collapsed}
@@ -61,7 +61,10 @@ function ControlsSummary() {
       </span>
       <span className="inline-flex items-center gap-1 text-13 font-bold text-accent-strong">
         {t("filters.edit")}
-        <Icon name="arrow-down-01" />
+        <Icon
+          name="arrow-down-01"
+          className="transition-[translate] duration-150 ease-smooth-out group-hover:translate-y-0.5"
+        />
       </span>
     </button>
   );
