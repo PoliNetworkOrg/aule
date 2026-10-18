@@ -323,9 +323,18 @@
     display: none !important;
   }
 
+  /* The ring draws itself in from the element's edge. Quick: it answers a keystroke. */
   :focus-visible {
     outline: 2px solid var(--color-accent);
     outline-offset: 2px;
+    animation: focus-ring 100ms var(--ease-smooth-out);
+  }
+
+  @keyframes focus-ring {
+    from {
+      outline-color: transparent;
+      outline-offset: 0;
+    }
   }
 
   /* ---------- Page transitions ---------- */
