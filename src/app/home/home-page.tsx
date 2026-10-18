@@ -3,6 +3,7 @@ import { t, tf, useLocale } from "../i18n";
 import { capitalise, formatRange, parseIsoDate, romeTodayIso } from "../state/time";
 import { Button, IconButton } from "../ui/button";
 import { Icon } from "../ui/icon";
+import { Nudge } from "../ui/nudge";
 import { Swap } from "../ui/swap";
 import { countActiveFilters, setControlsCollapsed, useStore } from "../state/store";
 import { Favourites } from "./favourites";
@@ -59,13 +60,10 @@ function ControlsSummary() {
           <> · {tf(active === 1 ? "filters.oneActive" : "filters.active", { n: active })}</>
         )}
       </span>
-      <span className="inline-flex items-center gap-1 text-13 font-bold text-accent-strong">
+      <Nudge direction="down" className="gap-1 text-13 font-bold text-accent-strong">
         {t("filters.edit")}
-        <Icon
-          name="arrow-down-01"
-          className="transition-[translate] duration-150 ease-smooth-out group-hover:translate-y-0.5"
-        />
-      </span>
+        <Icon name="arrow-down-01" />
+      </Nudge>
     </button>
   );
 }

@@ -4,6 +4,7 @@ import { t, tf, useLocale } from "../i18n";
 import { campuses } from "../state/availability";
 import { setCampuses, toggledCampuses, useStore } from "../state/store";
 import { Icon } from "../ui/icon";
+import { Nudge } from "../ui/nudge";
 import { pressableLarge } from "../ui/motion";
 import { Panel, PanelHeader, PanelTitle } from "../ui/panel";
 import { CheckList, Popup, type CheckGroup } from "../ui/popup";
@@ -77,13 +78,10 @@ export function WherePanel() {
           <span className="truncate text-17 font-bold">{label?.title || "…"}</span>
           <span className="truncate text-13 text-muted">{label?.subtitle}</span>
         </span>
-        <span className="inline-flex items-center gap-1 text-13 font-bold text-accent-strong">
+        <Nudge direction="down" className="gap-1 text-13 font-bold text-accent-strong">
           {t("where.change")}
-          <Icon
-            name="arrow-down-01"
-            className="transition-[translate] duration-150 ease-smooth-out group-hover:translate-y-0.5"
-          />
-        </span>
+          <Icon name="arrow-down-01" />
+        </Nudge>
       </button>
       <Popup open={open} anchor={trigger} title={t("campus.choose")} onClose={close}>
         <CheckList
