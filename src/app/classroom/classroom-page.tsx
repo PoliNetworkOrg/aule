@@ -80,7 +80,7 @@ function NowStatus({ entry }: { entry: ClassroomEntry }) {
   return (
     <p
       className={cn(
-        "flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md px-3 py-2.5 text-14",
+        "flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md px-3 py-2.5 text-14 transition-[background-color,color]",
         status.state === "free" && "bg-free-soft text-free",
         status.state === "busy" && "bg-busy-soft text-busy",
         status.state === "closed" && "bg-surface-muted text-muted",
