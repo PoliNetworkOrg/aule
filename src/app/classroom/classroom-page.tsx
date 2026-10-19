@@ -21,6 +21,7 @@ import { Button, buttonVariants } from "../ui/button";
 import { Card } from "../ui/card";
 import { EmptyState, emptyStateAction } from "../ui/empty-state";
 import { Icon } from "../ui/icon";
+import { Nudge } from "../ui/nudge";
 import { PanelTitle } from "../ui/panel";
 import { StatusDot } from "../ui/tag";
 import { Schedule } from "./schedule";
@@ -80,7 +81,7 @@ function NowStatus({ entry }: { entry: ClassroomEntry }) {
   return (
     <p
       className={cn(
-        "flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md px-3 py-2.5 text-14",
+        "flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md px-3 py-2.5 text-14 transition-[background-color,color]",
         status.state === "free" && "bg-free-soft text-free",
         status.state === "busy" && "bg-busy-soft text-busy",
         status.state === "closed" && "bg-surface-muted text-muted",
@@ -179,7 +180,12 @@ function Photo({ roomId, roomName }: { roomId: number; roomName: string }) {
           />
         )}
         {state === "ready" && (
-          <span className="absolute right-3 bottom-3 inline-flex items-center gap-1.5 rounded-md bg-scrim/82 px-2.5 py-[7px] text-13 font-bold text-white">
+          <span
+            className={cn(
+              "absolute right-3 bottom-3 inline-flex items-center gap-1.5 rounded-md bg-scrim/82 px-2.5 py-[7px] text-13 font-bold text-white",
+              "transition-opacity duration-250 ease-in-out starting:opacity-0",
+            )}
+          >
             <Icon name="full-screen" />
             {t("classroom.enlarge")}
           </span>
@@ -264,14 +270,16 @@ function Location({ entry }: { entry: ClassroomEntry }) {
       )}
       <div className="flex flex-wrap gap-2">
         <a
-          className={buttonVariants({ variant: "ghost" })}
+          className={cn(buttonVariants({ variant: "ghost" }), "group")}
           href={directionsUrl}
           target="_blank"
           rel="noopener noreferrer"
         >
           <Icon name="directions-01" className="text-18" />
-          {t("classroom.directions")}
-          <Icon name="arrow-up-right-01" className="text-14 text-subtle" />
+          <Nudge direction="right">
+            {t("classroom.directions")}
+            <Icon name="arrow-up-right-01" className="text-14 text-subtle" />
+          </Nudge>
         </a>
       </div>
     </Card>
@@ -328,11 +336,13 @@ export function ClassroomPage({
     <main className={PAGE}>
       <button
         type="button"
-        className="mb-2 -ml-1.5 inline-flex min-h-10 items-center gap-1.5 rounded-md pr-2.5 pl-1.5 text-14 font-semibold text-muted hover:bg-accent-soft hover:text-accent-strong"
+        className="group mb-2 -ml-1.5 inline-flex min-h-10 items-center gap-1.5 rounded-md pr-2.5 pl-1.5 text-14 font-semibold text-muted hover:bg-accent-soft hover:text-accent-strong"
         onClick={leavePage}
       >
-        <Icon name="arrow-left-01" />
-        {t("classroom.back")}
+        <Nudge direction="left">
+          <Icon name="arrow-left-01" />
+          {t("classroom.back")}
+        </Nudge>
       </button>
 
       <div className="grid gap-4 lg:grid-cols-[380px_minmax(0,1fr)] lg:gap-6 lg:[align-items:start]">

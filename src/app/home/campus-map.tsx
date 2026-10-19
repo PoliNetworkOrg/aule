@@ -18,6 +18,7 @@ import {
   loadMapLibre,
   MAP_CONTROLS,
   mapControlsLocale,
+  onFirstRender,
   onStyleFailure,
   OPENFREEMAP_ATTRIBUTION,
   reduceMotion,
@@ -94,6 +95,9 @@ function BuildingPanel({
       className={cn(
         "flex w-[340px] flex-none flex-col gap-2.5 overflow-y-auto border-l border-border bg-surface p-3.5",
         "max-md:max-h-[48%] max-md:w-auto max-md:border-t max-md:border-l-0",
+        // Settles in from the side (from below on phones, where it's a lower panel).
+        // Closing is instant; the map is resized once, as the panel takes its room.
+        "transition-[opacity,translate] duration-250 ease-smooth-out starting:translate-x-3 starting:opacity-0 max-md:starting:translate-x-0 max-md:starting:translate-y-3",
       )}
       aria-label={label}
     >
@@ -170,15 +174,46 @@ function BuildingPanel({
   );
 }
 
+interface BuildingMarker {
+  marker: MapLibreMarker;
+  element: HTMLButtonElement;
+  /** The free-room count of a building marker; unused (and detached) on a dot. */
+  count: HTMLSpanElement;
+}
+
+// Marker elements are built outside React: their state is data attributes the
+// classes below react to, and a new one fades and swells in.
+const MARKER_APPEAR =
+  "transition-[background-color,border-color,color,opacity,scale] duration-250 ease-smooth-out starting:scale-90 starting:opacity-0";
+
+const MARKER_DOT = cn(
+  "size-3 rounded-full border-2 border-surface bg-neutral shadow-sm hover:bg-accent",
+  "data-[selected=true]:size-3.5 data-[selected=true]:bg-accent",
+);
+
+const MARKER_PILL = cn(
+  "inline-flex h-[30px] items-center gap-1.5 rounded-full border border-border bg-surface pr-1 pl-2.5",
+  "font-sans text-13 font-bold whitespace-nowrap text-foreground shadow-md hover:border-accent",
+  "data-[closed=true]:border-dashed data-[closed=true]:text-muted",
+  "data-[selected=true]:border-accent data-[selected=true]:bg-accent data-[selected=true]:text-on-accent",
+);
+
+const MARKER_COUNT = cn(
+  "inline-grid h-[22px] min-w-[22px] place-items-center rounded-full bg-free px-1.5 text-12 text-on-status",
+  "data-[empty=true]:bg-surface-muted data-[empty=true]:text-muted",
+);
+
 export default function CampusMap({ results }: { results: BuildingAvailability[] }) {
   useLocale();
   const theme = useTheme();
   const host = useRef<HTMLDivElement>(null);
   const campusSwitch = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
-  const markers = useRef<MapLibreMarker[]>([]);
+  const markers = useRef(new Map<string, BuildingMarker>());
+  const toggleBuilding = useRef<(key: string, campusId: string) => void>(() => {});
   const [library, setLibrary] = useState<MapLibreLibrary | null>(null);
   const [error, setError] = useState(false);
+  const [drawn, setDrawn] = useState(false);
   const [focusedCampusId, setFocusedCampusId] = useState<string | null>(null);
   const campusIds = useStore((state) => state.campusIds);
   const selected = useStore((state) => state.mapBuilding);
@@ -225,6 +260,7 @@ export default function CampusMap({ results }: { results: BuildingAvailability[]
   // Boot the map once.
   useEffect(() => {
     let disposed = false;
+    const live = markers.current;
 
     loadMapLibre()
       .then((maplibregl) => {
@@ -270,6 +306,7 @@ export default function CampusMap({ results }: { results: BuildingAvailability[]
           console.error("Campus map style failed to load", reason);
           setError(true);
         });
+        onFirstRender(map, () => !disposed && setDrawn(true));
         applyMapTheme(map);
         mapRef.current = map;
         setLibrary(maplibregl);
@@ -282,8 +319,8 @@ export default function CampusMap({ results }: { results: BuildingAvailability[]
 
     return () => {
       disposed = true;
-      markers.current.forEach((marker) => marker.remove());
-      markers.current = [];
+      live.forEach(({ marker }) => marker.remove());
+      live.clear();
       mapRef.current?.remove();
       mapRef.current = null;
     };
@@ -315,93 +352,109 @@ export default function CampusMap({ results }: { results: BuildingAvailability[]
     }
   }, [library, focusedCampus, selectedBuilding]);
 
+  // What a marker click does, with the selection as of the latest render.
+  useEffect(() => {
+    toggleBuilding.current = (key, campusId) => {
+      setFocusedCampusId(campusId);
+      setMapBuilding(key === selected ? null : key);
+    };
+  }, [selected]);
+
   // Building markers labelled with their free-room count for the current search.
+  // They persist and are updated in place: only buildings that appear or go away
+  // add or remove one, so a change of filters doesn't make every marker flash.
   useEffect(() => {
     const map = mapRef.current;
 
     if (!map || !library) return;
 
-    markers.current.forEach((marker) => marker.remove());
-    markers.current = [];
-
     const closed = date ? closedBuildings(campusIds, date, from, to) : new Set<string>();
+    const wanted = new Set<string>();
 
     for (const { key, campus, building } of entries) {
       if (!hasCoordinates(building)) continue;
 
-      const toggle = () => {
-        setFocusedCampusId(campus.id);
-        setMapBuilding(key === selected ? null : key);
-      };
+      wanted.add(key);
 
-      if (building.secondary) {
-        // Nothing to book: a small dot with no count, named on hover and in its panel.
-        const dot = document.createElement("button");
+      const label = `${buildingLabel(key, severalCampuses)}: `;
+      const free = results.find((group) => group.key === key)?.rooms.length ?? 0;
+      const isClosed = closed.has(key);
+      let entry = markers.current.get(key);
 
-        dot.type = "button";
-        dot.className = cn(
-          "size-3 rounded-full border-2 border-surface bg-neutral shadow-sm hover:bg-accent",
-          key === selected && "size-3.5 bg-accent",
-        );
-        dot.title = building.altName ? `${building.name} · ${building.altName}` : building.name;
-        dot.setAttribute(
-          "aria-label",
-          `${buildingLabel(key, severalCampuses)}: ${t("map.noClassrooms")}`,
-        );
-        dot.addEventListener("click", toggle);
-        markers.current.push(
-          new library.Marker({ element: dot, anchor: "center" })
+      if (!entry) {
+        const element = document.createElement("button");
+        const text = document.createElement("span");
+        const count = document.createElement("span");
+
+        element.type = "button";
+        element.addEventListener("click", () => toggleBuilding.current(key, campus.id));
+
+        if (building.secondary) {
+          // Nothing to book: a small dot with no count, named on hover and in its panel.
+          element.className = cn(MARKER_DOT, MARKER_APPEAR);
+          element.title = building.altName
+            ? `${building.name} · ${building.altName}`
+            : building.name;
+        } else {
+          // MapLibre adds its own classes (position, transform) to the element.
+          element.className = cn(MARKER_PILL, MARKER_APPEAR);
+          count.className = MARKER_COUNT;
+          text.textContent = building.altName || building.name;
+          element.append(text, count);
+        }
+
+        entry = {
+          marker: new library.Marker({
+            element,
+            anchor: building.secondary ? "center" : "bottom",
+          })
             .setLngLat([building.long, building.lat])
             .addTo(map),
-        );
-        continue;
+          element,
+          count,
+        };
+        markers.current.set(key, entry);
       }
 
-      const free = results.find((group) => group.key === key)?.rooms.length ?? 0;
+      const { element } = entry;
 
-      const element = document.createElement("button");
-      const label = document.createElement("span");
-      const count = document.createElement("span");
+      element.dataset.selected = String(key === selected);
+      element.dataset.closed = String(isClosed);
+      entry.count.dataset.empty = String(!free);
+      entry.count.textContent = String(free);
 
-      const isClosed = closed.has(key);
+      if (building.secondary) {
+        element.setAttribute("aria-label", `${label}${t("map.noClassrooms")}`);
+      } else {
+        element.setAttribute(
+          "aria-label",
+          `${label}${isClosed ? t("map.closed") : tf("results.available", { n: free })}`,
+        );
 
-      element.type = "button";
-      // MapLibre adds its own classes (position, transform) to the element.
-      element.className = cn(
-        "inline-flex h-[30px] items-center gap-1.5 rounded-full border border-border bg-surface pr-1 pl-2.5",
-        "font-sans text-13 font-bold whitespace-nowrap text-foreground shadow-md hover:border-accent",
-        isClosed && "border-dashed text-muted",
-        key === selected && "border-accent bg-accent text-on-accent",
-      );
-      element.setAttribute(
-        "aria-label",
-        `${buildingLabel(key, severalCampuses)}: ${isClosed ? t("map.closed") : tf("results.available", { n: free })}`,
-      );
+        if (isClosed) element.title = t("map.closed");
+        else element.removeAttribute("title");
+      }
+    }
 
-      if (isClosed) element.title = t("map.closed");
+    for (const [key, { marker }] of markers.current) {
+      if (wanted.has(key)) continue;
 
-      label.textContent = building.altName || building.name;
-      count.className = cn(
-        "inline-grid h-[22px] min-w-[22px] place-items-center rounded-full bg-free px-1.5 text-12 text-on-status",
-        !free && "bg-surface-muted text-muted",
-      );
-      count.textContent = String(free);
-      element.append(label, count);
-      element.addEventListener("click", toggle);
-      markers.current.push(
-        new library.Marker({ element, anchor: "bottom" })
-          .setLngLat([building.long, building.lat])
-          .addTo(map),
-      );
+      marker.remove();
+      markers.current.delete(key);
     }
   }, [library, entries, campusIds, severalCampuses, results, selected, date, from, to]);
 
   return (
     <div className={cn("relative flex min-h-0 flex-1 max-md:flex-col", MAP_CONTROLS)}>
-      <div className="relative min-h-0 min-w-0 flex-1 bg-surface-muted">
+      {/* Clips what MapLibre draws past the canvas: markers of buildings off screen,
+          mid-flight, would otherwise sit over the building panel. */}
+      <div className="relative min-h-0 min-w-0 flex-1 overflow-clip bg-surface-muted">
         {/* MapLibre's unlayered stylesheet sets position: relative; keep the canvas filling this wrapper. */}
         <div
-          className="absolute! inset-0"
+          className={cn(
+            "absolute! inset-0 transition-opacity duration-250 ease-in-out",
+            !drawn && "opacity-0",
+          )}
           ref={host}
           role="application"
           aria-label={t("results.map")}
@@ -431,13 +484,13 @@ export default function CampusMap({ results }: { results: BuildingAvailability[]
         )}
       </div>
       {error && (
-        <div className="absolute inset-0 flex items-center justify-center gap-2 text-muted">
+        <div className="absolute inset-0 flex items-center justify-center gap-2 text-muted transition-opacity duration-250 ease-in-out starting:opacity-0">
           <Icon name="alert-02" />
           {t("map.error")}
         </div>
       )}
       {!selectedEntry && !error && (
-        <p className="pointer-events-none absolute bottom-7 left-1/2 -translate-x-1/2 rounded-full border border-border bg-surface px-3 py-1.5 text-13 whitespace-nowrap text-muted shadow-sm">
+        <p className="pointer-events-none absolute bottom-7 left-1/2 -translate-x-1/2 rounded-full border border-border bg-surface px-3 py-1.5 text-13 whitespace-nowrap text-muted shadow-sm transition-opacity duration-250 ease-in-out starting:opacity-0">
           {t("map.hint")}
         </p>
       )}

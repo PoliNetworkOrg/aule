@@ -1,0 +1,44 @@
+import { useState, type ReactNode } from "react";
+import { cn } from "../../lib/cn";
+import { usePresence } from "./presence";
+
+/**
+ * Something that comes and goes in the flow of the page: opens by height and
+ * fades, so what's around it glides instead of jumping. Closes quicker than it
+ * opens, and keeps its last content on screen while it folds away.
+ *
+ * Margins animate too. Where the parent has a gap or the content a margin, give
+ * the folded margins (`folded`, and the same ones as `starting:` classes in
+ * `className`) that cancel them out, so a folded Reveal takes no room at all.
+ */
+export function Reveal({
+  show,
+  className,
+  folded,
+  children,
+}: {
+  show: boolean;
+  className?: string;
+  folded?: string;
+  children: ReactNode;
+}) {
+  const { mounted, leaving } = usePresence(show);
+  const [kept, setKept] = useState(children);
+
+  if (show && kept !== children) setKept(children);
+
+  if (!mounted) return null;
+
+  return (
+    <div
+      className={cn(
+        "grid grid-rows-[1fr] transition-[grid-template-rows,margin,opacity] duration-250 ease-smooth-out",
+        "starting:grid-rows-[0fr] starting:opacity-0",
+        className,
+        leaving && ["grid-rows-[0fr] opacity-0 duration-150", folded],
+      )}
+    >
+      <div className="min-h-0 overflow-hidden">{kept}</div>
+    </div>
+  );
+}

@@ -85,6 +85,7 @@
   "data.stale": "Data may not be up to date for today.",
   "data.hoursUnavailable": "Opening hours unavailable: some rooms may show as free even though the building is closed.",
   "common.close": "Close",
+  "common.loading": "Loading…",
   "classroom.back": "Free rooms",
   "classroom.backHome": "Back to free rooms",
   "classroom.notFound": "Room not found",

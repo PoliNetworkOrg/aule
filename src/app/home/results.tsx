@@ -28,11 +28,13 @@ import { Chip, ChipRow } from "../ui/chip";
 import { EmptyState, emptyStateAction } from "../ui/empty-state";
 import { Icon } from "../ui/icon";
 import { Notice, noticeAction } from "../ui/notice";
+import { Reveal } from "../ui/reveal";
 import { Segmented, SegmentedOption } from "../ui/segmented";
 import { Skeleton } from "../ui/skeleton";
 import { buildingDomId, buildingLabel, campusSelectionLabel } from "./campus-label";
 import { RoomCard, roomGrid } from "./room-card";
 import { StableText } from "../ui/stable";
+import { Swap } from "../ui/swap";
 import { StaleDataWarning } from "./stale-data-warning";
 
 const CampusMap = lazy(() => import("./campus-map"));
@@ -115,11 +117,15 @@ function Summary({ results }: { results: BuildingAvailability[] }) {
   return (
     <div className="min-w-0 flex-1">
       <p className="text-16 font-bold max-sm:flex max-sm:flex-wrap max-sm:items-center max-sm:gap-x-2 max-sm:gap-y-1">
-        {occupancy === "loading" && !rooms.length
-          ? t("results.loading")
-          : free === 1
-            ? t("results.oneRoom")
-            : tf("results.rooms", { n: free })}
+        <Swap
+          value={
+            occupancy === "loading" && !rooms.length
+              ? t("results.loading")
+              : free === 1
+                ? t("results.oneRoom")
+                : tf("results.rooms", { n: free })
+          }
+        />
         {partial > 0 && (
           // Off (grey) while partly free rooms are hidden, lit in the partial colour once
           // listed. A dashed edge, like the other chips that add or drop results, so it
@@ -153,6 +159,12 @@ function Summary({ results }: { results: BuildingAvailability[] }) {
 }
 
 function DataNotice() {
+  const notice = useDataNotice();
+
+  return <Reveal show={notice !== null}>{notice}</Reveal>;
+}
+
+function useDataNotice() {
   const generatedAt = useStore((state) => state.generatedAt);
   const occupancy = useStore((state) => state.occupancy);
   const openingHours = useStore((state) => state.openingHours);
@@ -278,45 +290,50 @@ function ResultsHints({ all, shown }: { all: BuildingAvailability[]; shown: numb
 
   const offerPartial = !filters.partial && shown === 0 && partial > 0;
 
-  if (!offerPartial && !impact.length) return null;
-
   // The building header below adds its sticky padding on top of the list gap:
   // pull it closer so the hints sit 20px from both the toolbar and the header.
+  // Folded, the margins cancel the list gap so nothing is left of them.
   return (
-    <div className="mt-2 -mb-3 grid gap-2.5">
-      {offerPartial && (
-        <div className={hint}>
-          <Icon name="time-quarter-pass" className={hintIcon} />
-          <p className="text-14">{tf("results.onlyPartial", { n: partial })}</p>
-          <Button
-            variant="primary"
-            className={hintAction}
-            onClick={() => setFilters({ partial: true })}
-          >
-            <StableText k="results.showPartialButton" />
-          </Button>
-        </div>
-      )}
-      {impact.length > 0 && (
-        <div className={hint}>
-          <Icon name="filter-horizontal" className={hintIcon} />
-          <p className="text-14">{t("results.filterImpact")}</p>
-          <ChipRow className={hintAction}>
-            {impact.map(({ key, gain }) => (
-              <Chip key={key} variant="impact" onClick={() => clearFilter(key)}>
-                <Icon name="cancel-01" />
-                {key === "minSeats"
-                  ? tf("filters.seatsValue", { n: filters.minSeats })
-                  : key === "building"
-                    ? buildingLabel(filters.building, campusIds.length > 1)
-                    : t(FILTER_LABELS[key])}
-                <span className="font-bold text-free">+{gain}</span>
-              </Chip>
-            ))}
-          </ChipRow>
-        </div>
-      )}
-    </div>
+    <Reveal
+      show={offerPartial || impact.length > 0}
+      className="mt-2 -mb-3 starting:-mt-5 starting:mb-0"
+      folded="-mt-5 mb-0"
+    >
+      <div className="grid gap-2.5">
+        {offerPartial && (
+          <div className={hint}>
+            <Icon name="time-quarter-pass" className={hintIcon} />
+            <p className="text-14">{tf("results.onlyPartial", { n: partial })}</p>
+            <Button
+              variant="primary"
+              className={hintAction}
+              onClick={() => setFilters({ partial: true })}
+            >
+              <StableText k="results.showPartialButton" />
+            </Button>
+          </div>
+        )}
+        {impact.length > 0 && (
+          <div className={hint}>
+            <Icon name="filter-horizontal" className={hintIcon} />
+            <p className="text-14">{t("results.filterImpact")}</p>
+            <ChipRow className={hintAction}>
+              {impact.map(({ key, gain }) => (
+                <Chip key={key} variant="impact" onClick={() => clearFilter(key)}>
+                  <Icon name="cancel-01" />
+                  {key === "minSeats"
+                    ? tf("filters.seatsValue", { n: filters.minSeats })
+                    : key === "building"
+                      ? buildingLabel(filters.building, campusIds.length > 1)
+                      : t(FILTER_LABELS[key])}
+                  <span className="font-bold text-free">+{gain}</span>
+                </Chip>
+              ))}
+            </ChipRow>
+          </div>
+        )}
+      </div>
+    </Reveal>
   );
 }
 
@@ -338,7 +355,7 @@ function ResultsList({
 
   if (occupancy === "loading" && !all.length)
     return (
-      <div className={resultsList} aria-busy="true">
+      <div key="loading" className={resultsList} aria-busy="true">
         {Array.from({ length: 3 }, (_, index) => (
           <div key={index}>
             <Skeleton className="mb-3 h-[18px] w-[140px]" />
@@ -353,7 +370,12 @@ function ResultsList({
     );
 
   return (
-    <div className={resultsList}>
+    // Keyed apart from the skeleton so it is a new element that fades in, as it does
+    // when the list comes back from the map.
+    <div
+      key="results"
+      className={cn(resultsList, "transition-opacity duration-250 ease-in-out starting:opacity-0")}
+    >
       <ResultsHints all={all} shown={shown} />
       {results.length ? (
         results.map((group) => <BuildingGroup key={group.key} group={group} />)
@@ -394,6 +416,8 @@ export function Results({ className }: { className?: string }) {
       className={cn(
         "flex min-h-0 flex-1 flex-col border-t border-border bg-surface",
         "lg:overflow-clip lg:rounded-lg lg:border",
+        // Phones: it shows after the controls step (it only toggles `hidden`).
+        "max-lg:transition-opacity max-lg:duration-250 max-lg:ease-in-out max-lg:starting:opacity-0",
         className,
       )}
       aria-label={t("results.title")}

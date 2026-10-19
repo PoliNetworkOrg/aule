@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { cn } from "../../lib/cn";
 import { closePage } from "../../lib/navigation";
 import { leavePage, openInApp } from "../state/navigation-context";
@@ -5,6 +6,7 @@ import { type Locale, LOCALES, setLocale, t, useLocale } from "../i18n";
 import { setThemePreference, THEME_PREFERENCES, useThemePreference } from "../theme";
 import { IconButton } from "./button";
 import { Icon } from "./icon";
+import { SlidingPill } from "./sliding-pill";
 
 const LOCALE_NAMES: Record<Locale, string> = { it: "Italiano", en: "English" };
 
@@ -52,21 +54,24 @@ const THEME_OPTIONS = {
 function ThemeToggle() {
   useLocale();
   const preference = useThemePreference();
+  const host = useRef<HTMLDivElement>(null);
 
   return (
     <div
-      className="inline-flex rounded-full border border-border bg-surface-muted p-[3px]"
+      ref={host}
+      className="relative inline-flex rounded-full border border-border bg-surface-muted p-[3px]"
       role="group"
       aria-label={t("header.theme")}
     >
+      <SlidingPill host={host} className="rounded-full" />
       {THEME_PREFERENCES.map((option) => (
         <button
           key={option}
           type="button"
           className={cn(
-            "grid h-7 w-[34px] place-items-center rounded-full text-muted",
-            "transition-[background-color,color] hover:text-foreground",
-            "aria-pressed:bg-surface aria-pressed:text-accent-strong aria-pressed:shadow-sm",
+            "relative grid h-7 w-[34px] place-items-center rounded-full text-muted",
+            "transition-[color] hover:text-foreground",
+            "aria-pressed:text-accent-strong",
           )}
           aria-pressed={option === preference}
           aria-label={t(THEME_OPTIONS[option].label)}
@@ -86,7 +91,10 @@ export function Header({ page }: { page: "home" | "classroom" | "info" }) {
   useLocale();
 
   return (
-    <header className="sticky top-0 z-20 border-b border-border bg-surface pt-[env(safe-area-inset-top)]">
+    <header
+      // Its own view transition group, so it stays put while the pages slide.
+      className="sticky top-0 z-20 border-b border-border bg-surface pt-[env(safe-area-inset-top)] [view-transition-name:site-header]"
+    >
       <div className="mx-auto flex h-header max-w-content items-center gap-3 px-gutter max-xs:gap-2">
         <a
           className="flex min-w-0 items-center gap-2.5 text-foreground no-underline"

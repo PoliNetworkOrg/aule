@@ -3,7 +3,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "../../lib/cn";
 
 const tagVariants = cva(
-  "inline-flex h-[22px] items-center gap-1 rounded-sm px-2 text-12 font-bold whitespace-nowrap tabular-nums",
+  "inline-flex h-[22px] items-center gap-1 rounded-sm px-2 text-12 font-bold whitespace-nowrap tabular-nums transition-[background-color,color]",
   {
     variants: {
       tone: {
@@ -27,18 +27,21 @@ export function Tag({
   return <span className={cn(tagVariants({ tone }), className)} {...props} />;
 }
 
-const statusDotVariants = cva("size-2 flex-none rounded-full bg-neutral", {
-  variants: {
-    status: {
-      free: "bg-free",
-      partial: "bg-partial",
-      occupied: "bg-busy",
-      closed: "bg-neutral",
-      eventsOnly: "bg-neutral",
-      unknown: "",
+const statusDotVariants = cva(
+  "size-2 flex-none rounded-full bg-neutral transition-[background-color]",
+  {
+    variants: {
+      status: {
+        free: "bg-free",
+        partial: "bg-partial",
+        occupied: "bg-busy",
+        closed: "bg-neutral",
+        eventsOnly: "bg-neutral",
+        unknown: "",
+      },
     },
   },
-});
+);
 
 /** The coloured dot before a room's name; decorative, the status is also spelled out. */
 export function StatusDot({

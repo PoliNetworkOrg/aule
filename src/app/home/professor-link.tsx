@@ -11,7 +11,7 @@ export function ProfessorLink({ name, query = "" }: { name: string; query?: stri
   return (
     <button
       type="button"
-      className="text-left text-accent-strong underline decoration-accent/35 underline-offset-2 hover:decoration-current"
+      className="text-left text-accent-strong underline decoration-accent/35 underline-offset-2 transition-[text-decoration-color] hover:decoration-current"
       title={tf("search.byProfessor", { name: label })}
       onClick={() => {
         setQuery(label);

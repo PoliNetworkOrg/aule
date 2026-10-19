@@ -65,7 +65,7 @@ export function Favourites() {
             return (
               <li
                 key={entry.room.id}
-                className="flex min-w-0 items-stretch overflow-hidden rounded-md border border-border bg-surface transition-[border-color] hover:border-accent-soft-border"
+                className="flex min-w-0 items-stretch overflow-hidden rounded-md border border-border bg-surface transition-[border-color,opacity] duration-250 hover:border-accent-soft-border starting:opacity-0"
               >
                 <button
                   type="button"

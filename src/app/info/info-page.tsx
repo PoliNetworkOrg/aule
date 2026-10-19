@@ -9,6 +9,8 @@ import { Button, buttonVariants } from "../ui/button";
 import { Card, SectionTitle } from "../ui/card";
 import { RichText } from "../ui/rich-text";
 import { Icon } from "../ui/icon";
+import { Nudge } from "../ui/nudge";
+import { Swap } from "../ui/swap";
 
 const REPOSITORY = "https://github.com/PoliNetworkOrg/aule";
 
@@ -40,7 +42,7 @@ function DataStatus() {
         onClick={() => void reloadOccupancy()}
       >
         <Icon name="refresh" className={cn(occupancy === "loading" && "animate-spin")} />
-        {occupancy === "loading" ? t("info.reloading") : t("info.reload")}
+        <Swap value={occupancy === "loading" ? t("info.reloading") : t("info.reload")} />
       </Button>
     </div>
   );
@@ -82,11 +84,13 @@ export function InfoPage() {
     <main className="mx-auto w-full max-w-[800px] px-gutter pt-3 pb-12">
       <button
         type="button"
-        className="mb-2 -ml-1.5 inline-flex min-h-10 items-center gap-1.5 rounded-md pr-2.5 pl-1.5 text-14 font-semibold text-muted hover:bg-accent-soft hover:text-accent-strong"
+        className="group mb-2 -ml-1.5 inline-flex min-h-10 items-center gap-1.5 rounded-md pr-2.5 pl-1.5 text-14 font-semibold text-muted hover:bg-accent-soft hover:text-accent-strong"
         onClick={leavePage}
       >
-        <Icon name="arrow-left-01" />
-        {t("classroom.back")}
+        <Nudge direction="left">
+          <Icon name="arrow-left-01" />
+          {t("classroom.back")}
+        </Nudge>
       </button>
 
       <Card className="flex flex-col gap-3.5 p-6">

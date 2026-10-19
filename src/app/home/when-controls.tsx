@@ -537,6 +537,10 @@ function RangeSlider() {
             // Concentric with the track it sits in.
             "absolute top-1 bottom-1 z-1 min-w-1 rounded-[calc(var(--radius-md)-3px)] shadow-[inset_0_0_0_1.5px_var(--color-accent)]",
             "bg-[color-mix(in_srgb,var(--color-accent)_28%,var(--color-surface))]",
+            // Eases to a new window (the Now and duration buttons, the pickers), but
+            // follows a drag exactly: a transition there would lag behind the finger.
+            "transition-[left,width] duration-150 ease-smooth-out",
+            dragging && "transition-none",
             sliderFocus,
           )}
           style={{ left: percentOf(from), width: `calc(${percentOf(to)} - ${percentOf(from)})` }}
@@ -556,6 +560,8 @@ function RangeSlider() {
               "pointer-events-none absolute top-1/2 z-3 size-5.5 -translate-1/2 rounded-full border-2 border-accent bg-surface shadow-sm",
               // Filled while it's being dragged.
               dragging === mode && "bg-accent",
+              "transition-[left,background-color] duration-150 ease-smooth-out",
+              dragging && "transition-[background-color]",
               sliderFocus,
             )}
             style={{ left: percentOf(value) }}

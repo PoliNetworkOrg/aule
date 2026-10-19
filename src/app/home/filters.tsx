@@ -16,10 +16,13 @@ import { Chip, ChipRow } from "../ui/chip";
 import { Field, FieldLabel } from "../ui/field";
 import { centreStable, insetFocus } from "../ui/focus";
 import { Icon } from "../ui/icon";
+import { IconSwap } from "../ui/icon-swap";
 import { pressable } from "../ui/motion";
 import { Panel, PanelHeader, PanelTitle } from "../ui/panel";
+import { Reveal } from "../ui/reveal";
 import { Segmented, SegmentedOption } from "../ui/segmented";
 import { StableText } from "../ui/stable";
+import { Swap } from "../ui/swap";
 import { buildingLabel } from "./campus-label";
 
 const SEAT_OPTIONS: SeatsFilter[] = [0, 30, 60, 100, 200];
@@ -52,7 +55,7 @@ function ToggleChip({
 }) {
   return (
     <Chip aria-pressed={active} onClick={onToggle}>
-      <Icon name={active ? "checkmark-circle-02" : icon} />
+      <IconSwap icon={icon} swapped={active} to="checkmark-circle-02" />
       {t(label)}
     </Chip>
   );
@@ -65,12 +68,7 @@ function MoreFilters({ filters }: { filters: FilterState }) {
 
   return (
     <div
-      className={cn(
-        "grid scroll-mt-4 gap-4.5 rounded-lg border border-border bg-surface p-4",
-        // Settles in from just above as it opens; no height animation, so the
-        // panels below simply move down. Closing (unmount) is instant.
-        "transition-[opacity,translate] duration-250 ease-smooth-out starting:-translate-y-1 starting:opacity-0",
-      )}
+      className="grid scroll-mt-4 gap-4.5 rounded-lg border border-border bg-surface p-4"
       id="more-filters"
     >
       <Field>
@@ -173,15 +171,20 @@ export function Filters() {
         </PanelTitle>
         <button
           type="button"
-          className="inline-flex h-8 items-center gap-1.5 rounded-full bg-busy-soft px-2.5 text-13 font-bold text-busy hover:bg-busy/16"
-          hidden={active === 0}
+          className={cn(
+            "inline-flex h-8 items-center gap-1.5 rounded-full bg-busy-soft px-2.5 text-13 font-bold text-busy hover:bg-busy/16",
+            // Stays in place and fades; `invisible` only takes effect once the fade is done.
+            "transition-[background-color,opacity,scale,visibility] duration-250 ease-smooth-out",
+            active === 0 && "invisible scale-95 opacity-0 duration-150",
+          )}
+          inert={active === 0}
           aria-label={tf("filters.resetCount", { n: active })}
           onClick={resetFilters}
         >
           <Icon name="cancel-01" />
           {t("filters.reset")}
           <span className="inline-grid h-4.5 min-w-4.5 place-items-center rounded-full bg-busy text-11 text-on-status">
-            {active}
+            <Swap value={active} />
           </span>
         </button>
       </PanelHeader>
@@ -221,7 +224,12 @@ export function Filters() {
           <Icon name="filter-horizontal" />
           {t("filters.more")}
           {advanced > 0 && (
-            <span className="inline-grid h-5 min-w-5 place-items-center rounded-full bg-accent px-1.5 text-12 font-bold text-on-accent">
+            <span
+              className={cn(
+                "inline-grid h-5 min-w-5 place-items-center rounded-full bg-accent px-1.5 text-12 font-bold text-on-accent",
+                "transition-[opacity,scale] duration-250 ease-smooth-out starting:scale-95 starting:opacity-0",
+              )}
+            >
               {advanced}
             </span>
           )}
@@ -235,7 +243,10 @@ export function Filters() {
           />
         </Chip>
       </ChipRow>
-      {open && <MoreFilters filters={filters} />}
+      {/* Folded, the negative margin takes back the panel's gap. */}
+      <Reveal show={open} className="starting:-mt-2.5" folded="-mt-2.5">
+        <MoreFilters filters={filters} />
+      </Reveal>
     </Panel>
   );
 }

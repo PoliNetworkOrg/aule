@@ -121,6 +121,20 @@ export function onStyleFailure(map: MapLibreMap, handler: (error: MapErrorEvent[
   });
 }
 
+/**
+ * Calls `reveal` once the map has drawn its first view, or after a few seconds
+ * whatever happens (a slow tile server must not leave the map invisible), so a
+ * map can fade in over its placeholder instead of popping in tile by tile.
+ */
+export function onFirstRender(map: MapLibreMap, reveal: () => void) {
+  const timer = window.setTimeout(reveal, 3000);
+
+  map.once("load", () => {
+    window.clearTimeout(timer);
+    reveal();
+  });
+}
+
 /** MapLibre's own UI strings (control tooltips, gesture hints) in the current language. */
 export function mapControlsLocale() {
   const keys = [
