@@ -85,6 +85,7 @@
   "data.stale": "I dati potrebbero non essere aggiornati a oggi.",
   "data.hoursUnavailable": "Orari di apertura non disponibili: alcune aule potrebbero risultare libere anche se l'edificio è chiuso.",
   "common.close": "Chiudi",
+  "common.loading": "Caricamento…",
   "classroom.back": "Aule libere",
   "classroom.backHome": "Torna alle aule libere",
   "classroom.notFound": "Aula non trovata",

@@ -4,6 +4,7 @@ import { startApplication } from "../app/boot";
 import { notifyPageRendered } from "../lib/navigation";
 import { HomePage } from "../app/home/home-page";
 import { Header } from "../app/ui/header";
+import { PageLoading } from "../app/ui/page-loading";
 
 function pageOf(pathname: string) {
   if (pathname.startsWith("/classroom/")) return "classroom";
@@ -34,6 +35,7 @@ function Root() {
       <Header page={page} />
       <HomePage hidden={page !== "home"} />
       <Outlet />
+      <PageLoading />
     </>
   );
 }

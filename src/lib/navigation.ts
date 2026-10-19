@@ -1,3 +1,4 @@
+import { useSyncExternalStore } from "react";
 import { createBrowserHistory } from "@tanstack/react-router";
 
 // Native hash navigation creates history entries with null state. Supply the
@@ -29,6 +30,34 @@ export function registerPreload(preload: (path: string) => Promise<void>) {
   preloadRoute = preload;
 }
 
+// A page that loads quickly should not flash a spinner: it only shows once the
+// wait is long enough to notice.
+const SPINNER_DELAY_MS = 400;
+
+let pageLoading = false;
+
+const loadingListeners = new Set<() => void>();
+
+function setPageLoading(loading: boolean) {
+  if (pageLoading === loading) return;
+
+  pageLoading = loading;
+  loadingListeners.forEach((listener) => listener());
+}
+
+function subscribeToLoading(listener: () => void) {
+  loadingListeners.add(listener);
+
+  return () => {
+    loadingListeners.delete(listener);
+  };
+}
+
+/** Whether a navigation is waiting for the next page's code to arrive. */
+export function usePageLoading() {
+  return useSyncExternalStore(subscribeToLoading, () => pageLoading);
+}
+
 let pageRendered: (() => void) | null = null;
 
 /** Called by the root layout once a navigation's page is on screen. */
@@ -58,7 +87,11 @@ async function navigate(
   }
 
   // A failed preload is not fatal: the router retries when it renders the page.
+  const spinner = window.setTimeout(() => setPageLoading(true), SPINNER_DELAY_MS);
+
   await preload?.().catch(() => undefined);
+  window.clearTimeout(spinner);
+  setPageLoading(false);
 
   const root = document.documentElement;
 
