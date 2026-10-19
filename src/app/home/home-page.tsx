@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { cn } from "../../lib/cn";
 import { t, tf, useLocale } from "../i18n";
 import { capitalise, formatRange, parseIsoDate, romeTodayIso } from "../state/time";
@@ -113,6 +114,13 @@ export function HomePage({ hidden }: { hidden: boolean }) {
   const collapsed = useStore((state) => state.controlsCollapsed);
   // Phones: the controls stay on screen a moment as they close.
   const { leaving } = usePresence(!collapsed);
+  const controls = useRef<HTMLElement>(null);
+
+  // Phones and tablets: the parameters always open at the top, not where they
+  // were left (the aside is only hidden, so it would keep its scroll).
+  useEffect(() => {
+    if (!collapsed) controls.current?.scrollTo({ top: 0 });
+  }, [collapsed]);
 
   return (
     <main className="mx-auto flex min-h-0 w-full max-w-content flex-1 flex-col" hidden={hidden}>
@@ -132,6 +140,7 @@ export function HomePage({ hidden }: { hidden: boolean }) {
         >
           <ControlsSummary />
           <aside
+            ref={controls}
             className={cn(
               "group/controls flex flex-none flex-col gap-3 px-gutter pt-3 pb-4.5 max-[600px]:scrollbar-none",
               // Phones: the controls open like a drawer, dropping in from the summary bar
