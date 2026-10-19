@@ -22,6 +22,13 @@ export const appHistory = createBrowserHistory({
 
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
 
+let preloadRoute: ((path: string) => Promise<void>) | null = null;
+
+/** Lets navigate() load a page's code before the transition starts (see main.tsx). */
+export function registerPreload(preload: (path: string) => Promise<void>) {
+  preloadRoute = preload;
+}
+
 let pageRendered: (() => void) | null = null;
 
 /** Called by the root layout once a navigation's page is on screen. */
@@ -34,14 +41,24 @@ export function notifyPageRendered() {
  * transitions" in styles.css), forward when opening a page and back when
  * leaving one. The router renders after the history changes, so the transition
  * waits for notifyPageRendered, and gives up after a moment rather than leave
- * the screen frozen. Browsers without view transitions just navigate.
+ * the screen frozen. Pages are code-split, so a page that is not loaded yet is
+ * loaded first (`preload`): otherwise the transition would capture the new
+ * page still blank on a slow connection. Browsers without view transitions
+ * just navigate.
  */
-function navigate(direction: "forward" | "back", update: () => void) {
+async function navigate(
+  direction: "forward" | "back",
+  update: () => void,
+  preload?: () => Promise<void>,
+) {
   if (!document.startViewTransition || reduceMotion.matches) {
     update();
 
     return;
   }
+
+  // A failed preload is not fatal: the router retries when it renders the page.
+  await preload?.().catch(() => undefined);
 
   const root = document.documentElement;
 
@@ -67,15 +84,19 @@ function navigate(direction: "forward" | "back", update: () => void) {
 }
 
 export function openPage(path: string) {
-  navigate("forward", () => appHistory.push(path));
+  void navigate(
+    "forward",
+    () => appHistory.push(path),
+    () => preloadRoute?.(path) ?? Promise.resolve(),
+  );
 }
 
 export function closePage() {
   // Already home: nothing changes on screen, so there is nothing to transition.
   if (appHistory.location.pathname === "/") appHistory.replace("/");
-  else navigate("back", () => appHistory.replace("/"));
+  else void navigate("back", () => appHistory.replace("/"));
 }
 
 export function goBack() {
-  navigate("back", () => appHistory.back());
+  void navigate("back", () => appHistory.back());
 }
