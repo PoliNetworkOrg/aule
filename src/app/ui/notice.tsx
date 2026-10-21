@@ -7,6 +7,7 @@ const noticeVariants = cva("flex items-center gap-2 rounded-md px-3 py-2 text-14
     tone: {
       warning: "border border-partial-border bg-partial-soft text-partial",
       error: "border border-busy-border bg-busy-soft text-busy",
+      info: "border border-accent-soft-border bg-accent-soft text-foreground icon:text-accent",
     },
   },
 });

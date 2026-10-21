@@ -1,17 +1,19 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { closePage } from "../../lib/navigation";
 import { formatRomeHHMM } from "../available-rooms-script";
-import { t, tf, useLocale } from "../i18n";
+import { getLocale, t, tf, useLocale } from "../i18n";
 import {
+  availableDates,
   findClassroom,
   findClassroomBySlug,
   isUsuallyClosed,
   roomNowStatus,
   type ClassroomEntry,
 } from "../state/availability";
+import { graduationOn, useGraduations } from "../state/graduation";
 import { leavePage, type ClassroomContext } from "../state/navigation-context";
 import { useStore } from "../state/store";
-import { formatTime, romeTodayIso } from "../state/time";
+import { formatTime, parseIsoDate, romeTodayIso } from "../state/time";
 import { hasCoordinates } from "../map/maplibre";
 import { fetchPhotoUrl } from "../utils/photo";
 import { FavouriteButton } from "../home/room-card";
@@ -111,6 +113,42 @@ function UsuallyClosedNote() {
       <span>
         <strong className="text-foreground">{t("classroom.eventsOnlyTitle")}</strong>{" "}
         {t("classroom.eventsOnlyText")}
+      </span>
+    </p>
+  );
+}
+
+/** The days the schedule shows when the room's campus holds graduation ceremonies. */
+function GraduationNote({ entry }: { entry: ClassroomEntry }) {
+  useLocale();
+  useGraduations();
+  useStore((state) => state.dataRevision);
+
+  const dates = availableDates().filter((date) => graduationOn(date, entry.campus.id));
+
+  if (!dates.length) return null;
+
+  const format = new Intl.DateTimeFormat(getLocale(), {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+
+  return (
+    <p
+      className="flex items-start gap-2 rounded-md border border-accent-soft-border bg-accent-soft px-3 py-2.5 text-14 icon:mt-0.5 icon:text-accent"
+      role="note"
+    >
+      <Icon name="laurel-wreath-01" />
+      <span>
+        <strong>
+          {tf("classroom.graduationTitle", {
+            days: dates.map((date) => format.format(parseIsoDate(date))).join(", "),
+          })}
+        </strong>{" "}
+        <span className="text-muted">
+          {t(dates.length > 1 ? "classroom.graduationTextMany" : "classroom.graduationText")}
+        </span>
       </span>
     </p>
   );
@@ -374,6 +412,7 @@ export function ClassroomPage({
 
             <NowStatus entry={entry} />
             {isUsuallyClosed(entry) && <UsuallyClosedNote />}
+            <GraduationNote entry={entry} />
 
             {/* Icons label the values; the text stays for screen readers and as a tooltip.
                 Full width, one equal column per stat (two when the floor is unknown); a

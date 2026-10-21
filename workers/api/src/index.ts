@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { classrooms } from "./routes/classrooms";
+import { graduationSessions } from "./routes/graduation-sessions";
 import { openingHours } from "./routes/opening-hours";
 import { occupancy } from "./routes/occupancy";
 import { photos } from "./routes/photos";
@@ -16,6 +17,8 @@ app.use("*", cors());
 app.route("/v1/classrooms", classrooms);
 
 app.route("/v1/opening-hours", openingHours);
+
+app.route("/v1/graduation-sessions", graduationSessions);
 
 app.route("/v1/occupations", occupancy);
 
