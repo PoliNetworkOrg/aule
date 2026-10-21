@@ -34,11 +34,14 @@ jobs:
         run: |
           mkdir -p data
           if npx --yes wrangler@4 r2 object get "poliaule-data/graduation-sessions.json" \
-              --file data/graduation-sessions.json --remote; then
+              --file data/graduation-sessions.json --remote 2>restore.err; then
             echo "Restored $(jq '.sessions | length' data/graduation-sessions.json) sessions."
-          else
+          elif grep -qi "not found\|does not exist" restore.err; then
             echo "No graduation-sessions.json in R2 yet (first run?)."
             rm -f data/graduation-sessions.json
+          else
+            cat restore.err >&2
+            exit 1
           fi
 
       - name: Set up Python
