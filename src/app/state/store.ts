@@ -40,6 +40,8 @@ export interface AppState {
   openingHours: boolean;
   /** Bumped whenever occupancy data is (re)loaded, so derived data recomputes. */
   dataRevision: number;
+  /** Bumped when the graduation days load (see graduation.ts). */
+  graduationRevision: number;
   generatedAt: Date | null;
   /** Never empty, in directory order (see sortCampuses). */
   campusIds: string[];
@@ -189,6 +191,7 @@ let state: AppState = {
   occupancy: "loading",
   openingHours: true,
   dataRevision: 0,
+  graduationRevision: 0,
   generatedAt: null,
   campusIds: readInitialCampuses(),
   date: "",
