@@ -237,6 +237,8 @@ export interface MenuOption {
   value: string;
   label: string;
   description?: string;
+  /** A small icon after the label, with its meaning as a tooltip. */
+  badge?: { icon: string; label: string };
 }
 
 export interface MenuGroup {
@@ -257,7 +259,15 @@ const groupLabel = "px-2.5 pb-1 text-11 font-bold tracking-widest text-subtle up
 function OptionText({ option }: { option: MenuOption }) {
   return (
     <span className="flex flex-col">
-      <span className="font-semibold">{option.label}</span>
+      <span className="flex items-center gap-1.5 font-semibold">
+        {option.label}
+        {option.badge && (
+          <span title={option.badge.label} className="flex text-accent">
+            <Icon name={option.badge.icon} />
+            <span className="sr-only">{option.badge.label}</span>
+          </span>
+        )}
+      </span>
       {option.description && <span className="text-13 text-muted">{option.description}</span>}
     </span>
   );

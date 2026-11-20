@@ -11,6 +11,7 @@ import { cn } from "../../lib/cn";
 import { romeMinutesOfDay } from "../available-rooms-script";
 import { LOCALES, t, translate, useLocale, type Locale } from "../i18n";
 import { availableDates } from "../state/availability";
+import { graduatingCampuses, useGraduations } from "../state/graduation";
 import { readState, setDate, setDuration, setState, setWindow, useStore } from "../state/store";
 import {
   capitalise,
@@ -87,8 +88,10 @@ export function DateStrip() {
   const locale = useLocale();
   const selected = useStore((state) => state.date);
   const status = useStore((state) => state.occupancy);
+  const campusIds = useStore((state) => state.campusIds);
 
   useStore((state) => state.dataRevision);
+  useGraduations();
 
   const dates = availableDates();
   const today = romeTodayIso();
@@ -149,20 +152,30 @@ export function DateStrip() {
       <div className={dateColumns} role="group" aria-label={t("when.day")}>
         {dates.map((date, index) => {
           const day = days[index];
+          const graduation = graduatingCampuses(date, campusIds).length > 0;
+
+          const label = new Intl.DateTimeFormat(locale, {
+            weekday: "long",
+            day: "numeric",
+            month: "long",
+          }).format(day);
 
           return (
             <button
               key={date}
               type="button"
               aria-pressed={date === selected}
-              aria-label={new Intl.DateTimeFormat(locale, {
-                weekday: "long",
-                day: "numeric",
-                month: "long",
-              }).format(day)}
-              className={dateDay}
+              aria-label={graduation ? `${label} · ${t("graduation.day")}` : label}
+              title={graduation ? t("graduation.day") : undefined}
+              className={cn(dateDay, "relative")}
               onClick={() => setDate(date)}
             >
+              {graduation && (
+                <Icon
+                  name="laurel-wreath-01"
+                  className="absolute top-0.75 right-0.75 text-11 text-accent group-aria-pressed:text-inherit"
+                />
+              )}
               <span className={dateWeekday}>
                 <Stable
                   variants={LOCALES.map((variant) =>

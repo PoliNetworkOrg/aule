@@ -8,13 +8,16 @@ import { Nudge } from "../ui/nudge";
 import { pressableLarge } from "../ui/motion";
 import { Panel, PanelHeader, PanelTitle } from "../ui/panel";
 import { CheckList, Popup, type CheckGroup } from "../ui/popup";
+import { graduationOn, useGraduations } from "../state/graduation";
 import { campusSelectionLabel } from "./campus-label";
 import { hiddenByMoreFilters } from "./filters";
 
 /** "Where": the campuses, first of the search parameters. */
 export function WherePanel() {
   useLocale();
+  useGraduations();
   const campusIds = useStore((state) => state.campusIds);
+  const date = useStore((state) => state.date);
   const ready = useStore((state) => state.directory === "ready");
   const trigger = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
@@ -32,7 +35,14 @@ export function WherePanel() {
     const area = campus.group ?? "";
     const group = groups.get(area) ?? { label: area || t("campus.otherCities"), options: [] };
 
-    group.options.push({ value: campus.id, label: campus.name });
+    group.options.push({
+      value: campus.id,
+      label: campus.name,
+      // The day picked below, so the picker says where rooms may be taken.
+      badge: graduationOn(date, campus.id)
+        ? { icon: "laurel-wreath-01", label: t("graduation.day") }
+        : undefined,
+    });
     groups.set(area, group);
   }
 

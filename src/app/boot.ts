@@ -7,6 +7,7 @@ import {
 import { ensureClassroomDirectory } from "./classroom-search-data";
 import { initI18n } from "./i18n";
 import { availableDates, findCampus, campuses } from "./state/availability";
+import { loadGraduations } from "./state/graduation";
 import { readState, setCampuses, setState, sortCampuses } from "./state/store";
 import { defaultWindow, isAfterHours, romeTodayIso } from "./state/time";
 import { buttonVariants } from "./ui/button";
@@ -98,6 +99,7 @@ function applyOccupancy() {
 
 export async function reloadOccupancy() {
   setState({ occupancy: "loading" });
+  void loadGraduations();
   await fetchClassroomsData();
   applyOccupancy();
 }
@@ -105,6 +107,8 @@ export async function reloadOccupancy() {
 export function startApplication() {
   started ??= (async () => {
     const timeout = window.setTimeout(showSplashError, 15000);
+
+    void loadGraduations();
 
     const occupancy = fetchClassroomsData().then(applyOccupancy, () =>
       setState({ occupancy: "error" }),

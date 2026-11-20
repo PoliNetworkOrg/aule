@@ -36,6 +36,7 @@ import { RoomCard, roomGrid } from "./room-card";
 import { StableText } from "../ui/stable";
 import { Swap } from "../ui/swap";
 import { StaleDataWarning } from "./stale-data-warning";
+import { GraduationNotice } from "./graduation-notice";
 
 const CampusMap = lazy(() => import("./campus-map"));
 
@@ -439,6 +440,7 @@ export function Results({ className }: { className?: string }) {
         </div>
       </div>
       <DataNotice />
+      <GraduationNotice />
       <div
         className={cn(
           "relative min-h-0 flex-1",
