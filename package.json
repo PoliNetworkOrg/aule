@@ -8,9 +8,9 @@
     "build": "vp build && tsc --noEmit",
     "build:beta": "vp build --mode beta && tsc --noEmit",
     "preview": "vp preview",
-    "lint": "oxlint --max-warnings 0 && oxfmt --check",
-    "lint:fix": "oxlint --fix && oxfmt --write",
-    "format": "oxfmt --write",
+    "lint": "vp lint --max-warnings 0 && vp fmt --check",
+    "lint:fix": "vp lint --fix && vp fmt --write",
+    "format": "vp fmt --write",
     "test": "vp test run",
     "typecheck": "tsc --noEmit"
   },
@@ -25,7 +25,6 @@
     "tailwind-merge": "^3.7.0"
   },
   "devDependencies": {
-    "@oxlint/plugins": "1.83.0",
     "@shadcn/lint": "0.1.1",
     "@tailwindcss/vite": "^4.0.0",
     "@tanstack/router-plugin": "^1.168.40",
@@ -33,12 +32,10 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.1",
-    "oxfmt": "0.68.0",
-    "oxlint": "1.83.0",
     "tailwindcss": "^4.0.0",
     "typescript": "~6.0.3",
-    "vite": "npm:@voidzero-dev/vite-plus-core@0.3.3",
-    "vite-plus": "0.3.3"
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
   },
   "engines": {
     "node": ">=22.18.0"

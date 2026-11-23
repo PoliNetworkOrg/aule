@@ -1,3 +1,5 @@
+import { fileURLToPath } from "node:url";
+
 import { defineConfig, type Plugin } from "vite-plus";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
@@ -52,5 +54,59 @@ export default defineConfig(({ mode }) => ({
   test: {
     // The API worker has its own node:test suite.
     exclude: ["**/node_modules/**", "workers/**"],
+  },
+  fmt: {
+    ignorePatterns: [
+      "dist/**",
+      "tools/oxlint/anti-slop/**",
+      "src/routeTree.gen.ts",
+      "public/**",
+      "data/**",
+      "docs/upstream/**",
+    ],
+  },
+  lint: {
+    plugins: ["typescript", "react", "unicorn", "oxc"],
+    jsPlugins: [
+      {
+        name: "anti-slop",
+        specifier: fileURLToPath(new URL("./tools/oxlint/anti-slop/index.ts", import.meta.url)),
+      },
+      "@shadcn/lint",
+    ],
+    ignorePatterns: ["dist/**", "tools/oxlint/anti-slop/**", "src/routeTree.gen.ts"],
+    rules: {
+      "oxc/no-accumulating-spread": "error",
+      "anti-slop/no-array-filter-map": "error",
+      "anti-slop/no-reduce-accumulator-copy": "error",
+      "anti-slop/no-chained-type-assertions": "error",
+      "anti-slop/no-conditional-empty-object-spread": "error",
+      "anti-slop/no-known-value-widening": "error",
+      "anti-slop/no-module-mocking": "error",
+      "anti-slop/no-object-parameters": "error",
+      "anti-slop/no-reflect-apply": "error",
+      "anti-slop/no-reflect-get": "error",
+      "anti-slop/no-runtime-typeof": [
+        "error",
+        {
+          allowInTypeGuards: true,
+        },
+      ],
+      "anti-slop/no-unsafe-dictionary-type": "error",
+      "anti-slop/no-shape-in-symbol-names": "error",
+      "anti-slop/no-unknown-parameters": "error",
+      "anti-slop/no-unknown-returns": "error",
+      "anti-slop/no-unknown-type-aliases": "error",
+      "anti-slop/no-widen-then-assert": "error",
+      "anti-slop/require-readable-spacing": "error",
+      "anti-slop/require-safety-comment-for-type-assertion": "error",
+      "shadcn/no-unknown-classes": [
+        "error",
+        {
+          allow: ["hgi-*"],
+        },
+      ],
+      "shadcn/no-raw-colors": "error",
+    },
   },
 }));

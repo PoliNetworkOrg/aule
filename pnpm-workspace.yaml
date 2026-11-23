@@ -1,8 +1,7 @@
 minimumReleaseAgeExclude:
   - vitrium@0.2.0
 overrides:
-  vite: npm:@voidzero-dev/vite-plus-core@0.3.3
-  vitest: 4.1.11
-peerDependencyRules:
-  allowedVersions:
-    vite: "0.3.3"
+  vite@*: "catalog:"
+catalog:
+  vite: npm:@voidzero-dev/vite-plus-core@8.3.8000
+  vite-plus: 1.7.0

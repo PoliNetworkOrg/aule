@@ -3,6 +3,7 @@ import { cn } from "../../lib/cn";
 import { formatRomeYYYYMMDD } from "../available-rooms-script";
 import { t } from "../i18n";
 import { useStore } from "../state/store";
+import { useNow } from "../state/use-now";
 import { IconButton } from "../ui/button";
 import { Icon } from "../ui/icon";
 
@@ -13,11 +14,12 @@ export function StaleDataWarning() {
   const [display, setDisplay] = useState<"closed" | "hover" | "pinned">("closed");
   const container = useRef<HTMLDivElement>(null);
   const id = useId();
+  const now = useNow();
 
   const stale =
     occupancy !== "error" &&
     !!generatedAt &&
-    formatRomeYYYYMMDD(generatedAt) !== formatRomeYYYYMMDD(new Date());
+    formatRomeYYYYMMDD(generatedAt) !== formatRomeYYYYMMDD(now);
 
   const open = stale && display !== "closed";
 
