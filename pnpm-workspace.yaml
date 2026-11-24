@@ -5,3 +5,10 @@ overrides:
 catalog:
   vite: npm:@voidzero-dev/vite-plus-core@8.3.8000
   vite-plus: 1.7.0
+packageExtensions:
+  # typescript@7 ships only the native `tsc`; typescript-eslint (the parser
+  # @shadcn/lint falls back to when oxc-parser is unavailable) still needs the
+  # classic compiler API, so it keeps resolving TypeScript 6.
+  "@shadcn/lint@0.1.1":
+    dependencies:
+      typescript: 6.0.3
