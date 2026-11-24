@@ -16,7 +16,7 @@ The original application modules, component styles, assets, locale files, data s
 
 ## Lint and dependencies
 
-`.oxlintrc.json` includes the upstream anti-slop config's `oxc/no-accumulating-spread` and every generic vendored rule documented in its README. The optional Effect rules are not applicable. `no-runtime-typeof` permits explicit type guards, avoiding a new validation dependency. Unused state was removed, statement ternaries became `if` statements, and forced layout reads are explicitly `void`.
+The `lint` block in `vite.config.ts` includes the upstream anti-slop config's `oxc/no-accumulating-spread` and every generic vendored rule documented in its README. The optional Effect rules are not applicable. `no-runtime-typeof` permits explicit type guards, avoiding a new validation dependency. Unused state was removed, statement ternaries became `if` statements, and forced layout reads are explicitly `void`.
 
 `@shadcn/lint` runs inside the `lint` script's Oxlint invocation. `shadcn/no-unknown-classes` and `shadcn/no-raw-colors` are enabled. The original external icon classes and named styling/state markers are allowed explicitly. These rules check the React view and control markup. The allowlist includes source state markers and classes declared in shadow stylesheets or the critical splash CSS in `index.html`. No ESLint or Prettier pipeline/configuration was introduced. Oxfmt checks formatting after lint.
 

@@ -14,6 +14,7 @@ import { graduationOn, useGraduations } from "../state/graduation";
 import { leavePage, type ClassroomContext } from "../state/navigation-context";
 import { useStore } from "../state/store";
 import { formatTime, parseIsoDate, romeTodayIso } from "../state/time";
+import { useNow } from "../state/use-now";
 import { hasCoordinates } from "../map/maplibre";
 import { fetchPhotoUrl } from "../utils/photo";
 import { FavouriteButton } from "../home/room-card";
@@ -68,15 +69,9 @@ function NowStatus({ entry }: { entry: ClassroomEntry }) {
   useLocale();
   useStore((state) => state.dataRevision);
 
-  const [, setTick] = useState(0);
+  const now = useNow();
 
-  useEffect(() => {
-    const timer = window.setInterval(() => setTick((tick) => tick + 1), 60_000);
-
-    return () => window.clearInterval(timer);
-  }, []);
-
-  const status = roomNowStatus(entry.room.id, romeTodayIso(), formatRomeHHMM(new Date()));
+  const status = roomNowStatus(entry.room.id, romeTodayIso(), formatRomeHHMM(now));
 
   if (!status) return null;
 

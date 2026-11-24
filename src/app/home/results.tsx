@@ -22,6 +22,7 @@ import {
   type ResultsView,
 } from "../state/store";
 import { capitalise, formatRange, parseIsoDate, romeTodayIso } from "../state/time";
+import { useNow } from "../state/use-now";
 import { cn } from "../../lib/cn";
 import { Button, IconButton } from "../ui/button";
 import { Chip, ChipRow } from "../ui/chip";
@@ -169,6 +170,7 @@ function useDataNotice() {
   const generatedAt = useStore((state) => state.generatedAt);
   const occupancy = useStore((state) => state.occupancy);
   const openingHours = useStore((state) => state.openingHours);
+  const now = useNow();
 
   if (occupancy === "error")
     return (
@@ -181,8 +183,7 @@ function useDataNotice() {
       </Notice>
     );
 
-  if (generatedAt && formatRomeYYYYMMDD(generatedAt) !== formatRomeYYYYMMDD(new Date()))
-    return null;
+  if (generatedAt && formatRomeYYYYMMDD(generatedAt) !== formatRomeYYYYMMDD(now)) return null;
 
   // Occupancy loaded but opening hours did not: rooms are listed as if every
   // building were open, so say so and let the user retry.
